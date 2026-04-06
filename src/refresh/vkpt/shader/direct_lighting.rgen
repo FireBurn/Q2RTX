@@ -142,6 +142,12 @@ direct_lighting(ivec2 ipos, bool is_odd_checkerboard, out vec3 high_freq, out ve
 void
 main() 
 {
+#ifdef KHR_RAY_QUERY
+	if (rt_LaunchID.x >= uint(global_ubo.width / 2) ||
+		rt_LaunchID.y >= uint(global_ubo.height))
+		return;
+#endif
+
 	ivec2 ipos = ivec2(rt_LaunchID.xy);
 	if(rt_LaunchID.z != 0)
 		ipos.x += global_ubo.width / 2;

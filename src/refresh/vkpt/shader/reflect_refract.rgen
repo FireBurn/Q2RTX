@@ -63,6 +63,12 @@ get_primary_ray(vec2 screen_pos)
 void
 main() 
 {
+#ifdef KHR_RAY_QUERY
+	if (rt_LaunchID.x >= uint(global_ubo.width / 2) ||
+		rt_LaunchID.y >= uint(global_ubo.height))
+		return;
+#endif
+
 	ivec2 ipos = ivec2(rt_LaunchID.xy);
 	if(rt_LaunchID.z != 0)
 		ipos.x += global_ubo.width / 2;

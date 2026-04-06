@@ -279,6 +279,9 @@ void main()
             my_slope += push.weights[abs(dx)] * s_Shared[clamp(linear_idx + dx, 0, HISTOGRAM_BINS-1)];
         }
     }
+    // Every invocation must finish the neighbor reads before computePrefixSum
+    // starts overwriting the same shared array.
+    barrier();
 
     // Compute tone curve.
     // Turn slopes into an inclusive prefix sum:

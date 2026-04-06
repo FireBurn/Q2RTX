@@ -3,6 +3,17 @@
 # ZLIB
 #
 
+# The portable FidelityFX target is also buildable as a standalone project.
+# Q2RTX consumes only its library here; its probe and validation executables
+# remain available from a dedicated extern/ffx-vulkan build.
+if(IS_64_BIT AND CONFIG_VKPT_RENDERER AND CONFIG_VKPT_FSR3)
+    set(FFX_VK_PORTABLE_BUILD_TESTS OFF CACHE BOOL
+        "Build the portable FidelityFX Vulkan contract tests" FORCE)
+    set(FFX_VK_PORTABLE_BUILD_PROBE OFF CACHE BOOL
+        "Build the Vulkan device capability probe" FORCE)
+    add_subdirectory(ffx-vulkan)
+endif()
+
 if(USE_SYSTEM_ZLIB)
     find_package(ZLIB REQUIRED)
 

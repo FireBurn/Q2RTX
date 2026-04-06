@@ -47,6 +47,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shader/global_ubo.h"
 #include "shader/global_textures.h"
 #include "shader/vertex_buffer.h"
+#include "temporal_contract.h"
 
 #define LENGTH(a) ((sizeof (a)) / (sizeof(*(a))))
 
@@ -96,10 +97,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	SHADER_MODULE_DO(QVK_MOD_GOD_RAYS_FILTER_COMP)                   \
 	SHADER_MODULE_DO(QVK_MOD_SHADOW_MAP_VERT)                        \
 	SHADER_MODULE_DO(QVK_MOD_COMPOSITING_COMP)                       \
-	SHADER_MODULE_DO(QVK_MOD_FSR_EASU_FP16_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_EASU_FP32_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_RCAS_FP16_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_RCAS_FP32_COMP)                     \
+	/* FSR1 shader modules removed: FSR4 loads SPIR-V directly at runtime */\
 	SHADER_MODULE_DO(QVK_MOD_NORMALIZE_NORMAL_MAP_COMP)              \
 	SHADER_MODULE_DO(QVK_MOD_DEBUG_LINE_FRAG)                        \
 	SHADER_MODULE_DO(QVK_MOD_DEBUG_LINE_VERT)                        \
@@ -198,12 +196,30 @@ typedef struct QVK_s {
 	uint32_t                    gpu_slice_width;
 	uint32_t                    gpu_slice_width_prev;
 	uint32_t                    num_swap_chain_images;
+	uint32_t                    framegen_required_swap_chain_images;
 	VkImage*                    swap_chain_images;
 	VkImageView*                swap_chain_image_views;
+	bool*                       swap_chain_image_initialized;
+	/* A binary semaphore passed to Present must not be re-signaled until the
+	 * presentation engine has consumed it.  Index this array by
+	 * (swapchain-image * device_count + GPU), not frame-in-flight. */
+	VkSemaphore*                swap_chain_render_finished;
+	/* A second acquired image is required for analytical frame generation: one
+	 * generated image then the real image are presented in display order. */
+	VkSemaphore                  framegen_image_available[MAX_FRAMES_IN_FLIGHT];
+	uint32_t                     framegen_generated_swap_chain_image_index;
+	bool                         framegen_present_active;
+	bool                         framegen_generated_frame_ready;
 	
 	bool                        use_ray_query;
 	bool                        enable_validation;
 	bool                        supports_fp16;
+	bool                        supports_int16;
+	bool                        supports_int8;
+	bool                        supports_dot4;
+	bool                        supports_compute_derivatives;
+	bool                        supports_storage_image_extended_formats;
+	bool                        supports_storage_image_write_without_format;
 	bool                        supports_colorspace;
 	bool                        supports_debug_lines;
 	bool                        supports_smooth_lines;
@@ -492,8 +508,6 @@ void create_orthographic_matrix(mat4_t matrix, float xmin, float xmax,
 	PROFILER_DO(BLOOM,                      1) \
 	PROFILER_DO(TONE_MAPPING,               1) \
 	PROFILER_DO(FSR,                        1) \
-	PROFILER_DO(FSR_EASU,                   2) \
-	PROFILER_DO(FSR_RCAS,                   2) \
 	PROFILER_DO(UPDATE_ENVIRONMENT,         1) \
 	PROFILER_DO(GOD_RAYS,                   1) \
 	PROFILER_DO(GOD_RAYS_REFLECT_REFRACT,   1) \
@@ -612,7 +626,14 @@ VkResult vkpt_draw_destroy(void);
 VkResult vkpt_draw_destroy_pipelines(void);
 VkResult vkpt_draw_create_pipelines(void);
 VkResult vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf);
+/* Record the queued UI without consuming it when preserve_queue is true.
+ * Frame generation uses this to compose identical UI over generated and real
+ * scene images; ordinary rendering should use the consuming wrapper above. */
+VkResult vkpt_draw_submit_stretch_pics_ex(VkCommandBuffer cmd_buf, bool preserve_queue);
 VkResult vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D extent, bool filtered, bool warped);
+VkResult vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
+	unsigned int image_index, VkExtent2D extent, bool filtered, bool warped,
+	unsigned int descriptor_slot);
 VkResult vkpt_draw_clear_stretch_pics(void);
 
 VkResult vkpt_uniform_buffer_create(void);
@@ -689,16 +710,64 @@ VkResult vkpt_interleave(VkCommandBuffer cmd_buf);
 VkResult vkpt_taa(VkCommandBuffer cmd_buf);
 VkResult vkpt_asvgf_gradient_reproject(VkCommandBuffer cmd_buf);
 
+/* Provider-neutral temporal resource/lifecycle adapter. */
+void vkpt_temporal_request_reset(uint32_t reasons);
+void vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
+	bool render_world, bool denoised);
+void vkpt_temporal_mark_inputs_ready(void);
+void vkpt_temporal_mark_scene_presented(void);
+void vkpt_temporal_begin_ui_composition(void);
+void vkpt_temporal_end_ui_composition(void);
+void vkpt_temporal_end_frame(bool presented);
+const VkptTemporalFrame *vkpt_temporal_get_frame(void);
+/* Validate the current provider-neutral frame before importing borrowed
+ * images into an external temporal effect. `reason` is optional. */
+bool vkpt_temporal_validate_current_frame(uint32_t required_inputs,
+	char *reason, size_t reason_size);
+
 void vkpt_fsr_init_cvars(void);
+extern cvar_t *cvar_flt_fsr_enable;
+extern cvar_t *cvar_flt_upscaler;
+extern cvar_t *cvar_flt_fsr_quality;
+extern cvar_t *cvar_flt_fsr3_sharpening;
+extern cvar_t *cvar_flt_fsr4_sharpening;
+extern cvar_t *cvar_flt_fsr4_auto_exposure;
+extern cvar_t *cvar_flt_fsr4_dynamic_resolution;
+extern cvar_t *cvar_flt_frame_generation;
+extern cvar_t *cvar_flt_frame_generation_min_rendered_fps;
+extern cvar_t *cvar_flt_frame_generation_active;
+extern cvar_t *cvar_flt_frame_generation_reason;
+extern cvar_t *cvar_flt_frame_generation_rendered_fps;
+extern cvar_t *cvar_flt_frame_generation_generated_fps;
+extern cvar_t *cvar_flt_upscaler_active;
+extern cvar_t *cvar_flt_upscaler_reason;
+void vkpt_fsr_request_reset(void);
 VkResult vkpt_fsr_initialize(void);
 VkResult vkpt_fsr_destroy(void);
 VkResult vkpt_fsr_create_pipelines(void);
 VkResult vkpt_fsr_destroy_pipelines(void);
+bool vkpt_fsr_is_requested(void);
 bool vkpt_fsr_is_enabled(void);
+int vkpt_fsr_requested_render_scale(void);
 bool vkpt_fsr_needs_upscale(void);
+uint32_t vkpt_fsr_jitter_phase_count(void);
 void vkpt_fsr_update_ubo(QVKUniformBuffer_t *ubo);
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf);
 VkResult vkpt_fsr_final_blit(VkCommandBuffer cmd_buf, bool warp);
+/* Analytical FSR3 Frame Generation is recorded after tone mapping.  The
+ * presenter owns acquire/submit/present; this function only records OF/FI. */
+bool vkpt_fsr_frame_generation_is_ready(void);
+bool vkpt_fsr_frame_generation_prepare_present(void);
+void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason);
+void vkpt_fsr_frame_generation_note_present_pair(void);
+VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf);
+
+/* FSR4: global backend override pointer.
+   Set to &fsr4_backend before calling ffxCreate/Dispatch/Query,
+   then cleared to NULL.  Defined in fsr.c, used by ffx_functions_q2rtx.c
+   to route all FFX API calls through the Vulkan backend. */
+#include "fsr4/ffx_fsr4_vk.h"
+extern FfxInterface *g_vkBackendOverride;
 
 VkResult vkpt_bloom_initialize(void);
 VkResult vkpt_bloom_destroy(void);
@@ -895,4 +964,3 @@ VkResult vkpt_debugdraw_destroy(void);
 VkResult vkpt_debugdraw_destroy_pipelines(void);
 
 #endif  /*__VKPT_H__*/
-

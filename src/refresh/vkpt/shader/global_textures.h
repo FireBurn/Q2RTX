@@ -75,8 +75,19 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	IMG_DO(FSR_EASU_OUTPUT,           35, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(FSR_RCAS_OUTPUT,           36, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(CLEAR,                     37, R8G8B8A8_UNORM,      rgba8,   1,                   1              ) \
+	/* Dense, positive-forward primary-surface view Z for temporal providers. */ \
+	IMG_DO(TEMPORAL_VIEW_Z,           38, R32_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	/* Matching conventional Vulkan depth: near=0, far=1. */ \
+	IMG_DO(TEMPORAL_DEVICE_DEPTH,     39, R32_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	/* FSR3 temporal-history controls, written by the primary-surface pass. */ \
+	IMG_DO(TEMPORAL_REACTIVE_MASK,    40, R8_UNORM,            r8,      IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(TEMPORAL_COMPOSITION_MASK, 41, R8_UNORM,            r8,      IMG_WIDTH,           IMG_HEIGHT     ) \
+	/* Dense material inputs for provider-neutral denoising experiments. */ \
+	IMG_DO(TEMPORAL_NORMALS,          42, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(TEMPORAL_ALBEDO,           43, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(TEMPORAL_ROUGHNESS,        44, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
 
-#define NUM_IMAGES_BASE     38
+#define NUM_IMAGES_BASE     45
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
@@ -89,8 +100,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	IMG_DO(PT_BASE_COLOR_B,           NUM_IMAGES_BASE + 7,  R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_METALLIC_A,             NUM_IMAGES_BASE + 8,  R8G8_UNORM,          rg8,     IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_METALLIC_B,             NUM_IMAGES_BASE + 9,  R8G8_UNORM,          rg8,     IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
-	IMG_DO(PT_VIEW_DEPTH_A,           NUM_IMAGES_BASE + 10, R16_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
-	IMG_DO(PT_VIEW_DEPTH_B,           NUM_IMAGES_BASE + 11, R16_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(PT_VIEW_DEPTH_A,           NUM_IMAGES_BASE + 10, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(PT_VIEW_DEPTH_B,           NUM_IMAGES_BASE + 11, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(PT_NORMAL_A,               NUM_IMAGES_BASE + 12, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_NORMAL_B,               NUM_IMAGES_BASE + 13, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_GEO_NORMAL_A,           NUM_IMAGES_BASE + 14, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
@@ -121,8 +132,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	IMG_DO(PT_BASE_COLOR_A,           NUM_IMAGES_BASE + 7,  R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_METALLIC_B,             NUM_IMAGES_BASE + 8,  R8G8_UNORM,          rg8,     IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_METALLIC_A,             NUM_IMAGES_BASE + 9,  R8G8_UNORM,          rg8,     IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
-	IMG_DO(PT_VIEW_DEPTH_B,           NUM_IMAGES_BASE + 10, R16_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
-	IMG_DO(PT_VIEW_DEPTH_A,           NUM_IMAGES_BASE + 11, R16_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(PT_VIEW_DEPTH_B,           NUM_IMAGES_BASE + 10, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(PT_VIEW_DEPTH_A,           NUM_IMAGES_BASE + 11, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(PT_NORMAL_B,               NUM_IMAGES_BASE + 12, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_NORMAL_A,               NUM_IMAGES_BASE + 13, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
 	IMG_DO(PT_GEO_NORMAL_B,           NUM_IMAGES_BASE + 14, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
@@ -199,6 +210,7 @@ layout(
 #define SAMPLER_r32ui   usampler2D
 #define SAMPLER_rg32ui  usampler2D
 #define SAMPLER_r32i    isampler2D
+#define SAMPLER_r16f    sampler2D
 #define SAMPLER_r32f    sampler2D
 #define SAMPLER_rg32f   sampler2D
 #define SAMPLER_rg16f   sampler2D
@@ -212,6 +224,7 @@ layout(
 #define IMAGE_r32ui   uimage2D
 #define IMAGE_rg32ui  uimage2D
 #define IMAGE_r32i    iimage2D
+#define IMAGE_r16f    image2D
 #define IMAGE_r32f    image2D
 #define IMAGE_rg32f   image2D
 #define IMAGE_rg16f   image2D

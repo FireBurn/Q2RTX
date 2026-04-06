@@ -4,6 +4,7 @@ cmake_policy(SET CMP0069 NEW)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 project(quake2-RTX)
+include(CTest)
 set(Q2RTX_VERSION_MAJOR 1)
 set(Q2RTX_VERSION_MINOR 8)
 set(Q2RTX_VERSION_POINT 1)
@@ -27,6 +28,7 @@ execute_process(
 
 OPTION(CONFIG_GL_RENDERER "Enable GL renderer" ON)
 OPTION(CONFIG_VKPT_RENDERER "Enable VKPT renderer" ON)
+OPTION(CONFIG_VKPT_FSR3 "Build the native Vulkan FSR 3 upscaler" ON)
 OPTION(CONFIG_VKPT_ENABLE_DEVICE_GROUPS "Enable device groups (multi-gpu) support" ON)
 OPTION(CONFIG_VKPT_ENABLE_IMAGE_DUMPS "Enable image dumping functionality" OFF)
 OPTION(CONFIG_USE_CURL "Use CURL for HTTP support" ON)

@@ -473,7 +473,9 @@ Ray get_shadow_ray(vec3 p1, vec3 p2, float tmin)
 	Ray ray;
 	ray.origin = p1 + l * tmin;
 	ray.t_min = 0;
-	ray.t_max = dist - tmin - 0.01;
+	// Keep the endpoint bias from producing an invalid negative ray segment
+	// when the sampled light position is at (or very close to) the surface.
+	ray.t_max = max(ray.t_min, dist - tmin - 0.01);
 	ray.direction = l;
 
 	return ray;

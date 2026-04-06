@@ -184,4 +184,19 @@ void main()
         imageStore(IMG_FLAT_MOTION, opos, imageLoad(IMG_PT_MOTION, ipos));
     else
         imageStore(IMG_FLAT_MOTION, opos, imageLoad(IMG_PT_MOTION, ipos + ivec2(other_side_offset, 0)));
+
+    /* Export unfiltered primary material inputs at the same dense render
+     * coordinates as FLAT_COLOR.  These are deliberately independent of the
+     * denoiser output: a future temporal denoiser/Ray Regeneration adapter
+     * needs stable surface identity rather than post-filtered radiance. The
+     * geometric normal is valid for cameras/screens too, unlike PT_NORMAL's
+     * camera-UV encoding. */
+    uint packed_geo_normal = imageLoad(IMG_PT_GEO_NORMAL_A, ipos).x;
+    vec3 geo_normal = packed_geo_normal != 0u
+        ? decode_normal(packed_geo_normal) : vec3(0.0);
+    vec4 base_color = imageLoad(IMG_PT_BASE_COLOR_A, ipos);
+    float roughness = imageLoad(IMG_PT_METALLIC_A, ipos).y;
+    imageStore(IMG_TEMPORAL_NORMALS, opos, vec4(geo_normal, 1.0));
+    imageStore(IMG_TEMPORAL_ALBEDO, opos, base_color);
+    imageStore(IMG_TEMPORAL_ROUGHNESS, opos, vec4(roughness));
 }

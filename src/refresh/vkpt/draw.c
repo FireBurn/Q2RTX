@@ -44,6 +44,10 @@ enum
 
 #define TEXNUM_WHITE (~0)
 #define MAX_STRETCH_PICS (1<<14)
+/* A generated and a real frame may be recorded from the same engine frame.
+ * They need distinct writable final-blit descriptors while their command
+ * buffers are in flight. */
+#define FINAL_BLIT_SETS_PER_FRAME 2
 
 static drawStatic_t draw = {
 	.scale = 1.0f,
@@ -71,6 +75,7 @@ static clipRect_t clip_rect;
 static bool clip_enable = false;
 
 static StretchPic_t stretch_pic_queue[MAX_STRETCH_PICS];
+static bool stretch_pic_queue_uploaded = false;
 
 static VkPipelineLayout        pipeline_layout_stretch_pic;
 static VkPipelineLayout        pipeline_layout_final_blit;
@@ -88,7 +93,8 @@ static VkDescriptorPool        desc_pool_ubo;
 static VkDescriptorPool        desc_pool_final_blit;
 static VkDescriptorSet         desc_set_sbo[MAX_FRAMES_IN_FLIGHT];
 static VkDescriptorSet         desc_set_ubo[MAX_FRAMES_IN_FLIGHT];
-static VkDescriptorSet         desc_set_final_blit[MAX_FRAMES_IN_FLIGHT];
+static VkDescriptorSet         desc_set_final_blit[
+    MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME];
 
 extern cvar_t* cvar_ui_hdr_nits;
 extern cvar_t* cvar_tm_hdr_saturation_scale;
@@ -188,6 +194,7 @@ static inline void enqueue_stretch_pic(
 
 	sp->color = color;
 	sp->tex_handle = tex_handle;
+	stretch_pic_queue_uploaded = false;
 	if(tex_handle >= 0 && tex_handle < MAX_RIMAGES
 	&& !r_images[tex_handle].registration_sequence) {
 		sp->tex_handle = TEXNUM_WHITE;
@@ -358,11 +365,11 @@ vkpt_draw_initialize()
 	VkDescriptorPoolSize pool_size_final_blit[] = {
 		{
 			.type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.descriptorCount = MAX_FRAMES_IN_FLIGHT,
+			.descriptorCount = MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME,
 		},
 		{
 			.type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.descriptorCount = MAX_FRAMES_IN_FLIGHT,
+			.descriptorCount = MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME,
 		},
 	};
 
@@ -370,7 +377,7 @@ vkpt_draw_initialize()
 		.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.poolSizeCount = LENGTH(pool_size_final_blit),
 		.pPoolSizes    = pool_size_final_blit,
-		.maxSets       = MAX_FRAMES_IN_FLIGHT,
+		.maxSets       = MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME,
 	};
 
 	_VK(vkCreateDescriptorPool(qvk.device, &pool_info_final_blit, NULL, &desc_pool_final_blit));
@@ -440,7 +447,11 @@ vkpt_draw_initialize()
 
 		vkUpdateDescriptorSets(qvk.device, 1, &output_buf_write_ubo, 0, NULL);
 
-		_VK(vkAllocateDescriptorSets(qvk.device, &descriptor_set_alloc_info_final_blit, desc_set_final_blit + i));
+		for (int slot = 0; slot < FINAL_BLIT_SETS_PER_FRAME; ++slot) {
+			_VK(vkAllocateDescriptorSets(qvk.device,
+				&descriptor_set_alloc_info_final_blit,
+				desc_set_final_blit + i * FINAL_BLIT_SETS_PER_FRAME + slot));
+		}
 	}
 	return VK_SUCCESS;
 }
@@ -701,27 +712,32 @@ VkResult
 vkpt_draw_clear_stretch_pics()
 {
 	num_stretch_pics = 0;
+	stretch_pic_queue_uploaded = false;
 	return VK_SUCCESS;
 }
 
 VkResult
-vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf)
+vkpt_draw_submit_stretch_pics_ex(VkCommandBuffer cmd_buf, bool preserve_queue)
 {
 	if (num_stretch_pics == 0)
 		return VK_SUCCESS;
 
-	BufferResource_t *buf_spq = buf_stretch_pic_queue + qvk.current_frame_index;
-	StretchPic_t *spq_dev = (StretchPic_t *) buffer_map(buf_spq);
-	memcpy(spq_dev, stretch_pic_queue, sizeof(StretchPic_t) * num_stretch_pics);
-	buffer_unmap(buf_spq);
-	spq_dev = NULL;
+	/* A generated and real present replay exactly the same queued UI. Upload
+	 * once, then only record the second draw: host-writing the per-frame buffer
+	 * while the generated submission reads it is a Vulkan data race. */
+	if (!stretch_pic_queue_uploaded) {
+		BufferResource_t *buf_spq = buf_stretch_pic_queue + qvk.current_frame_index;
+		StretchPic_t *spq_dev = (StretchPic_t *) buffer_map(buf_spq);
+		memcpy(spq_dev, stretch_pic_queue, sizeof(StretchPic_t) * num_stretch_pics);
+		buffer_unmap(buf_spq);
 
-	BufferResource_t *ubo_res = buf_ubo + qvk.current_frame_index;
-	StretchPic_UBO_t *ubo = (StretchPic_UBO_t *) buffer_map(ubo_res);
-	ubo->hdr_color_scale = cvar_ui_hdr_nits->value * 0.0125;
-	ubo->tm_hdr_saturation_scale = cvar_tm_hdr_saturation_scale->value;
-	buffer_unmap(ubo_res);
-	ubo = NULL;
+		BufferResource_t *ubo_res = buf_ubo + qvk.current_frame_index;
+		StretchPic_UBO_t *ubo = (StretchPic_UBO_t *) buffer_map(ubo_res);
+		ubo->hdr_color_scale = cvar_ui_hdr_nits->value * 0.0125;
+		ubo->tm_hdr_saturation_scale = cvar_tm_hdr_saturation_scale->value;
+		buffer_unmap(ubo_res);
+		stretch_pic_queue_uploaded = true;
+	}
 
 	VkRenderPassBeginInfo render_pass_info = {
 		.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -744,13 +760,27 @@ vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf)
 	vkCmdDraw(cmd_buf, 4, num_stretch_pics, 0, 0);
 	vkCmdEndRenderPass(cmd_buf);
 
-	num_stretch_pics = 0;
+	if (!preserve_queue) {
+		num_stretch_pics = 0;
+		stretch_pic_queue_uploaded = false;
+	}
 	return VK_SUCCESS;
 }
 
 VkResult
-vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D extent, bool filtered, bool warped)
+vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf)
 {
+	return vkpt_draw_submit_stretch_pics_ex(cmd_buf, false);
+}
+
+VkResult
+vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
+	unsigned int image_index, VkExtent2D extent, bool filtered, bool warped,
+	unsigned int descriptor_slot)
+{
+	assert(descriptor_slot < FINAL_BLIT_SETS_PER_FRAME);
+	VkDescriptorSet final_blit_set = desc_set_final_blit[
+		qvk.current_frame_index * FINAL_BLIT_SETS_PER_FRAME + descriptor_slot];
 	VkDescriptorImageInfo img_info_input = {
 		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
 		.imageView   = qvk.images_views[image_index],
@@ -767,7 +797,7 @@ vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D ex
 	VkWriteDescriptorSet elem_images[] = {
 		{
 			.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet          = desc_set_final_blit[qvk.current_frame_index],
+			.dstSet          = final_blit_set,
 			.dstBinding      = 0,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -776,7 +806,7 @@ vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D ex
 		},
 		{
 			.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet          = desc_set_final_blit[qvk.current_frame_index],
+			.dstSet          = final_blit_set,
 			.dstBinding      = 1,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
@@ -797,7 +827,7 @@ vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D ex
 
 	VkDescriptorSet desc_sets[] = {
 		qvk.desc_set_ubo,
-		desc_set_final_blit[qvk.current_frame_index]
+		final_blit_set
 	};
 
 	FinalBlitPushConstants_t push_constants = {.input_dimensions = {extent.width, extent.height}};
@@ -813,6 +843,14 @@ vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D ex
 	vkCmdEndRenderPass(cmd_buf);
 
 	return VK_SUCCESS;
+}
+
+VkResult
+vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
+	VkExtent2D extent, bool filtered, bool warped)
+{
+	return vkpt_final_blit_with_descriptor_slot(cmd_buf, image_index, extent,
+		filtered, warped, 0);
 }
 
 void R_SetClipRect_RTX(const clipRect_t *clip) 

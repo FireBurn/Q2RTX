@@ -174,7 +174,8 @@ VkptInit_t vkpt_initialization[] = {
 	{ "tonemap",  vkpt_tone_mapping_initialize,        vkpt_tone_mapping_destroy,            VKPT_INIT_DEFAULT,            0 },
 	{ "tonemap|", vkpt_tone_mapping_create_pipelines,  vkpt_tone_mapping_destroy_pipelines,  VKPT_INIT_RELOAD_SHADER,      0 },
 	{ "fsr",      vkpt_fsr_initialize,                 vkpt_fsr_destroy,                     VKPT_INIT_DEFAULT,            0 },
-	{ "fsr|",     vkpt_fsr_create_pipelines,           vkpt_fsr_destroy_pipelines,           VKPT_INIT_RELOAD_SHADER,      0 },
+	{ "fsr|",     vkpt_fsr_create_pipelines,           vkpt_fsr_destroy_pipelines,           VKPT_INIT_SWAPCHAIN_RECREATE
+	                                                                                         | VKPT_INIT_RELOAD_SHADER,      0 },
 
 	{ "physicalSky", vkpt_physical_sky_initialize,         vkpt_physical_sky_destroy,            VKPT_INIT_DEFAULT,        0 },
 	{ "physicalSky|", vkpt_physical_sky_create_pipelines,  vkpt_physical_sky_destroy_pipelines,  VKPT_INIT_RELOAD_SHADER,  0 },
@@ -233,12 +234,20 @@ static inline bool extents_equal(VkExtent2D a, VkExtent2D b)
 
 static VkExtent2D get_render_extent(void)
 {
-	int scale;
-	if(drs_effective_scale)
+	int scale = vkpt_fsr_requested_render_scale();
+	const bool fsr_dynamic_resolution = vkpt_fsr_is_requested() && scale == 0;
+	/* Fixed-ratio FSR models own their exact scale. The explicit FSR4 DRS model
+	 * returns zero here, deliberately restoring the existing bounded profiler
+	 * controller instead of using a static graph at an arbitrary ratio. */
+	if(scale <= 0 && drs_effective_scale)
 	{
 		scale = drs_effective_scale;
 	}
-	else
+	/* An upscaler's render input must not exceed its display output. The legacy
+	 * Q2RTX DRS controller legitimately permits supersampling up to 200% when
+	 * TAA is selected, but the explicit FSR4 DRS model must cap that controller
+	 * at native resolution. */
+	if(scale <= 0)
 	{
 		scale = scr_viewsize->integer;
 		if(cvar_drs_enable->integer)
@@ -247,6 +256,8 @@ static VkExtent2D get_render_extent(void)
 			scale = min(cvar_drs_maxscale->integer, scale);
 		}
 	}
+	if (fsr_dynamic_resolution)
+		scale = min(scale, 100);
 
 	VkExtent2D result;
 	result.width = (uint32_t)(qvk.extent_unscaled.width * (float)scale / 100.f);
@@ -260,13 +271,15 @@ static VkExtent2D get_render_extent(void)
 static VkExtent2D get_screen_image_extent(void)
 {
 	VkExtent2D result;
-	if (cvar_drs_enable->integer)
+	if (vkpt_fsr_is_requested())
+	{
+		/* Fixed-model providers always reconstruct to the display extent.  Ignore
+		 * legacy DRS allocation ranges while one is requested. */
+		result = qvk.extent_unscaled;
+	}
+	else if (cvar_drs_enable->integer)
 	{
 		int image_scale = max(cvar_drs_minscale->integer, cvar_drs_maxscale->integer);
-
-		// In case FSR enable we'll always upscale to 100% and thus need at least the unscaled extent
-		if(vkpt_fsr_is_enabled())
-			image_scale = max(image_scale, 100);
 
 		result.width = (uint32_t)(qvk.extent_unscaled.width * (float)image_scale / 100.f);
 		result.height = (uint32_t)(qvk.extent_unscaled.height * (float)image_scale / 100.f);
@@ -277,7 +290,11 @@ static VkExtent2D get_screen_image_extent(void)
 		result.height = max(qvk.extent_render.height, qvk.extent_unscaled.height);
 	}
 
-	result.width = (result.width + 1) & ~1;
+	/* Temporal providers may dispatch in 8-pixel output tiles.  Keep image
+	 * allocations padded even when a window extent is not tile-aligned; valid
+	 * render/display extents remain unchanged. */
+	result.width = (result.width + 7u) & ~7u;
+	result.height = (result.height + 7u) & ~7u;
 
 	return result;
 }
@@ -297,6 +314,8 @@ vkpt_initialize_all(VkptInitFlags_t init_flags)
 
 	qvk.extent_taa_images.width = max(qvk.extent_screen_images.width, qvk.extent_unscaled.width);
 	qvk.extent_taa_images.height = max(qvk.extent_screen_images.height, qvk.extent_unscaled.height);
+	qvk.extent_taa_images.width = (qvk.extent_taa_images.width + 7u) & ~7u;
+	qvk.extent_taa_images.height = (qvk.extent_taa_images.height + 7u) & ~7u;
 
 	qvk.gpu_slice_width = (qvk.extent_render.width + qvk.device_count - 1) / qvk.device_count;
 
@@ -467,7 +486,8 @@ static const char *optional_instance_extension_name[NUM_OPTIONAL_INSTANCE_EXTENS
 #define OPTIONAL_DEVICE_EXTENSIONS					\
 	VK_OPT_EXT_DO(VK_KHR_LINE_RASTERIZATION)		\
 	VK_OPT_EXT_DO(VK_KHR_SHADER_NON_SEMANTIC_INFO)	\
-	VK_OPT_EXT_DO(VK_EXT_DEBUG_MARKER)
+	VK_OPT_EXT_DO(VK_EXT_DEBUG_MARKER)				\
+	VK_OPT_EXT_DO(VK_KHR_COMPUTE_SHADER_DERIVATIVES)
 
 enum optional_device_extension_id
 {
@@ -489,7 +509,7 @@ static const VkApplicationInfo vk_app_info = {
 	.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
 	.pEngineName        = "vkpt",
 	.engineVersion      = VK_MAKE_VERSION(1, 0, 0),
-	.apiVersion         = VK_API_VERSION_1_2,
+	.apiVersion         = VK_API_VERSION_1_3,
 };
 
 /* use this to override file names */
@@ -701,7 +721,16 @@ create_swapchain(void)
 		qvk.extent_unscaled.height = max(surf_capabilities.minImageExtent.height, qvk.extent_unscaled.height);
 	}
 
-	uint32_t num_images = max(surf_capabilities.minImageCount, 2);
+	/* Two images may be acquired by an FG render while the presentation engine
+	 * retains its minimum set. Request min+2 rather than assuming a fixed count:
+	 * RADV's min=3 surface still intermittently rejects a second acquire from a
+	 * 4-image chain. */
+	qvk.framegen_required_swap_chain_images =
+		surf_capabilities.minImageCount + 2u;
+	uint32_t requested_image_count =
+		(cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0)
+			? qvk.framegen_required_swap_chain_images : 2u;
+	uint32_t num_images = max(surf_capabilities.minImageCount, requested_image_count);
 	if(surf_capabilities.maxImageCount > 0)
 		num_images = min(num_images, surf_capabilities.maxImageCount);
 
@@ -736,6 +765,17 @@ create_swapchain(void)
 	assert(qvk.num_swap_chain_images);
 	qvk.swap_chain_images = malloc(qvk.num_swap_chain_images * sizeof(*qvk.swap_chain_images));
 	vkGetSwapchainImagesKHR(qvk.device, qvk.swap_chain, &qvk.num_swap_chain_images, qvk.swap_chain_images);
+	qvk.swap_chain_image_initialized = calloc(qvk.num_swap_chain_images,
+		sizeof(*qvk.swap_chain_image_initialized));
+	if (!qvk.swap_chain_image_initialized) {
+		Com_EPrintf("out of memory tracking swapchain image state\n");
+		free(qvk.swap_chain_images);
+		qvk.swap_chain_images = NULL;
+		qvk.num_swap_chain_images = 0;
+		vkDestroySwapchainKHR(qvk.device, qvk.swap_chain, NULL);
+		qvk.swap_chain = VK_NULL_HANDLE;
+		return VK_ERROR_OUT_OF_HOST_MEMORY;
+	}
 
 	qvk.swap_chain_image_views = malloc(qvk.num_swap_chain_images * sizeof(*qvk.swap_chain_image_views));
 	for(int i = 0; i < qvk.num_swap_chain_images; i++) {
@@ -764,39 +804,70 @@ create_swapchain(void)
 		if(vkCreateImageView(qvk.device, &img_create_info, NULL, qvk.swap_chain_image_views + i) != VK_SUCCESS) {
 			Com_EPrintf("error creating image view!");
 
+			for (int j = 0; j < i; ++j)
+				vkDestroyImageView(qvk.device, qvk.swap_chain_image_views[j], NULL);
 			free(qvk.swap_chain_image_views);
 			qvk.swap_chain_image_views = NULL;
 
 			free(qvk.swap_chain_images);
 			qvk.swap_chain_images = NULL;
+			free(qvk.swap_chain_image_initialized);
+			qvk.swap_chain_image_initialized = NULL;
 
 			qvk.num_swap_chain_images = 0;
-			return 1;
+			vkDestroySwapchainKHR(qvk.device, qvk.swap_chain, NULL);
+			qvk.swap_chain = VK_NULL_HANDLE;
+			return VK_ERROR_INITIALIZATION_FAILED;
 		}
 	}
 
-	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
-
-	for (int image_index = 0; image_index < qvk.num_swap_chain_images; image_index++)
-	{
-		IMAGE_BARRIER(cmd_buf,
-			.image = qvk.swap_chain_images[image_index],
-			.subresourceRange = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = 1
-			},
-			.srcAccessMask = 0,
-			.dstAccessMask = 0,
-			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-		);
+	const size_t render_semaphore_count =
+		(size_t)qvk.num_swap_chain_images * (size_t)qvk.device_count;
+	qvk.swap_chain_render_finished = calloc(render_semaphore_count,
+		sizeof(*qvk.swap_chain_render_finished));
+	if (!qvk.swap_chain_render_finished) {
+		Com_EPrintf("out of memory allocating swapchain render semaphores\n");
+		for (uint32_t i = 0; i < qvk.num_swap_chain_images; ++i)
+			vkDestroyImageView(qvk.device, qvk.swap_chain_image_views[i], NULL);
+		free(qvk.swap_chain_image_views);
+		free(qvk.swap_chain_images);
+		free(qvk.swap_chain_image_initialized);
+		qvk.swap_chain_image_views = NULL;
+		qvk.swap_chain_images = NULL;
+		qvk.swap_chain_image_initialized = NULL;
+		qvk.num_swap_chain_images = 0;
+		vkDestroySwapchainKHR(qvk.device, qvk.swap_chain, NULL);
+		qvk.swap_chain = VK_NULL_HANDLE;
+		return VK_ERROR_OUT_OF_HOST_MEMORY;
 	}
 
-	vkpt_submit_command_buffer_simple(cmd_buf, qvk.queue_graphics, true);
-	vkpt_wait_idle(qvk.queue_graphics, &qvk.cmd_buffers_graphics);
+	VkSemaphoreCreateInfo render_semaphore_info = {
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+	for (size_t i = 0; i < render_semaphore_count; ++i) {
+		VkResult result = vkCreateSemaphore(qvk.device, &render_semaphore_info,
+			NULL, &qvk.swap_chain_render_finished[i]);
+		if (result != VK_SUCCESS) {
+			Com_EPrintf("error creating swapchain render semaphore\n");
+			for (size_t j = 0; j < i; ++j)
+				vkDestroySemaphore(qvk.device,
+					qvk.swap_chain_render_finished[j], NULL);
+			free(qvk.swap_chain_render_finished);
+			qvk.swap_chain_render_finished = NULL;
+			for (uint32_t j = 0; j < qvk.num_swap_chain_images; ++j)
+				vkDestroyImageView(qvk.device, qvk.swap_chain_image_views[j], NULL);
+			free(qvk.swap_chain_image_views);
+			free(qvk.swap_chain_images);
+			free(qvk.swap_chain_image_initialized);
+			qvk.swap_chain_image_views = NULL;
+			qvk.swap_chain_images = NULL;
+			qvk.swap_chain_image_initialized = NULL;
+			qvk.num_swap_chain_images = 0;
+			vkDestroySwapchainKHR(qvk.device, qvk.swap_chain, NULL);
+			qvk.swap_chain = VK_NULL_HANDLE;
+			return result;
+		}
+	}
 
 	return VK_SUCCESS;
 }
@@ -819,6 +890,12 @@ create_command_pool_and_fences(void)
 	/* fences and semaphores */
 	for (int frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++)
 	{
+		VkSemaphoreCreateInfo framegen_semaphore_info = {
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+		};
+		_VK(vkCreateSemaphore(qvk.device, &framegen_semaphore_info, NULL,
+			&qvk.framegen_image_available[frame]));
+		ATTACH_LABEL_VARIABLE(qvk.framegen_image_available[frame], SEMAPHORE);
 		for (int gpu = 0; gpu < qvk.device_count; gpu++)
 		{
 			semaphore_group_t* group = &qvk.semaphores[frame][gpu];
@@ -1229,7 +1306,9 @@ init_vulkan(void)
 		}
 	}
 
-	// Query device 16-bit float capabilities
+	// Query optional arithmetic features used by renderer/provider paths.  Do
+	// not request unsupported FSR4 features unconditionally: Q2RTX must still
+	// start on devices that will use TAA/FSR3 fallbacks.
 	VkPhysicalDevice16BitStorageFeatures features_16bit_storage = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
 	};
@@ -1238,23 +1317,48 @@ init_vulkan(void)
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 			.pNext = &features_16bit_storage
 		};
+		VkPhysicalDeviceVulkan13Features device_features_1_3 = {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+			.pNext = &device_features_1_2
+		};
 		VkPhysicalDeviceFeatures2 device_features = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR,
-			.pNext = &device_features_1_2
+			.pNext = &device_features_1_3
+		};
+		VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR device_features_derivatives = {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR,
 		};
 		VkPhysicalDeviceLineRasterizationFeaturesKHR device_features_lines = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_KHR,
 		};
+		if (available_optional_device_extensions[OPT_EXT_VK_KHR_COMPUTE_SHADER_DERIVATIVES]) {
+			device_features_derivatives.pNext = device_features.pNext;
+			device_features.pNext = &device_features_derivatives;
+		}
 		if (available_optional_device_extensions[OPT_EXT_VK_KHR_LINE_RASTERIZATION]) {
 			device_features_lines.pNext = device_features.pNext;
 			device_features.pNext = &device_features_lines;
 		}
 		vkGetPhysicalDeviceFeatures2(qvk.physical_device, &device_features);
 		qvk.supports_fp16 = device_features_1_2.shaderFloat16 && features_16bit_storage.storageBuffer16BitAccess;
+		qvk.supports_int16 = device_features.features.shaderInt16;
+		qvk.supports_int8 = device_features_1_2.shaderInt8;
+		qvk.supports_dot4 = device_features_1_3.shaderIntegerDotProduct;
+		qvk.supports_compute_derivatives =
+			available_optional_device_extensions[OPT_EXT_VK_KHR_COMPUTE_SHADER_DERIVATIVES] &&
+			device_features_derivatives.computeDerivativeGroupLinear;
+		qvk.supports_storage_image_extended_formats =
+			device_features.features.shaderStorageImageExtendedFormats;
+		qvk.supports_storage_image_write_without_format =
+			device_features.features.shaderStorageImageWriteWithoutFormat;
 		qvk.supports_debug_lines = device_features.features.fillModeNonSolid && device_features.features.wideLines;
 		qvk.supports_smooth_lines = qvk.supports_debug_lines && device_features_lines.smoothLines;
 	}
 	Com_Printf("FP16 support: %s\n", qvk.supports_fp16 ? "yes" : "no");
+	Com_Printf("INT8/DOT4 support: %s/%s\n",
+		qvk.supports_int8 ? "yes" : "no", qvk.supports_dot4 ? "yes" : "no");
+	Com_Printf("Compute derivative group-linear support: %s\n",
+		qvk.supports_compute_derivatives ? "yes" : "no");
 	Com_Printf("Debug lines support: %s%s\n", qvk.supports_debug_lines ? "yes" : "no", qvk.supports_smooth_lines ? " (smooth)" : "");
 
 	vkGetPhysicalDeviceMemoryProperties(qvk.physical_device, &qvk.mem_properties);
@@ -1347,6 +1451,7 @@ init_vulkan(void)
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 		.descriptorIndexing = VK_TRUE,
 		.shaderFloat16 = qvk.supports_fp16,
+		.shaderInt8 = qvk.supports_int8,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
 		.runtimeDescriptorArray = VK_TRUE,
@@ -1354,9 +1459,14 @@ init_vulkan(void)
 		.bufferDeviceAddress = VK_TRUE,
 		.bufferDeviceAddressMultiDevice = qvk.device_count > 1 ? VK_TRUE : VK_FALSE,
 	};
+	VkPhysicalDeviceVulkan13Features device_features_vk13 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		.pNext = &device_features_vk12,
+		.shaderIntegerDotProduct = qvk.supports_dot4,
+	};
 	VkPhysicalDeviceFeatures2 device_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR,
-		.pNext = &device_features_vk12,
+		.pNext = &device_features_vk13,
 		.features = {
 			.robustBufferAccess = VK_TRUE,
 			.fullDrawIndexUint32 = VK_TRUE,
@@ -1387,10 +1497,10 @@ init_vulkan(void)
 			.fragmentStoresAndAtomics = VK_FALSE,
 			.shaderTessellationAndGeometryPointSize = VK_FALSE,
 			.shaderImageGatherExtended = VK_FALSE,
-			.shaderStorageImageExtendedFormats = VK_TRUE,
+			.shaderStorageImageExtendedFormats = qvk.supports_storage_image_extended_formats,
 			.shaderStorageImageMultisample = VK_FALSE,
 			.shaderStorageImageReadWithoutFormat = VK_FALSE,
-			.shaderStorageImageWriteWithoutFormat = VK_FALSE,
+			.shaderStorageImageWriteWithoutFormat = qvk.supports_storage_image_write_without_format,
 			.shaderUniformBufferArrayDynamicIndexing = VK_TRUE,
 			.shaderSampledImageArrayDynamicIndexing = VK_TRUE,
 			.shaderStorageBufferArrayDynamicIndexing = VK_TRUE,
@@ -1399,7 +1509,7 @@ init_vulkan(void)
 			.shaderCullDistance = VK_FALSE,
 			.shaderFloat64 = VK_FALSE,
 			.shaderInt64 = VK_FALSE,
-			.shaderInt16 = qvk.supports_fp16,
+			.shaderInt16 = qvk.supports_int16,
 			.shaderResourceResidency = VK_FALSE,
 			.shaderResourceMinLod = VK_FALSE,
 			.sparseBinding = VK_FALSE,
@@ -1464,6 +1574,15 @@ init_vulkan(void)
 	if (qvk.supports_smooth_lines) {
 		line_rast_feat.pNext = device_features.pNext;
 		device_features.pNext = &line_rast_feat;
+	}
+
+	VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR cs_deriv_feat = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR,
+		.computeDerivativeGroupLinear = VK_TRUE,
+	};
+	if (qvk.supports_compute_derivatives) {
+		cs_deriv_feat.pNext = device_features.pNext;
+		device_features.pNext = &cs_deriv_feat;
 	}
 
 	/* create device and queue */
@@ -1594,6 +1713,16 @@ vkpt_destroy_shader_modules()
 VkResult
 destroy_swapchain(void)
 {
+	for (size_t i = 0;
+		i < (size_t)qvk.num_swap_chain_images * (size_t)qvk.device_count;
+		++i) {
+		if (qvk.swap_chain_render_finished &&
+			qvk.swap_chain_render_finished[i] != VK_NULL_HANDLE)
+			vkDestroySemaphore(qvk.device, qvk.swap_chain_render_finished[i], NULL);
+	}
+	free(qvk.swap_chain_render_finished);
+	qvk.swap_chain_render_finished = NULL;
+
 	for(int i = 0; i < qvk.num_swap_chain_images; i++) {
 		vkDestroyImageView  (qvk.device, qvk.swap_chain_image_views[i], NULL);
 		qvk.swap_chain_image_views[i] = VK_NULL_HANDLE;
@@ -1603,6 +1732,8 @@ destroy_swapchain(void)
 
 	free(qvk.swap_chain_images);
 	qvk.swap_chain_images = NULL;
+	free(qvk.swap_chain_image_initialized);
+	qvk.swap_chain_image_initialized = NULL;
 
 	qvk.num_swap_chain_images = 0;
 
@@ -1622,6 +1753,7 @@ destroy_vulkan(void)
 
 	for (int frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++)
 	{
+		vkDestroySemaphore(qvk.device, qvk.framegen_image_available[frame], NULL);
 		for (int gpu = 0; gpu < qvk.device_count; gpu++)
 		{
 			semaphore_group_t* group = &qvk.semaphores[frame][gpu];
@@ -2627,6 +2759,15 @@ evaluate_taa_settings(const reference_mode_t* ref_mode)
 	qvk.effective_aa_mode = AA_MODE_OFF;
 	qvk.extent_taa_output = qvk.extent_render;
 
+	/* Temporal super resolution replaces Q2RTX's TAA/TAAU and always produces
+	 * a display-resolution scene for the existing post-processing chain. */
+	if (vkpt_fsr_is_enabled())
+	{
+		qvk.effective_aa_mode = AA_MODE_UPSCALE;
+		qvk.extent_taa_output = qvk.extent_unscaled;
+		return;
+	}
+
 	if (!ref_mode->enable_denoiser)
 		return;
 
@@ -2913,9 +3054,12 @@ prepare_ubo(refdef_t *fd, mleaf_t* viewleaf, const reference_mode_t* ref_mode, c
 		ubo->flt_taa = 0;
 	}
 
-	if (qvk.effective_aa_mode == AA_MODE_UPSCALE)
+	if (qvk.effective_aa_mode == AA_MODE_UPSCALE || fsr_enabled)
 	{
-		int taa_index = (int)(qvk.frame_counter % NUM_TAA_SAMPLES);
+		uint32_t phase_count = fsr_enabled
+			? vkpt_fsr_jitter_phase_count() : NUM_TAA_SAMPLES;
+		phase_count = max(1u, min((uint32_t)NUM_TAA_SAMPLES, phase_count));
+		int taa_index = (int)(qvk.frame_counter % phase_count);
 		ubo->sub_pixel_jitter[0] = taa_samples[taa_index][0];
 		ubo->sub_pixel_jitter[1] = taa_samples[taa_index][1];
 	}
@@ -3022,6 +3166,10 @@ R_RenderFrame_RTX(refdef_t *fd)
 	reference_mode_t ref_mode;
 	evaluate_reference_mode(&ref_mode);
 	evaluate_taa_settings(&ref_mode);
+	/* A temporal provider owns valid history even when ASVGF is disabled.  Keep
+	 * this separate from the denoiser state so FSR does not reset every frame in
+	 * the useful raw/composited rendering configuration. */
+	bool temporal_upscaler_ran = false;
 	
 	qvk.frame_menu_mode = cl_paused->integer == 1 && uis.menuDepth > 0 && render_world;
 
@@ -3066,6 +3214,9 @@ R_RenderFrame_RTX(refdef_t *fd)
 
 	vkpt_physical_sky_update_ubo(ubo, &sun_light, render_world);
 	vkpt_bloom_update(ubo, frame_time, ubo->medium != MEDIUM_NONE, qvk.frame_menu_mode);
+	vkpt_temporal_begin_frame(
+		frame_time <= 0.f ? frame_wallclock_time : frame_time,
+		temporal_frame_valid, render_world, ref_mode.enable_denoiser);
 
 	if(update_world_animations)
 		bsp_mesh_animate_light_polys(&vkpt_refdef.bsp_mesh_world);
@@ -3286,8 +3437,31 @@ R_RenderFrame_RTX(refdef_t *fd)
 		END_PERF_MARKER(post_cmd_buf, PROFILER_ASVGF_FULL);
 
 		vkpt_interleave(post_cmd_buf);
+		vkpt_temporal_mark_inputs_ready();
 
-		vkpt_taa(post_cmd_buf);
+		if (vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
+		{
+			VkResult upscaler_result = vkpt_fsr_do(post_cmd_buf);
+			temporal_upscaler_ran = upscaler_result == VK_SUCCESS;
+			if (upscaler_result == VK_NOT_READY)
+			{
+				/* Input-contract rejection happens before the provider records
+				 * commands, so Q2RTX TAA is a safe same-frame fallback. */
+				vkpt_taa(post_cmd_buf);
+			}
+			else if (upscaler_result != VK_SUCCESS)
+			{
+				/* A provider failure may leave a partially recorded command
+				 * stream.  Never submit it or feed stale TAA_OUTPUT to post. */
+				Com_Error(ERR_FATAL,
+					"Temporal upscaler dispatch failed (%s)",
+					qvk_result_to_string(upscaler_result));
+			}
+		}
+		else
+		{
+			vkpt_taa(post_cmd_buf);
+		}
 
 		BEGIN_PERF_MARKER(post_cmd_buf, PROFILER_BLOOM);
 		if (cvar_bloom_enable->integer != 0 || qvk.frame_menu_mode)
@@ -3310,10 +3484,19 @@ R_RenderFrame_RTX(refdef_t *fd)
 		}
 		END_PERF_MARKER(post_cmd_buf, PROFILER_TONE_MAPPING);
 
-		// Skip FSR (upscaling) if image is going to be heavily blurred anyway (menu mode)
-		if(vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
-		{
-			vkpt_fsr_do(post_cmd_buf);
+		if (qvk.framegen_present_active) {
+			VkResult framegen_result = vkpt_fsr_frame_generation_record(post_cmd_buf);
+			if (framegen_result == VK_SUCCESS) {
+				qvk.framegen_generated_frame_ready = true;
+			} else {
+				/* The real HUDless scene is already complete. Present it on both
+				 * acquired images rather than using a failed/partial generated output. */
+				qvk.framegen_generated_frame_ready = false;
+				vkpt_fsr_frame_generation_publish_status(false,
+					"fallback: analytical interpolation rejected this frame");
+				Com_WPrintf("FSR3 FG: interpolation skipped (%s); presenting real frame.\n",
+					qvk_result_to_string(framegen_result));
+			}
 		}
 
 		{
@@ -3326,7 +3509,10 @@ R_RenderFrame_RTX(refdef_t *fd)
 		vkpt_submit_command_buffer_simple(post_cmd_buf, qvk.queue_graphics, true);
 	}
 
-	temporal_frame_valid = ref_mode.enable_denoiser;
+	/* The next temporal frame may reuse history only if its producer actually
+	 * ran.  A menu/bypass/fallback frame deliberately breaks provider history;
+	 * the provider sees that through frame->history_valid and performs a reset. */
+	temporal_frame_valid = ref_mode.enable_denoiser || temporal_upscaler_ran;
 	
 	frame_ready = true;
 	drs_last_frame_world = true;
@@ -3341,11 +3527,22 @@ R_RenderFrame_RTX(refdef_t *fd)
 static void temporal_cvar_changed(cvar_t *self)
 {
 	temporal_frame_valid = false;
+	vkpt_temporal_request_reset(VKPT_TEMPORAL_RESET_SETTINGS_CHANGED);
+	vkpt_fsr_request_reset();
+}
+
+static void projection_cvar_changed(cvar_t *self)
+{
+	accumulation_cvar_changed(self);
+	temporal_cvar_changed(self);
 }
 
 static void
 recreate_swapchain(void)
 {
+	vkpt_temporal_request_reset(
+		VKPT_TEMPORAL_RESET_SWAPCHAIN_CHANGED |
+		VKPT_TEMPORAL_RESET_DISPLAY_SIZE_CHANGED);
 	vkDeviceWaitIdle(qvk.device);
 	vkpt_destroy_all(VKPT_INIT_SWAPCHAIN_RECREATE);
 	destroy_swapchain();
@@ -3505,9 +3702,22 @@ R_BeginFrame_RTX(void)
 	}
 
 	drs_process();
+	if (vkpt_fsr_is_requested() && vkpt_fsr_requested_render_scale() == 0) {
+		/* Keep the profiler/controller state and feedback scale consistent with
+		 * the FSR4 DRS input extent clamp in get_render_extent(). */
+		drs_current_scale = min(drs_current_scale, 100);
+		if (drs_effective_scale != 0)
+			drs_effective_scale = min(drs_effective_scale, 100);
+	}
 	if (vkpt_refdef.fd)
 	{
-		vkpt_refdef.fd->feedback.resolution_scale = (drs_effective_scale != 0) ? drs_effective_scale : scr_viewsize->integer;
+		int provider_scale = vkpt_fsr_requested_render_scale();
+		int effective_scale = (drs_effective_scale != 0)
+			? drs_effective_scale : scr_viewsize->integer;
+		if (vkpt_fsr_is_requested() && provider_scale == 0)
+			effective_scale = min(effective_scale, 100);
+		vkpt_refdef.fd->feedback.resolution_scale = provider_scale > 0
+			? provider_scale : effective_scale;
 	}
 
 	qvk.extent_render = get_render_extent();
@@ -3521,10 +3731,39 @@ R_BeginFrame_RTX(void)
 		recreate_swapchain();
 	}
 
-retry:;
+	retry:;
 
 	if (!qvk.swap_chain) // we're minimized, don't render
 		return;
+	/* cvars are initialized after the first startup swapchain on some paths.
+	 * Rebuild once when FG is requested so the second acquire has two spare images.
+	 * If the surface cannot supply minImageCount+2 images, the attempt flag prevents a
+	 * recreate loop and FG remains safely disabled. */
+	static bool framegen_swapchain_upgrade_attempted;
+	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
+		framegen_swapchain_upgrade_attempted = false;
+	else if (qvk.num_swap_chain_images < qvk.framegen_required_swap_chain_images &&
+		!framegen_swapchain_upgrade_attempted) {
+		framegen_swapchain_upgrade_attempted = true;
+		recreate_swapchain();
+		goto retry;
+	}
+	/* Frame interpolation presents generated then real images. Keep the normal
+	 * one-image acquisition path as the fallback whenever its compute/presenter
+	 * prerequisites are not met. Three images avoid blocking a two-acquire frame
+	 * behind the presentation engine on minimum-double-buffer swapchains. */
+	qvk.framegen_present_active =
+		qvk.num_swap_chain_images >= qvk.framegen_required_swap_chain_images &&
+		vkpt_fsr_frame_generation_prepare_present();
+	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
+		vkpt_fsr_frame_generation_publish_status(false, "off");
+	else if (qvk.num_swap_chain_images < qvk.framegen_required_swap_chain_images)
+		vkpt_fsr_frame_generation_publish_status(false,
+			"fallback: surface did not provide minImageCount+2 swapchain images");
+	else if (!qvk.framegen_present_active && !vkpt_fsr_frame_generation_is_ready())
+		vkpt_fsr_frame_generation_publish_status(false,
+			"fallback: FSR3/frame-generation temporal contract unavailable");
+	qvk.framegen_generated_frame_ready = false;
 
 #ifdef VKPT_DEVICE_GROUPS
 	VkAcquireNextImageInfoKHR acquire_info = {
@@ -3547,6 +3786,41 @@ retry:;
 	}
 	else if(res_swapchain != VK_SUCCESS) {
 		Com_EPrintf("Error %d in vkAcquireNextImageKHR\n", res_swapchain);
+	}
+	if (qvk.framegen_present_active) {
+		/* The first acquisition above becomes the generated-frame target. Acquire
+		 * the real-frame target with a distinct binary semaphore, then restore
+		 * current_swap_chain_image_index to the real image for the existing
+		 * renderer/framebuffers. */
+		qvk.framegen_generated_swap_chain_image_index = qvk.current_swap_chain_image_index;
+#ifdef VKPT_DEVICE_GROUPS
+		/* The FG swapchain requested minImageCount+2, so this is the deliberate
+		 * second acquired image of the display pair.  A zero-timeout probe made
+		 * FIFO/Mailbox discard generation whenever WSI had not returned a spare at
+		 * that exact instant.  Waiting here is safe: presentation can release one
+		 * of the reserved images independently of this frame's GPU submissions. */
+		acquire_info.timeout = ~((uint64_t)0);
+		acquire_info.semaphore = qvk.framegen_image_available[qvk.current_frame_index];
+		res_swapchain = vkAcquireNextImage2KHR(qvk.device, &acquire_info,
+			&qvk.current_swap_chain_image_index);
+#else
+		res_swapchain = vkAcquireNextImageKHR(qvk.device, qvk.swap_chain,
+			~((uint64_t)0), qvk.framegen_image_available[qvk.current_frame_index],
+			VK_NULL_HANDLE, &qvk.current_swap_chain_image_index);
+#endif
+		if (res_swapchain == VK_ERROR_OUT_OF_DATE_KHR || res_swapchain == VK_SUBOPTIMAL_KHR) {
+			recreate_swapchain();
+			goto retry;
+		}
+		if (res_swapchain != VK_SUCCESS ||
+			qvk.current_swap_chain_image_index == qvk.framegen_generated_swap_chain_image_index) {
+			if (res_swapchain != VK_NOT_READY)
+				Com_WPrintf("FSR3 FG: second swapchain acquisition failed; using real-frame fallback.\n");
+			qvk.current_swap_chain_image_index = qvk.framegen_generated_swap_chain_image_index;
+			qvk.framegen_present_active = false;
+			vkpt_fsr_frame_generation_publish_status(false,
+				"fallback: no second swapchain image available");
+		}
 	}
 
 	if (qvk.wait_for_idle_frames) {
@@ -3578,10 +3852,58 @@ retry:;
 	SCR_SetHudAlpha(1.f);
 }
 
+static void
+ensure_acquired_swapchain_image_initialized(VkCommandBuffer cmd_buf, uint32_t image_index)
+{
+	if (qvk.swap_chain_image_initialized[image_index])
+		return;
+	/* A newly created image is transitioned only after acquisition. */
+	IMAGE_BARRIER_STAGES(cmd_buf,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.image = qvk.swap_chain_images[image_index],
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0, .levelCount = 1,
+			.baseArrayLayer = 0, .layerCount = 1
+		},
+		.srcAccessMask = 0, .dstAccessMask = 0,
+		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	);
+	qvk.swap_chain_image_initialized[image_index] = true;
+}
+
+static VkResult
+present_swapchain_image(uint32_t image_index, VkSemaphore render_finished)
+{
+	VkPresentInfoKHR present_info = {
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &render_finished,
+		.swapchainCount = 1,
+		.pSwapchains = &qvk.swap_chain,
+		.pImageIndices = &image_index,
+	};
+#ifdef VKPT_DEVICE_GROUPS
+	uint32_t present_device_mask = 1;
+	VkDeviceGroupPresentInfoKHR group_present_info = {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_INFO_KHR,
+		.swapchainCount = 1,
+		.pDeviceMasks = &present_device_mask,
+		.mode = VK_DEVICE_GROUP_PRESENT_MODE_LOCAL_BIT_KHR,
+	};
+	if (qvk.device_count > 1)
+		present_info.pNext = &group_present_info;
+#endif
+	return vkQueuePresentKHR(qvk.queue_graphics, &present_info);
+}
+
 void
 R_EndFrame_RTX(void)
 {
 	LOG_FUNC();
+	bool framegen_generated_presented = false;
 
 	if (!qvk.swap_chain)
 	{
@@ -3594,7 +3916,46 @@ R_EndFrame_RTX(void)
 	if(cvar_tm_debug->integer)
 		vkpt_tone_mapping_draw_debug();
 
+	if (qvk.framegen_present_active) {
+		const uint32_t generated_index = qvk.framegen_generated_swap_chain_image_index;
+		const uint32_t real_index = qvk.current_swap_chain_image_index;
+		VkCommandBuffer generated_cmd = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+		VkSemaphore generated_signal = qvk.swap_chain_render_finished[generated_index];
+		VkSemaphore generated_wait = qvk.semaphores[qvk.current_frame_index][0].image_available;
+		VkPipelineStageFlags generated_wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		uint32_t device_index = 0;
+
+		qvk.current_swap_chain_image_index = generated_index;
+		ensure_acquired_swapchain_image_initialized(generated_cmd, generated_index);
+		if (frame_ready) {
+			vkpt_final_blit_with_descriptor_slot(generated_cmd,
+				qvk.framegen_generated_frame_ready ? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_TAA_OUTPUT,
+				qvk.extent_taa_output, false,
+				vkpt_refdef.fd && (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) &&
+				cvar_pt_waterwarp->integer, 1);
+		}
+		/* Do not consume the queued UI: the real frame below receives exactly the
+		 * same UI after its HUDless scene blit. */
+		vkpt_draw_submit_stretch_pics_ex(generated_cmd, true);
+		vkpt_submit_command_buffer(generated_cmd, qvk.queue_graphics, 1,
+			1, &generated_wait, &generated_wait_stage, &device_index,
+			1, &generated_signal, &device_index, VK_NULL_HANDLE);
+		VkResult generated_present = present_swapchain_image(generated_index, generated_signal);
+		framegen_generated_presented = generated_present == VK_SUCCESS ||
+			generated_present == VK_SUBOPTIMAL_KHR;
+		if (generated_present == VK_ERROR_OUT_OF_DATE_KHR || generated_present == VK_SUBOPTIMAL_KHR)
+			qvk.wait_for_idle_frames = MAX_FRAMES_IN_FLIGHT * 2;
+		/* The generated submission is ordered before the real submission on the
+		 * same graphics/present queue.  They use separate final-blit descriptors
+		 * and the replayed UI is uploaded only once, so the ordinary real-frame
+		 * fence (waited at the next R_BeginFrame_RTX) covers every resource used by
+		 * both commands.  Do not serialize the two presents with a CPU fence here:
+		 * that defeats analytical frame generation's intended cadence. */
+		qvk.current_swap_chain_image_index = real_index;
+	}
+
 	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+	ensure_acquired_swapchain_image_initialized(cmd_buf, qvk.current_swap_chain_image_index);
 
 	if (frame_ready)
 	{
@@ -3621,11 +3982,18 @@ R_EndFrame_RTX(void)
 		}
 
 		frame_ready = false;
+		vkpt_temporal_mark_scene_presented();
 	}
 
+	vkpt_temporal_begin_ui_composition();
 	vkpt_draw_submit_stretch_pics(cmd_buf);
+	vkpt_temporal_end_ui_composition();
 
-	VkSemaphore wait_semaphores[] = { qvk.semaphores[qvk.current_frame_index][0].image_available };
+	VkSemaphore wait_semaphores[] = {
+		qvk.framegen_present_active
+			? qvk.framegen_image_available[qvk.current_frame_index]
+			: qvk.semaphores[qvk.current_frame_index][0].image_available
+	};
 	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	uint32_t wait_device_indices[] = { 0 };
 
@@ -3633,7 +4001,9 @@ R_EndFrame_RTX(void)
 	uint32_t signal_device_indices[VKPT_MAX_GPUS];
 	for (int gpu = 0; gpu < qvk.device_count; gpu++)
 	{
-		signal_semaphores[gpu] = qvk.semaphores[qvk.current_frame_index][gpu].render_finished;
+		signal_semaphores[gpu] = qvk.swap_chain_render_finished[
+			(size_t)qvk.current_swap_chain_image_index * (size_t)qvk.device_count +
+			(size_t)gpu];
 		signal_device_indices[gpu] = gpu;
 	}
 
@@ -3668,31 +4038,25 @@ R_EndFrame_RTX(void)
 	}
 #endif
 
-	VkPresentInfoKHR present_info = {
-		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount = qvk.device_count,
-		.pWaitSemaphores    = signal_semaphores,
-		.swapchainCount     = 1,
-		.pSwapchains        = &qvk.swap_chain,
-		.pImageIndices      = &qvk.current_swap_chain_image_index,
-		.pResults           = NULL,
-	};
-
-#ifdef VKPT_DEVICE_GROUPS
-	uint32_t present_device_mask = 1;
-	VkDeviceGroupPresentInfoKHR group_present_info = {
-		.sType				= VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_INFO_KHR,
-		.swapchainCount		= 1,
-		.pDeviceMasks		= &present_device_mask,
-		.mode				= VK_DEVICE_GROUP_PRESENT_MODE_LOCAL_BIT_KHR,
-	};
-
-	if (qvk.device_count > 1) {
-		present_info.pNext = &group_present_info;
+	VkResult res_present = present_swapchain_image(
+		qvk.current_swap_chain_image_index, signal_semaphores[0]);
+	/* A two-image present pair is not by itself evidence of an interpolated
+	 * frame: when Prepare/Dispatch rejects a temporal input, the presenter
+	 * deliberately puts the real scene on both acquired images.  Only publish
+	 * the doubled cadence after the generated output was actually recorded. */
+	if (framegen_generated_presented && qvk.framegen_generated_frame_ready &&
+		(res_present == VK_SUCCESS || res_present == VK_SUBOPTIMAL_KHR)) {
+		/* This is the first point at which "active" means that an actual
+		 * interpolated frame and its following real frame both reached WSI. */
+		vkpt_fsr_frame_generation_publish_status(true,
+			"FSR3 analytical frame generation active");
+		vkpt_fsr_frame_generation_note_present_pair();
+	} else if (qvk.framegen_present_active && qvk.framegen_generated_frame_ready) {
+		vkpt_fsr_frame_generation_publish_status(false,
+			"fallback: generated or real present was rejected");
 	}
-#endif
-
-	VkResult res_present = vkQueuePresentKHR(qvk.queue_graphics, &present_info);
+	vkpt_temporal_end_frame(
+		res_present == VK_SUCCESS || res_present == VK_SUBOPTIMAL_KHR);
 	if(res_present == VK_ERROR_OUT_OF_DATE_KHR || res_present == VK_SUBOPTIMAL_KHR) {
 		recreate_swapchain();
 	}
@@ -3888,6 +4252,15 @@ R_Init_RTX(bool total)
 	cvar_flt_temporal_lf->changed = temporal_cvar_changed;
 	cvar_flt_temporal_spec->changed = temporal_cvar_changed;
 	cvar_flt_enable->changed = temporal_cvar_changed;
+	cvar_flt_fsr_enable->changed = temporal_cvar_changed;
+	cvar_flt_upscaler->changed = temporal_cvar_changed;
+	cvar_flt_fsr_quality->changed = temporal_cvar_changed;
+	cvar_flt_fsr3_sharpening->changed = temporal_cvar_changed;
+	cvar_flt_fsr4_sharpening->changed = temporal_cvar_changed;
+	cvar_flt_fsr4_auto_exposure->changed = temporal_cvar_changed;
+	cvar_flt_fsr4_dynamic_resolution->changed = temporal_cvar_changed;
+	cvar_flt_frame_generation->changed = temporal_cvar_changed;
+	cvar_flt_frame_generation_min_rendered_fps->changed = temporal_cvar_changed;
 
 	cvar_pt_dof->changed = accumulation_cvar_changed;
 	cvar_pt_aperture->changed = accumulation_cvar_changed;
@@ -3895,7 +4268,7 @@ R_Init_RTX(bool total)
 	cvar_pt_aperture_angle->changed = accumulation_cvar_changed;
 	cvar_pt_focus->changed = accumulation_cvar_changed;
 	cvar_pt_freecam->changed = accumulation_cvar_changed;
-	cvar_pt_projection->changed = accumulation_cvar_changed;
+	cvar_pt_projection->changed = projection_cvar_changed;
 
 	cvar_pt_num_bounce_rays->flags |= CVAR_ARCHIVE;
 
@@ -4351,6 +4724,7 @@ R_BeginRegistration_RTX(const char *name)
 	vkpt_physical_sky_latch_local_time();
 	vkpt_bloom_reset();
 	vkpt_tone_mapping_request_reset();
+	vkpt_temporal_request_reset(VKPT_TEMPORAL_RESET_SCENE_CHANGED);
 	vkpt_light_buffer_reset_counts();
 
 	memset(cluster_debug_mask, 0, sizeof(cluster_debug_mask));

@@ -264,6 +264,10 @@ SET(SRC_VKPT
 	refresh/vkpt/cameras.c
 	refresh/vkpt/freecam.c
 	refresh/vkpt/fsr.c
+	refresh/vkpt/fsr4/ffx_fsr4_vk.c
+	refresh/vkpt/fsr4/ffx_fsr4_schedule.c
+	refresh/vkpt/fsr4/ffx_fsr4_assets.c
+	refresh/vkpt/fsr4/ffx_functions_q2rtx.c
 	refresh/vkpt/main.c
 	refresh/vkpt/material.c
 	refresh/vkpt/matrix.c
@@ -275,6 +279,7 @@ SET(SRC_VKPT
 	refresh/vkpt/profiler.c
 	refresh/vkpt/shadow_map.c
 	refresh/vkpt/textures.c
+	refresh/vkpt/temporal.c
 	refresh/vkpt/tone_mapping.c
 	refresh/vkpt/transparency.c
 	refresh/vkpt/uniform_buffer.c
@@ -285,6 +290,15 @@ SET(SRC_VKPT
 	refresh/vkpt/god_rays.c
 	refresh/vkpt/conversion.c
 )
+
+IF(BUILD_TESTING)
+    add_executable(fsr4_schedule_test
+		refresh/vkpt/fsr4/ffx_fsr4_schedule.c
+		refresh/vkpt/fsr4/ffx_fsr4_assets.c
+		refresh/vkpt/fsr4/tests/test_fsr4_schedule.c)
+    target_include_directories(fsr4_schedule_test PRIVATE refresh/vkpt/fsr4)
+    add_test(NAME fsr4_schedule COMMAND fsr4_schedule_test)
+ENDIF()
 
 SET(HEADERS_VKPT
 	refresh/vkpt/vkpt.h
@@ -297,6 +311,7 @@ SET(HEADERS_VKPT
 	refresh/vkpt/physical_sky.h
 	refresh/vkpt/precomputed_sky.h
 	refresh/vkpt/conversion.h
+	refresh/vkpt/temporal_contract.h
 )
 
 set(SRC_SHADERS
@@ -328,10 +343,7 @@ set(SRC_SHADERS
 	refresh/vkpt/shader/stretch_pic.vert
 	refresh/vkpt/shader/final_blit.frag
 	refresh/vkpt/shader/final_blit.vert
-	refresh/vkpt/shader/fsr_easu_fp16.comp
-	refresh/vkpt/shader/fsr_easu_fp32.comp
-	refresh/vkpt/shader/fsr_rcas_fp16.comp
-	refresh/vkpt/shader/fsr_rcas_fp32.comp
+	# FSR1 shaders removed; FSR4 SPIR-V loaded at runtime
 	refresh/vkpt/shader/debug_line.frag
 	refresh/vkpt/shader/debug_line.vert
 )
@@ -366,8 +378,61 @@ IF(IS_64_BIT)
     endforeach()
 
     foreach(s ${SRC_SHADERS})
-        compile_shader(SOURCE_FILE ${s} INCLUDES "-I${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr" OUTPUT_FILE_LIST shader_bytecode)
+        compile_shader(SOURCE_FILE ${s} OUTPUT_FILE_LIST shader_bytecode)
     endforeach()
+
+    # FSR4 INT8 shaders and model assets are generated separately.  The script
+    # accepts either a native DXC or dxc.exe (automatically run through Wine).
+    # Keep this target opt-in: the source-bearing model payload has separate
+    # provenance/distribution constraints and is not part of a normal build.
+    set(FSR4_SDK_ROOT "" CACHE PATH "Path to the source-bearing AMD FSR4 SDK root")
+    set(FSR4_PRESET "performance" CACHE STRING "FSR4 model preset")
+    set_property(CACHE FSR4_PRESET PROPERTY STRINGS
+        all native quality balanced performance ultraperf drs)
+    set(FSR4_DXC "$ENV{DXC_BIN}" CACHE FILEPATH
+        "Path to native dxc or Windows dxc.exe used for FSR4 SPIR-V")
+    set(FSR4_WINE "$ENV{WINE_BIN}" CACHE FILEPATH
+        "Wine executable used when FSR4_DXC is a Windows .exe")
+    if(NOT FSR4_DXC)
+        find_program(FSR4_DXC_AUTO NAMES dxc PATHS "$ENV{VULKAN_SDK}/bin")
+        if(FSR4_DXC_AUTO)
+            set(FSR4_DXC "${FSR4_DXC_AUTO}" CACHE FILEPATH
+                "Path to native dxc or Windows dxc.exe used for FSR4 SPIR-V" FORCE)
+        endif()
+    endif()
+    if(NOT FSR4_WINE)
+        find_program(FSR4_WINE_AUTO NAMES wine)
+        if(FSR4_WINE_AUTO)
+            set(FSR4_WINE "${FSR4_WINE_AUTO}" CACHE FILEPATH
+                "Wine executable used when FSR4_DXC is a Windows .exe" FORCE)
+        endif()
+    endif()
+
+    set(FSR4_SHADER_OUT "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+    set(FSR4_SHADER_SCRIPT
+        "${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/compile_shaders_fsr4.sh")
+    add_custom_target(fsr4_shaders
+        COMMAND ${CMAKE_COMMAND} -E env
+                "DXC_BIN=${FSR4_DXC}"
+                "WINE_BIN=${FSR4_WINE}"
+                "${FSR4_SHADER_SCRIPT}"
+                "${FSR4_SDK_ROOT}" "${FSR4_PRESET}" "${FSR4_SHADER_OUT}"
+        DEPENDS
+            "${FSR4_SHADER_SCRIPT}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/fsr4_spirv_wrapper.hlsl"
+            "${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/fsr4_spirv_compat.hlsli"
+            "${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/validate_fsr4_spirv.py"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        COMMENT "Compiling and validating FSR4 ${FSR4_PRESET} SPIR-V/model assets"
+        VERBATIM)
+
+    if(FSR4_DXC AND FSR4_SDK_ROOT)
+        message(STATUS
+            "FSR4: target fsr4_shaders configured with DXC=${FSR4_DXC}, SDK=${FSR4_SDK_ROOT}")
+    else()
+        message(STATUS
+            "FSR4: target fsr4_shaders is opt-in; set FSR4_SDK_ROOT and FSR4_DXC")
+    endif()
 
     add_custom_target(shaders DEPENDS ${shader_bytecode})
 
@@ -496,6 +561,10 @@ IF (TARGET client)
     IF (CONFIG_VKPT_RENDERER)
         TARGET_SOURCES(client PRIVATE ${SRC_VKPT} ${HEADERS_VKPT})
         TARGET_INCLUDE_DIRECTORIES(client PRIVATE ${CMAKE_SOURCE_DIR}/extern/Vulkan-Headers/include)
+        # FSR4 backend headers
+        TARGET_INCLUDE_DIRECTORIES(client PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt
+            ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4)
         LINK_DIRECTORIES(client PRIVATE ${CMAKE_SOURCE_DIR})
         TARGET_COMPILE_DEFINITIONS(client PRIVATE REF_VKPT=1 USE_REF=1)
         IF (CONFIG_VKPT_ENABLE_DEVICE_GROUPS)
@@ -508,6 +577,10 @@ IF (TARGET client)
         TARGET_LINK_LIBRARIES(client vulkan-1)
         ELSE ()
         TARGET_LINK_LIBRARIES(client vulkan)
+        ENDIF()
+        IF (CONFIG_VKPT_FSR3)
+            TARGET_LINK_LIBRARIES(client ffx-vulkan::portable)
+            TARGET_COMPILE_DEFINITIONS(client PRIVATE VKPT_FSR3=1)
         ENDIF()
     ENDIF()
 
@@ -678,6 +751,14 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
 	        COMPONENT shareware)
 	ENDIF()
     INSTALL(TARGETS game DESTINATION share/quake2rtx/baseq2 COMPONENT shareware)
+
+    # Install pre-built FSR4 SPIR-V shaders if present in the source tree
+    IF(EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+        INSTALL(DIRECTORY
+            "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders"
+            DESTINATION share/quake2rtx/baseq2
+            COMPONENT shareware)
+    ENDIF()
 
     # Package data files, including the shareware pak0 for demo levels
     set (SHAREWARE_DATA_FILES_LIST

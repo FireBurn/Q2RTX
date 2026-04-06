@@ -94,6 +94,19 @@ get_primary_ray(vec2 screen_pos)
 	return ray;
 }
 
+float
+view_z_to_device_depth(float view_z)
+{
+	/* Q2RTX's projection is the OpenGL-style symmetric depth transform in
+	 * create_projection_matrix().  Convert its positive-forward view Z to the
+	 * conventional Vulkan/D3D range expected by temporal providers: zero at
+	 * the near plane and one at the far plane.  The viewport adjustment does
+	 * not alter these two matrix coefficients. */
+	float depth_scale = 0.5 * (global_ubo.P[2][2] + 1.0);
+	float depth_bias = 0.5 * global_ubo.P[3][2];
+	return clamp(depth_scale - depth_bias / max(view_z, 1e-6), 0.0, 1.0);
+}
+
 void generate_rng_seed(ivec2 ipos, bool is_odd_checkerboard)
 {
 	int frame_num = global_ubo.current_frame_idx;
@@ -112,6 +125,13 @@ void generate_rng_seed(ivec2 ipos, bool is_odd_checkerboard)
 void
 main()
 {
+#ifdef KHR_RAY_QUERY
+	/* vkCmdDispatch rounds the logical ray grid up to 8x8 workgroups. */
+	if (rt_LaunchID.x >= uint(global_ubo.width / 2) ||
+		rt_LaunchID.y >= uint(global_ubo.height))
+		return;
+#endif
+
 	ivec2 ipos = ivec2(rt_LaunchID.xy);
 	if(rt_LaunchID.z != 0)
 		ipos.x += global_ubo.width / 2;
@@ -197,6 +217,13 @@ main()
 		imageStore(IMG_PT_NORMAL_A, ipos, uvec4(0));
 		imageStore(IMG_PT_GEO_NORMAL_A, ipos, uvec4(0));
 		imageStore(IMG_PT_VIEW_DEPTH_A, ipos, vec4(PRIMARY_RAY_T_MAX));
+		/* Keep primary-surface depth independent of Q2RTX's denoiser depth.
+		 * Reflection/refraction passes deliberately overwrite PT_VIEW_DEPTH_A,
+		 * which makes it unsuitable for an external temporal provider. */
+		imageStore(IMG_TEMPORAL_VIEW_Z, image_position, vec4(PRIMARY_RAY_T_MAX));
+		imageStore(IMG_TEMPORAL_DEVICE_DEPTH, image_position, vec4(1.0));
+		imageStore(IMG_TEMPORAL_REACTIVE_MASK, image_position, vec4(0.0));
+		imageStore(IMG_TEMPORAL_COMPOSITION_MASK, image_position, vec4(0.0));
 		imageStore(IMG_PT_GODRAYS_THROUGHPUT_DIST, ipos, vec4(1, 1, 1, PRIMARY_RAY_T_MAX));
 		imageStore(IMG_PT_VIEW_DIRECTION, ipos, vec4(direction, 0));
 		imageStore(IMG_PT_SHADING_POSITION, ipos, vec4(global_ubo.cam_pos.xyz + direction * PRIMARY_RAY_T_MAX, 0));
@@ -261,7 +288,8 @@ main()
 	
 	vec2 screen_pos_curr, screen_pos_prev;
 	float distance_curr, distance_prev;
-	projection_view_to_screen((global_ubo.V * vec4(pos_ws_curr, 1)).xyz, screen_pos_curr, distance_curr, false);
+	vec3 view_pos_curr = (global_ubo.V * vec4(pos_ws_curr, 1)).xyz;
+	projection_view_to_screen(view_pos_curr, screen_pos_curr, distance_curr, false);
 	projection_view_to_screen((global_ubo.V_prev * vec4(pos_ws_prev, 1)).xyz, screen_pos_prev, distance_prev, true);
 	
 	vec3 motion;
@@ -269,6 +297,9 @@ main()
 	motion.z = distance_prev - distance_curr;
 
 	imageStore(IMG_PT_VIEW_DEPTH_A, ipos, vec4(distance_curr));
+	imageStore(IMG_TEMPORAL_VIEW_Z, image_position, vec4(max(0.0, view_pos_curr.z)));
+	imageStore(IMG_TEMPORAL_DEVICE_DEPTH, image_position,
+		vec4(view_z_to_device_depth(view_pos_curr.z)));
 	imageStore(IMG_PT_MOTION, ipos, vec4(motion, fwidth_depth));
 
 	vec3 primary_base_color = vec3(1);
@@ -302,6 +333,8 @@ main()
 	}
 
 	uint material_id = triangle.material_id;
+	const uint source_material_id = material_id;
+	const bool primary_has_alpha = triangle.alpha < 1.0;
 	// will be used in case of transparency, to retain difference between TRANSPARENT and TRANSP_MODEL
 	// default to TRANSP_MODEL so transparency on other material kind works (needed for eg gunalpha)
 	uint transparency_kind = (material_id & MATERIAL_KIND_MASK) == MATERIAL_KIND_TRANSPARENT ? MATERIAL_KIND_TRANSPARENT : MATERIAL_KIND_TRANSP_MODEL;
@@ -412,6 +445,31 @@ main()
 
 	if ((material_id & MATERIAL_FLAG_WEAPON) != 0)
 		checkerboard_flags |= CHECKERBOARD_FLAG_WEAPON;
+
+	/* FSR3's reactive input tells its history resolver that a pixel's
+	 * radiance is not reliably described by the primary-surface motion vector.
+	 * Its transparency/composition input covers content which can change behind
+	 * a stable surface.  Q2RTX already classifies these paths before the
+	 * checkerboard reflection/refraction work, so preserve that knowledge here
+	 * instead of deriving it later from filtered colour. */
+	uint source_kind = source_material_id & MATERIAL_KIND_MASK;
+	uint final_kind = material_id & MATERIAL_KIND_MASK;
+	bool special_composition =
+		primary_has_alpha ||
+		source_kind == MATERIAL_KIND_WATER ||
+		source_kind == MATERIAL_KIND_SLIME ||
+		source_kind == MATERIAL_KIND_GLASS ||
+		source_kind == MATERIAL_KIND_TRANSPARENT ||
+		source_kind == MATERIAL_KIND_TRANSP_MODEL ||
+		final_kind == MATERIAL_KIND_TRANSPARENT ||
+		final_kind == MATERIAL_KIND_TRANSP_MODEL ||
+		is_screen(material_id) || is_camera(material_id) ||
+		(material_id & (MATERIAL_FLAG_WARP | MATERIAL_FLAG_FLOWING)) != 0;
+	bool view_model = (source_material_id & MATERIAL_FLAG_WEAPON) != 0;
+	float composition_mask = special_composition ? 1.0 : 0.0;
+	float reactive_mask = (special_composition || view_model) ? 1.0 : 0.0;
+	imageStore(IMG_TEMPORAL_REACTIVE_MASK, image_position, vec4(reactive_mask));
+	imageStore(IMG_TEMPORAL_COMPOSITION_MASK, image_position, vec4(composition_mask));
 
 	imageStore(IMG_PT_GEO_NORMAL_A, ipos, uvec4(encode_normal(geo_normal)));
 	imageStore(IMG_PT_SHADING_POSITION, ipos, vec4(position.xyz, uintBitsToFloat(material_id)));

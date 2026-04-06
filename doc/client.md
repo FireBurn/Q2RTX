@@ -736,30 +736,150 @@ Red channel shows low-frequency (GI) gradients, green channel shows direct diffu
 and blue channel shows direct specular gradients. Default value is 0.
 
 #### `flt_taa`
-Enables temporal anti-aliasing and primary ray direction jitter. Default value is 1.
+Selects the Q2RTX anti-aliasing fallback: 0 disables anti-aliasing, 1 enables
+temporal anti-aliasing, and 2 enables temporal upscaling. The default is 2.
+This setting is used whenever the selected temporal upscaler is disabled or
+cannot run.
+
+#### `flt_upscaler`
+Selects the temporal reconstruction provider: 0 uses the Q2RTX `flt_taa`
+fallback, 1 selects the native Vulkan FSR 3.1.4 upscaler, and 2 selects the
+experimental FSR4 source-v07 INT8/DOT4 upscaler. The default is 0.
+
+FSR3 and FSR4 v07 both use the discrete `flt_fsr_quality` choice. FSR4 loads a
+separate coherent INT8 graph, initializer payload, and pass-0 weights for each
+ratio rather than running one trained model at arbitrary scale. Fixed models
+ignore the legacy resolution-scale controls; the explicit FSR4 DRS model is
+the exception and uses Q2RTX's bounded DRS controller. They require a
+supported single Vulkan GPU and perspective projection. If the selected
+provider cannot run, Q2RTX uses the `flt_taa` fallback instead.
+
+This experimental source-v07 path is based on an older FSR4 model payload; it
+must not be described as FSR 4.1.1. The implemented v07 static models cover the
+listed discrete quality ratios and expose a separate dynamic-resolution model.
+
+#### `flt_fsr_quality`
+
+Shared FSR3/FSR4 quality preset: 0 Native AA (100%), 1 Quality (67%),
+2 Balanced (59%), 3 Performance (50%, default), and 4 Ultra Performance (33%).
+For FSR4 v07 it selects the corresponding separately compiled INT8 model and
+matching initializer/weight data; changing it retires the old graph and resets
+temporal history. When `flt_fsr4_dynamic_resolution` is enabled, this fixed
+quality choice is replaced by the dedicated DRS model.
+
+#### `flt_fsr4_dynamic_resolution`
+
+Selects the experimental v07 FSR4 dynamic-resolution model. It hands render
+scale to Q2RTX's existing profiler-driven `drs_enable`, `drs_target`,
+`drs_minscale`, and `drs_maxscale` controller; with `drs_enable` off the DRS
+model still runs at the fixed `viewsize` scale. Its input scale is capped at
+100% even if legacy DRS/viewsize permits supersampling, because an upscaler
+cannot consume a render extent larger than its display output. The setting applies only to
+FSR4, replaces the fixed quality graph, retires the prior model safely, and
+resets temporal history when it changes. During normal adaptive render-size
+transitions, the dedicated DRS model preserves its display-sized recurrent
+history; camera cuts, settings, projection, display-size, and presentation
+gaps still reset it. Static FSR4 models are never dispatched at a DRS ratio.
+The DRS model is experimental and is not FSR 4.1.1.
+
+#### `flt_fsr3_sharpening`
+
+FSR3 RCAS sharpening amount from 0 (disabled, default) through 1. This controls
+the RCAS pass integrated in the native FSR3 dispatch and is distinct from the
+deprecated `flt_fsr_sharpness` compatibility cvar. Changing it resets temporal
+history. It is independent from experimental FSR4 v07 sharpening.
+
+The native Vulkan FSR3 path always uses its internal automatic-exposure graph.
+This is deliberate: the current official AMD 3.1.5 fallback reports exposure
+as required when automatic exposure is disabled, while Q2RTX has no separate
+sampled 1x1 FSR3 exposure texture. Its pre-tone-map HDR input and
+`STORAGE_SCALE_HDR` pre-exposure remain part of the dispatch contract.
+
+#### `flt_fsr4_sharpening`
+
+Experimental FSR4 v07 RCAS amount from 0 (disabled, default) through 1. The
+RCAS dispatch runs after the selected model output and writes the normal
+display-resolution HDR post-processing input. This is a separate control from
+`flt_fsr3_sharpening`. Changing it resets temporal history.
+The legacy `flt_fsr_sharpness` cvar remains a no-op compatibility alias.
+
+#### `flt_fsr4_auto_exposure`
+
+Enables the experimental FSR4 v07 SPD auto-exposure pass. It computes current
+and previous exposure from the pre-tone-map linear HDR render input before the
+FSR model passes. The default is 0, which uses the deterministic explicit
+identity exposure of 1.0. Changing the setting resets temporal history; turning
+it off also restores that identity exposure rather than reusing an old SPD
+value. This is independent from FSR4's dynamic-resolution-model selection.
+
+#### `flt_frame_generation`
+
+Enables the experimental analytical FSR3 Optical Flow and Frame Interpolation
+path. It requires the native FSR3 upscaler, a single GPU, rectilinear
+projection, display-resolution `TAA_OUTPUT`, valid device depth/motion inputs,
+and a swapchain with at least `minImageCount + 2` images (five on the tested
+RX 6800M/RADV surface). Q2RTX acquires two images, presents
+the generated HUDless scene with UI composited afterward, then presents the
+real frame with the same UI.
+
+Generated and real commands use separate final-blit descriptors and one shared
+UI upload, then run in that order on Q2RTX's graphics/present queue. The normal
+real-frame fence retires both; there is no CPU replay wait. The second acquire
+waits for the image reserved by the `minImageCount + 2` contract rather than
+dropping generation on a zero-timeout probe. This remains an experimental
+functional integration, not yet a low-latency/VRR pacing implementation. If
+interpolation rejects the temporal frame, both presentation paths safely use
+the real scene instead. The remaining presenter work is explicit pacing.
+
+#### `flt_frame_generation_min_rendered_fps`
+
+The minimum completed render rate required before the analytical presenter
+acquires its generated/real image pair. The default is 30 FPS as a conservative
+safety floor; 60 FPS is AMD's recommended target for analytical FSR3 frame
+generation. Set 0 to disable this guard while testing. The presenter pauses
+after four consecutive below-threshold completed frames and resumes after eight
+frames at least 2 FPS above the threshold, avoiding rapid on/off oscillation.
+Any pause resets FI/OF history before generation resumes.
+
+`flt_frame_generation_active` and `flt_frame_generation_reason` are read-only
+diagnostics. `active` becomes 1 only after an interpolated generated image and
+its following real image were both accepted by WSI. They distinguish that
+actual generated→real presentation sequence from explicit fallbacks such as
+insufficient swapchain images, unavailable FSR3 inputs, an interpolation-frame
+rejection, or a rejected present.
+
+#### `flt_frame_generation_rendered_fps`, `flt_frame_generation_generated_fps`
+
+Read-only rolling presentation-cadence diagnostics for the analytical FSR3
+presenter. They update only after an interpolated generated image and its real
+image have both been accepted by the present path, so `generated_fps` is exactly twice
+`rendered_fps` for this one-generated-frame-per-real-frame mode. They reset to
+zero whenever frame generation is off or falls back. They are not game-tick
+rates, GPU timestamps, or a substitute for the remaining explicit pacing work.
+
+#### `flt_upscaler_active`, `flt_upscaler_reason`
+
+Read-only diagnostics published by the provider resolver. `flt_upscaler_active`
+is 0 for the Q2RTX fallback, 1 for native FSR3, and 2 for experimental FSR4
+v07. `flt_upscaler_reason` states the selected active backend or the precise
+fallback reason, such as missing context, invalid extent, multiple GPUs, or a
+non-rectilinear projection.
 
 #### `flt_fsr_enable`
-Enables FidelityFX Super Resolution 1.0 ("AMD FSR 1.0") upscaling. Default value is 0.
-If enabled, upscaling is applied when the resolution scale is below 100%, either from
-dynamic resolution scaling or by setting a fixes resolution scale.
-
-There's currently no UI to choose the AMD FSR 1.0 quality mode.
-You can closely approximate that setting by using an appropriate fixed
-resolution scale:
-| AMD FSR 1.0 Quality Mode | Fixed resolution scale |
-| ------------------------ | ---------------------- |
-| Ultra Quality            | 75%                    |
-| Quality                  | 65%                    |
-| Balanced                 | 60%                    |
-| Performance              | 50%                    |
+Deprecated compatibility alias. An existing nonzero value is migrated to
+`flt_upscaler 2` at startup and then cleared.
 
 #### `flt_fsr_sharpness`
-FidelityFX Super Resolution 1.0 sharpening amount. Default is 0.2.
-Range is from 0.0 to 2.0, with lower meaning sharper.
+Deprecated compatibility cvar retained for existing configurations. The
+current providers ignore this value. It is not reused because its legacy 0-to-2
+inverted semantics are incompatible with the independent modern 0-to-1
+`flt_fsr3_sharpening` and `flt_fsr4_sharpening` amounts.
 
 #### `flt_fsr_easu`, `flt_fsr_rcas`
-Individual control of the upscaling and sharpening steps of FSR. Both default to 1.
-Intended for testing purposes.
+Deprecated compatibility cvars retained for existing configurations. They have
+no effect on either current provider. FSR3 and FSR4 v07 each have a separately
+implemented, opt-in RCAS pass controlled by their respective 0-to-1 sharpening
+cvar.
 
 #### `gr_enable`
 Enables the god rays (volumetric lighting) effect. Default value is 1.
@@ -2123,4 +2243,3 @@ it used to be you know where to look. The following list may be incomplete.
   will refuse to load and save games in old format for security reasons.
 
 - CD music is not supported, only OGG Vorbis music is supported.
-

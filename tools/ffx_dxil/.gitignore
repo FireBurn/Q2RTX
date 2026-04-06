@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+# Raw shader bytecode stays local and must not be redistributed.
+output/
+captures/
+*.dxbc
+*.dxil
+*.spv
+*.rdc
