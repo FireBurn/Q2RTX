@@ -264,6 +264,8 @@ SET(SRC_VKPT
 	refresh/vkpt/cameras.c
 	refresh/vkpt/freecam.c
 	refresh/vkpt/fsr.c
+	refresh/vkpt/fsr4/ffx_fsr4_vk.c
+	refresh/vkpt/fsr4/ffx_functions_q2rtx.c
 	refresh/vkpt/main.c
 	refresh/vkpt/material.c
 	refresh/vkpt/matrix.c
@@ -328,10 +330,7 @@ set(SRC_SHADERS
 	refresh/vkpt/shader/stretch_pic.vert
 	refresh/vkpt/shader/final_blit.frag
 	refresh/vkpt/shader/final_blit.vert
-	refresh/vkpt/shader/fsr_easu_fp16.comp
-	refresh/vkpt/shader/fsr_easu_fp32.comp
-	refresh/vkpt/shader/fsr_rcas_fp16.comp
-	refresh/vkpt/shader/fsr_rcas_fp32.comp
+	# FSR1 shaders removed; FSR4 SPIR-V loaded at runtime
 	refresh/vkpt/shader/debug_line.frag
 	refresh/vkpt/shader/debug_line.vert
 )
@@ -366,8 +365,29 @@ IF(IS_64_BIT)
     endforeach()
 
     foreach(s ${SRC_SHADERS})
-        compile_shader(SOURCE_FILE ${s} INCLUDES "-I${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr" OUTPUT_FILE_LIST shader_bytecode)
+        compile_shader(SOURCE_FILE ${s} OUTPUT_FILE_LIST shader_bytecode)
     endforeach()
+
+    # FSR4 SPIR-V shaders: built separately using DXC via compile_shaders.sh.
+    # The script produces .spv files into ${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders/
+    # Run manually: ./compile_shaders.sh <fsr4_sdk_root> performance baseq2/fsr4_shaders
+    # A CMake helper target is provided for convenience when DXC is available.
+    find_program(DXC_COMPILER NAMES dxc PATHS "$ENV{VULKAN_SDK}/bin/")
+    if(DXC_COMPILER)
+        set(FSR4_SDK_ROOT "" CACHE PATH "Path to AMD FSR4 SDK root")
+        set(FSR4_PRESET "performance" CACHE STRING "FSR4 quality preset")
+        set(FSR4_SHADER_OUT "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+        add_custom_target(fsr4_shaders
+            COMMAND ${CMAKE_SOURCE_DIR}/compile_shaders.sh
+                    "${FSR4_SDK_ROOT}" "${FSR4_PRESET}" "${FSR4_SHADER_OUT}"
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Compiling FSR4 SPIR-V shaders"
+        )
+        message(STATUS "FSR4: DXC found at ${DXC_COMPILER}; target fsr4_shaders available.")
+        message(STATUS "FSR4: Set FSR4_SDK_ROOT and run: cmake --build . --target fsr4_shaders")
+    else()
+        message(STATUS "FSR4: DXC not found. Pre-built .spv files must be placed in baseq2/fsr4_shaders/")
+    endif()
 
     add_custom_target(shaders DEPENDS ${shader_bytecode})
 
@@ -496,6 +516,10 @@ IF (TARGET client)
     IF (CONFIG_VKPT_RENDERER)
         TARGET_SOURCES(client PRIVATE ${SRC_VKPT} ${HEADERS_VKPT})
         TARGET_INCLUDE_DIRECTORIES(client PRIVATE ${CMAKE_SOURCE_DIR}/extern/Vulkan-Headers/include)
+        # FSR4 backend headers
+        TARGET_INCLUDE_DIRECTORIES(client PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt
+            ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4)
         LINK_DIRECTORIES(client PRIVATE ${CMAKE_SOURCE_DIR})
         TARGET_COMPILE_DEFINITIONS(client PRIVATE REF_VKPT=1 USE_REF=1)
         IF (CONFIG_VKPT_ENABLE_DEVICE_GROUPS)
@@ -678,6 +702,14 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
 	        COMPONENT shareware)
 	ENDIF()
     INSTALL(TARGETS game DESTINATION share/quake2rtx/baseq2 COMPONENT shareware)
+
+    # Install pre-built FSR4 SPIR-V shaders if present in the source tree
+    IF(EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+        INSTALL(DIRECTORY
+            "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders"
+            DESTINATION share/quake2rtx/baseq2
+            COMPONENT shareware)
+    ENDIF()
 
     # Package data files, including the shareware pak0 for demo levels
     set (SHAREWARE_DATA_FILES_LIST

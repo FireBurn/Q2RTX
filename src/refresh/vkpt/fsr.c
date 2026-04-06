@@ -2,6 +2,7 @@
 Copyright (C) 2018 Christoph Schied
 Copyright (C) 2019, NVIDIA CORPORATION. All rights reserved.
 Copyright (C) 2021, Frank Richter. All rights reserved.
+Copyright (C) 2025, FSR4 ML upscaler port.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,303 +20,433 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "vkpt.h"
+#include "fsr4/ffx_fsr4_vk.h"
 
 /*
-	FidelityFX Super Resolution 1.0 ("FSR") implementation overview
-	===============================================================
+    FidelityFX Super Resolution 4 (FSR4) integration
+    =================================================
 
-	FSR is a combination of an upscaling and a sharpening algorithm to produce
-	high-resolution output - of high quality and visually appealing -
-	from lower resolution input.
+    Replaces the FSR1 EASU+RCAS spatial upscaler with FSR4, an INT8
+    machine-learning temporal upscaler from the AMD FSR4 SDK.
 
-	The input to FSR is the rendered image, in perceptual color space
-	(after tone mapping, sRGB), pre-antialiased, without HUD elements.
-	In our case the output from TAA fits this nicely.
+    Signal path:
+        Rendered frame (render resolution)
+          → TAA (Q2RTX asvgf_taau.comp)
+          → VKPT_IMG_TAA_OUTPUT
+          → FSR4 vkpt_fsr_do()
+          → VKPT_IMG_FSR_EASU_OUTPUT   (upscaled, display resolution)
+          → vkpt_final_blit()
+          → swapchain
 
-	Step 1 is upscaling the input image to the output resolution
-	using the EASU ("Edge Adaptive Spatial Upsampling") algorithm.
-	This is implemented in the "fsr_easu" shader.
-	Shader inputs are various render dimensions, found in the global 'qvk'
-	structure.
+    VKPT_IMG_FSR_RCAS_OUTPUT is repurposed as the FSR4 recurrent-state
+    ping-pong buffer managed internally by the FSR4 backend.
 
-	Step 2 is sharpening the image using the RCAS
-	("Robust Contrast Adaptive Sharpening") algorithm.
-	This is implemented in the "fsr_rcas" shader.
-	Shader input is a "sharpness" value controlled by a cvar.
+    Cvars
+    -----
+    flt_fsr_enable    0 = off, 1 = on (same name as before)
+    flt_fsr_sharpness float [0,2], fed to FSR4 RCAS sharpening (default 0.2)
 
-	For more details see the official documentation:
-	https://gpuopen.com/fidelityfx-superresolution/
+    Shader files expected in baseq2/fsr4_shaders/
+    ---------------------------------------------
+    fsr4_pre.spv
+    fsr4_1080_pass1.spv  ... fsr4_1080_pass12.spv   (for ≤1080p output)
+    fsr4_2160_pass1.spv  ... fsr4_2160_pass12.spv   (for ≤4K output)
+    fsr4_4320_pass1.spv  ... fsr4_4320_pass12.spv   (for 8K output)
+    fsr4_post.spv
+    fsr4_rcas.spv        (optional)
+    fsr4_spd.spv         (optional)
 
-	Q2RTX cvars
-	-----------
-	* flt_fsr_enable - 0 = disable FSR, 1 = enable FSR.
-	* flt_fsr_sharpness - float in the range [0,2]
-		Default is 0.2, a recommendation from the docs.
-	* flt_fsr_easu, flt_fsr_rcas - individual toggles for EASU and
-	  RCAS steps.
-	  The official docs ask nicely to only call it FSR when
-	  both EASU and RCAS are used, so these options are not
-	  exposed via the settings UI. These cvars are mainly provided
-	  for testing purposes.
+    Generate with:
+        ./compile_shaders.sh <fsr4_sdk_root> performance baseq2/fsr4_shaders
+*/
 
-	Q2RTX FSR shaders
-	-----------------
-	* Shader sources are the shader/fsr_* files, which in turn include
-	  the headers in fsr/. Those headers actually contain the bulk of
-	  the implementation (and are used from both C and GLSL).
-	* Shaders are compiled to FP16 and FP32 variants. FP16 is recommended
-	  for best performance. However, there's actually hardware that can
-	  run Q2RTX but doesn't have FP16 shader support (GTX 10 series),
-	  so FP32 versions are provided for compatibility.
+/* ── backend state ───────────────────────────────────────────────────────── */
 
- */
+/* Definition of the global override pointer declared extern in vkpt.h.
+   Set to &fsr4_backend around every ffx::* call so the FSR4 provider
+   routes through our Vulkan backend instead of the DX12 path. */
+FfxInterface *g_vkBackendOverride = NULL;
 
-#if defined(__GNUC__)
-// FSR headers define a lot of functions that aren't used
-#pragma GCC diagnostic ignored "-Wunused-function"
-#endif
+static FfxInterface     fsr4_backend;
+static void *           fsr4_scratch     = NULL;
+static ffxContext        fsr4_context;
+static bool             fsr4_context_ok  = false;
+static bool             fsr4_backend_ok  = false;
+static bool             fsr4_reset_next  = true;
+static uint32_t         fsr4_last_rw     = 0;
+static uint32_t         fsr4_last_rh     = 0;
 
-#define A_CPU
-#include "fsr/ffx_a.h"
-#include "fsr/ffx_fsr1.h"
-
-enum {
-	FSR_EASU_TO_RCAS,
-	FSR_EASU_TO_DISPLAY,
-	FSR_RCAS_AFTER_EASU,
-	FSR_RCAS_AFTER_TAAU,
-	FSR_NUM_PIPELINES
-};
-
-static VkPipeline       pipeline_fsr_sdr[FSR_NUM_PIPELINES];
-static VkPipeline       pipeline_fsr_hdr[FSR_NUM_PIPELINES];
-static VkPipelineLayout pipeline_layout_fsr;
-
-cvar_t *cvar_flt_fsr_enable = NULL;
+cvar_t *cvar_flt_fsr_enable    = NULL;
+cvar_t *cvar_flt_fsr_sharpness = NULL;
+/* Compatibility stubs - profiler.c externs these */
 cvar_t *cvar_flt_fsr_easu = NULL;
 cvar_t *cvar_flt_fsr_rcas = NULL;
-cvar_t *cvar_flt_fsr_sharpness = NULL;
 
-void vkpt_fsr_init_cvars()
+/* ── shader loading ──────────────────────────────────────────────────────── */
+
+static bool load_spv(const char *rel_path, const char *entry_point, FfxFsr4VkShaderBlob *out)
 {
-	// FSR enable toggle
-	cvar_flt_fsr_enable = Cvar_Get("flt_fsr_enable", "0", CVAR_ARCHIVE);
-	// FSR EASU (upscaling) toggle
-	cvar_flt_fsr_easu = Cvar_Get("flt_fsr_easu", "1", CVAR_ARCHIVE);
-	// FSR RCAS (sharpening) toggle
-	cvar_flt_fsr_rcas = Cvar_Get("flt_fsr_rcas", "1", CVAR_ARCHIVE);
-	// FSR sharpness setting (float, 0..2)
-	cvar_flt_fsr_sharpness = Cvar_Get("flt_fsr_sharpness", "0.2", CVAR_ARCHIVE);
+    char full[MAX_OSPATH];
+    Q_snprintf(full, sizeof(full), "fsr4_shaders/%s", rel_path);
+
+    byte *buf = NULL;
+    int   len = FS_LoadFile(full, (void **)&buf);
+    if (len <= 0 || !buf) {
+        Com_WPrintf("FSR4: shader not found: %s\n", full);
+        return false;
+    }
+    if (len & 3) {
+        Com_WPrintf("FSR4: shader %s size %d not DWORD-aligned\n", full, len);
+        FS_FreeFile(buf);
+        return false;
+    }
+
+    uint32_t *words = Z_Malloc((size_t)len);
+    memcpy(words, buf, (size_t)len);
+    FS_FreeFile(buf);
+
+    out->spirv      = words;
+    out->sizeBytes  = (size_t)len;
+    out->entryPoint = entry_point;
+    return true;
 }
 
-VkResult
-vkpt_fsr_initialize()
+static void free_blobs(FfxFsr4VkShaderBlob blobs[FFX_FSR4_VK_PASS_COUNT])
 {
-	VkDescriptorSetLayout desc_set_layouts[] = {
-		qvk.desc_set_layout_ubo, qvk.desc_set_layout_textures
-	};
-
-	CREATE_PIPELINE_LAYOUT(qvk.device, &pipeline_layout_fsr, 
-		.setLayoutCount         = LENGTH(desc_set_layouts),
-		.pSetLayouts            = desc_set_layouts,
-	);
-	ATTACH_LABEL_VARIABLE(pipeline_layout_fsr, PIPELINE_LAYOUT);
-
-	return VK_SUCCESS;
+    for (int i = 0; i < FFX_FSR4_VK_PASS_COUNT; i++) {
+        if (blobs[i].spirv) {
+            Z_Free((void *)blobs[i].spirv);
+            blobs[i].spirv = NULL;
+        }
+    }
 }
 
-VkResult
-vkpt_fsr_destroy()
+static const char *display_res_tag(void)
 {
-	vkDestroyPipelineLayout(qvk.device, pipeline_layout_fsr, NULL);
-
-	return VK_SUCCESS;
+    uint32_t h = qvk.extent_unscaled.height;
+    if (h > 2160) return "4320";
+    if (h > 1080) return "2160";
+    return "1080";
 }
 
-VkResult
-vkpt_fsr_create_pipelines()
+/* ── context management ──────────────────────────────────────────────────── */
+
+static VkResult fsr4_recreate_context(void)
 {
-	for (unsigned int hdr = 0; hdr <= 1; hdr++) {
-		VkPipeline* pipeline_fsr = hdr != 0 ? pipeline_fsr_hdr : pipeline_fsr_sdr;
+    if (!fsr4_backend_ok) return VK_SUCCESS;
 
-		uint32_t spec_data[] = {
-			hdr, 0,
-			hdr, 1
-		};
+    if (fsr4_context_ok) {
+        g_vkBackendOverride = &fsr4_backend;
+        ffxDestroyContext(&fsr4_context, NULL);
+        g_vkBackendOverride = NULL;
+        fsr4_context_ok = false;
+    }
 
-		VkSpecializationMapEntry specEntries[] = {
-			{.constantID = 0, .offset = 0, .size = sizeof(uint32_t)},
-			{.constantID = 1, .offset = 4, .size = sizeof(uint32_t)}
-		};
+    g_vkBackendOverride = &fsr4_backend;
 
-		VkSpecializationInfo specInfoInput[] = {
-			{ .mapEntryCount = 2, .pMapEntries = specEntries, .dataSize = sizeof(uint32_t) * 2, .pData = &spec_data[0] },
-			{ .mapEntryCount = 2, .pMapEntries = specEntries, .dataSize = sizeof(uint32_t) * 2, .pData = &spec_data[2] },
-		};
+    ffxCreateContextDescUpscale desc;
+    memset(&desc, 0, sizeof(desc));
+    desc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE;
+    desc.header.pNext = NULL;
+    desc.maxRenderSize.width   = qvk.extent_render.width;
+    desc.maxRenderSize.height  = qvk.extent_render.height;
+    desc.maxUpscaleSize.width  = qvk.extent_unscaled.width;
+    desc.maxUpscaleSize.height = qvk.extent_unscaled.height;
+    desc.flags = FFX_UPSCALE_ENABLE_AUTO_EXPOSURE
+               | FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE;
 
-		enum QVK_SHADER_MODULES qvk_mod_easu = qvk.supports_fp16 ? QVK_MOD_FSR_EASU_FP16_COMP : QVK_MOD_FSR_EASU_FP32_COMP;
-		enum QVK_SHADER_MODULES qvk_mod_rcas = qvk.supports_fp16 ? QVK_MOD_FSR_RCAS_FP16_COMP : QVK_MOD_FSR_RCAS_FP32_COMP;
-		VkComputePipelineCreateInfo pipeline_info[FSR_NUM_PIPELINES] = {
-			[FSR_EASU_TO_RCAS] = {
-				.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-				.stage  = SHADER_STAGE_SPEC(qvk_mod_easu, VK_SHADER_STAGE_COMPUTE_BIT, &specInfoInput[0]),
-				.layout = pipeline_layout_fsr,
-			},
-			[FSR_EASU_TO_DISPLAY] = {
-				.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-				.stage  = SHADER_STAGE_SPEC(qvk_mod_easu, VK_SHADER_STAGE_COMPUTE_BIT, &specInfoInput[1]),
-				.layout = pipeline_layout_fsr,
-			},
-			[FSR_RCAS_AFTER_EASU] = {
-				.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-				.stage  = SHADER_STAGE_SPEC(qvk_mod_rcas, VK_SHADER_STAGE_COMPUTE_BIT, &specInfoInput[0]),
-				.layout = pipeline_layout_fsr,
-			},
-			[FSR_RCAS_AFTER_TAAU] = {
-				.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-				.stage  = SHADER_STAGE_SPEC(qvk_mod_rcas, VK_SHADER_STAGE_COMPUTE_BIT, &specInfoInput[1]),
-				.layout = pipeline_layout_fsr,
-			},
-		};
+    ffxReturnCode_t ret = ffxCreateContext(&fsr4_context, &desc.header, NULL);
+    g_vkBackendOverride = NULL;
 
-		_VK(vkCreateComputePipelines(qvk.device, 0, LENGTH(pipeline_info), pipeline_info, 0, pipeline_fsr));
-	}
+    if (ret != FFX_API_RETURN_OK) {
+        Com_WPrintf("FSR4: ffx::CreateContext failed (%d)\n", (int)ret);
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
 
-	return VK_SUCCESS;
-}
-	
-VkResult
-vkpt_fsr_destroy_pipelines()
-{
-	for(int i = 0; i < FSR_NUM_PIPELINES; i++) {
-		vkDestroyPipeline(qvk.device, pipeline_fsr_sdr[i], NULL);
-		vkDestroyPipeline(qvk.device, pipeline_fsr_hdr[i], NULL);
-	}
-	return VK_SUCCESS;
+    fsr4_context_ok    = true;
+    fsr4_reset_next    = true;
+    fsr4_last_rw       = qvk.extent_render.width;
+    fsr4_last_rh       = qvk.extent_render.height;
+
+    Com_Printf("FSR4: context ready %ux%u -> %ux%u\n",
+               qvk.extent_render.width,   qvk.extent_render.height,
+               qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+    return VK_SUCCESS;
 }
 
-bool vkpt_fsr_is_enabled()
+/* ── vkpt public API ─────────────────────────────────────────────────────── */
+
+void vkpt_fsr_init_cvars(void)
 {
-	if (cvar_flt_fsr_enable->integer == 0)
-		return false;
-
-	if ((cvar_flt_fsr_enable->integer == 1)
-		&& (qvk.extent_render.width >= qvk.extent_unscaled.width || qvk.extent_render.height >= qvk.extent_unscaled.height))
-	{
-		// Only apply when upscaling by default (but allow tweaking this from the console)
-		return false;
-	}
-
-	// Need one of EASU or RCAS enabled
-	return (cvar_flt_fsr_easu->integer != 0) || (cvar_flt_fsr_rcas->integer != 0);
+    cvar_flt_fsr_enable    = Cvar_Get("flt_fsr_enable",    "0",   CVAR_ARCHIVE);
+    cvar_flt_fsr_sharpness = Cvar_Get("flt_fsr_sharpness", "0.2", CVAR_ARCHIVE);
+    cvar_flt_fsr_easu      = Cvar_Get("flt_fsr_easu",      "1",   CVAR_ARCHIVE);
+    cvar_flt_fsr_rcas      = Cvar_Get("flt_fsr_rcas",      "1",   CVAR_ARCHIVE);
 }
 
-bool vkpt_fsr_needs_upscale()
+VkResult vkpt_fsr_initialize(void)
 {
-	return cvar_flt_fsr_easu->integer == 0;
+    size_t scratch_sz = ffxFsr4VkGetScratchMemorySize();
+    fsr4_scratch = Z_Malloc(scratch_sz);
+
+    FfxFsr4VkShaderBlob blobs[FFX_FSR4_VK_PASS_COUNT];
+    memset(blobs, 0, sizeof(blobs));
+
+    bool ok = true;
+    char name[64];
+    const char *res = display_res_tag();
+
+    ok &= load_spv("fsr4_pre.spv",  "main", &blobs[0]);
+    for (int i = 1; i <= 12 && ok; i++) {
+        /* Entry point names must outlive the blobs array.  Using string
+         * literals (static storage) avoids a dangling pointer when the
+         * local `entry` buffer goes out of scope before the pipelines are
+         * built by ffxCreateContext → cbCreateBackendCtx → mkPipeline. */
+        static const char *pass_entries[13] = {
+            NULL,   /* [0] unused – pre-pass uses "main" */
+            "fsr4_model_v07_i8_pass1",  "fsr4_model_v07_i8_pass2",
+            "fsr4_model_v07_i8_pass3",  "fsr4_model_v07_i8_pass4",
+            "fsr4_model_v07_i8_pass5",  "fsr4_model_v07_i8_pass6",
+            "fsr4_model_v07_i8_pass7",  "fsr4_model_v07_i8_pass8",
+            "fsr4_model_v07_i8_pass9",  "fsr4_model_v07_i8_pass10",
+            "fsr4_model_v07_i8_pass11", "fsr4_model_v07_i8_pass12",
+        };
+        Q_snprintf(name, sizeof(name), "fsr4_%s_pass%d.spv", res, i);
+        ok &= load_spv(name, pass_entries[i], &blobs[i]);
+    }
+    ok &= load_spv("fsr4_post.spv", "main", &blobs[13]);
+    /* optional passes – don't fail if absent */
+    load_spv("fsr4_rcas.spv", "main", &blobs[14]);
+    load_spv("fsr4_spd.spv",  "main", &blobs[15]);
+
+    if (!ok) {
+        Com_WPrintf("FSR4: required shaders missing – FSR4 disabled.\n"
+                    "      Run compile_shaders.sh to build baseq2/fsr4_shaders/\n");
+        free_blobs(blobs);
+        Z_Free(fsr4_scratch);
+        fsr4_scratch = NULL;
+        return VK_SUCCESS;
+    }
+
+    FfxFsr4VkCreateInfo ci;
+    memset(&ci, 0, sizeof(ci));
+    ci.device            = qvk.device;
+    ci.physicalDevice    = qvk.physical_device;
+    ci.scratchBuffer     = fsr4_scratch;
+    ci.scratchBufferSize = scratch_sz;
+    memcpy(ci.shaders, blobs, sizeof(blobs));
+
+    VkResult r = ffxFsr4VkCreateContext(&ci, &fsr4_backend);
+    free_blobs(blobs);
+
+    if (r != VK_SUCCESS) {
+        Com_WPrintf("FSR4: ffxFsr4VkCreateContext failed (%d) – FSR4 disabled.\n", r);
+        Z_Free(fsr4_scratch);
+        fsr4_scratch = NULL;
+        return VK_SUCCESS;
+    }
+
+    fsr4_backend_ok = true;
+    Com_Printf("FSR4: backend ready (INT8/dot4add path).\n");
+    return VK_SUCCESS;
 }
 
+VkResult vkpt_fsr_destroy(void)
+{
+    if (fsr4_context_ok) {
+        g_vkBackendOverride = &fsr4_backend;
+        ffxDestroyContext(&fsr4_context, NULL);
+        g_vkBackendOverride = NULL;
+        fsr4_context_ok = false;
+    }
+    if (fsr4_backend_ok) {
+        ffxFsr4VkDestroyContext((FfxFsr4VkContext *)fsr4_scratch);
+        fsr4_backend_ok = false;
+    }
+    if (fsr4_scratch) {
+        Z_Free(fsr4_scratch);
+        fsr4_scratch = NULL;
+    }
+    fsr4_reset_next = true;
+    fsr4_last_rw = fsr4_last_rh = 0;
+    return VK_SUCCESS;
+}
+
+VkResult vkpt_fsr_create_pipelines(void)
+{
+    return fsr4_recreate_context();
+}
+
+VkResult vkpt_fsr_destroy_pipelines(void)
+{
+    if (fsr4_context_ok) {
+        g_vkBackendOverride = &fsr4_backend;
+        ffxDestroyContext(&fsr4_context, NULL);
+        g_vkBackendOverride = NULL;
+        fsr4_context_ok = false;
+    }
+    return VK_SUCCESS;
+}
+
+bool vkpt_fsr_is_enabled(void)
+{
+    if (!fsr4_backend_ok || !fsr4_context_ok)
+        return false;
+    if (!cvar_flt_fsr_enable->integer)
+        return false;
+    if (cvar_flt_fsr_enable->integer == 1 &&
+        (qvk.extent_render.width  >= qvk.extent_unscaled.width ||
+         qvk.extent_render.height >= qvk.extent_unscaled.height))
+        return false;
+    return true;
+}
+
+/* FSR4 handles its own upscaling – no separate pre-upscale step needed */
+bool vkpt_fsr_needs_upscale(void)
+{
+    return false;
+}
+
+/* No-op: FSR4 drives its own constants via the FfxInterface */
 void vkpt_fsr_update_ubo(QVKUniformBuffer_t *ubo)
 {
-	// Set shader constants for FSR upscaling (EASU) pass
-	FsrEasuCon(&ubo->easu_const0[0], &ubo->easu_const1[0], &ubo->easu_const2[0], &ubo->easu_const3[0],
-			   qvk.extent_render.width, qvk.extent_render.height,	   // render dimensions
-			   IMG_WIDTH_TAA, IMG_HEIGHT_TAA,						   // container texture dimensions
-			   qvk.extent_unscaled.width, qvk.extent_unscaled.height); // display dimensions
-
-	// Set shader constants for FSR sharpening (RCAS) pass
-	FsrRcasCon(&ubo->rcas_const0[0], cvar_flt_fsr_sharpness->value);
-}
-
-#define BARRIER_COMPUTE(cmd_buf, img) \
-	do { \
-		VkImageSubresourceRange subresource_range = { \
-			.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT, \
-			.baseMipLevel   = 0, \
-			.levelCount     = 1, \
-			.baseArrayLayer = 0, \
-			.layerCount     = 1 \
-		}; \
-		IMAGE_BARRIER(cmd_buf, \
-				.image            = img, \
-				.subresourceRange = subresource_range, \
-				.srcAccessMask    = VK_ACCESS_SHADER_WRITE_BIT, \
-				.dstAccessMask    = VK_ACCESS_SHADER_READ_BIT, \
-				.oldLayout        = VK_IMAGE_LAYOUT_GENERAL, \
-				.newLayout        = VK_IMAGE_LAYOUT_GENERAL, \
-		); \
-	} while(0)
-
-static void vkpt_fsr_easu(VkCommandBuffer cmd_buf)
-{
-	VkDescriptorSet desc_sets[] = {
-		qvk.desc_set_ubo,
-		qvk_get_current_desc_set_textures()
-	};
-
-	BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR_EASU);
-
-	VkPipeline* pipeline_fsr = qvk.surf_is_hdr ? pipeline_fsr_hdr : pipeline_fsr_sdr;
-	vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_fsr[cvar_flt_fsr_rcas->integer != 0 ? FSR_EASU_TO_RCAS : FSR_EASU_TO_DISPLAY]);
-
-	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
-		pipeline_layout_fsr, 0, LENGTH(desc_sets), desc_sets, 0, 0);
-
-	VkExtent2D dispatch_size = qvk.extent_unscaled;
-
-	// Dispatch size as described by the FSR Integration Overview
-	vkCmdDispatch(cmd_buf,
-			(dispatch_size.width + 15) / 16,
-			(dispatch_size.height + 15) / 16,
-			1);
-	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_FSR_EASU_OUTPUT]);
-
-	END_PERF_MARKER(cmd_buf, PROFILER_FSR_EASU);
-}
-
-static void vkpt_fsr_rcas(VkCommandBuffer cmd_buf)
-{
-	VkDescriptorSet desc_sets[] = {
-		qvk.desc_set_ubo,
-		qvk_get_current_desc_set_textures()
-	};
-
-	BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR_RCAS);
-
-	VkPipeline* pipeline_fsr = qvk.surf_is_hdr ? pipeline_fsr_hdr : pipeline_fsr_sdr;
-	vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_fsr[cvar_flt_fsr_easu->integer != 0 ? FSR_RCAS_AFTER_EASU : FSR_RCAS_AFTER_TAAU]);
-
-	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
-		pipeline_layout_fsr, 0, LENGTH(desc_sets), desc_sets, 0, 0);
-
-	VkExtent2D dispatch_size = qvk.extent_unscaled;
-
-	// Dispatch size as described by the FSR Integration Overview
-	vkCmdDispatch(cmd_buf,
-			(dispatch_size.width + 15) / 16,
-			(dispatch_size.height + 15) / 16,
-			1);
-	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_FSR_RCAS_OUTPUT]);
-
-	END_PERF_MARKER(cmd_buf, PROFILER_FSR_RCAS);
+    (void)ubo;
 }
 
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf)
 {
-	BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    if (!vkpt_fsr_is_enabled())
+        return VK_SUCCESS;
 
-	if(cvar_flt_fsr_easu->integer != 0)
-		vkpt_fsr_easu(cmd_buf);
-	if(cvar_flt_fsr_rcas->integer != 0)
-		vkpt_fsr_rcas(cmd_buf);
+    /* Recreate if render resolution changed */
+    if (qvk.extent_render.width  != fsr4_last_rw ||
+        qvk.extent_render.height != fsr4_last_rh)
+    {
+        _VK(fsr4_recreate_context());
+        if (!fsr4_context_ok) return VK_SUCCESS;
+    }
 
-	END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
 
-	return VK_SUCCESS;
+    /* Query the Halton jitter offset for this frame */
+    int32_t phase_count = 0;
+    {
+        ffxQueryDescUpscaleGetJitterPhaseCount q;
+        memset(&q, 0, sizeof(q));
+        q.header.type = FFX_API_QUERY_DESC_TYPE_UPSCALE_GET_JITTER_PHASE_COUNT;
+        q.header.pNext = NULL;
+        q.displayWidth   = qvk.extent_unscaled.width;
+        q.renderWidth    = qvk.extent_render.width;
+        q.pOutPhaseCount = &phase_count;
+        g_vkBackendOverride = &fsr4_backend;
+        ffxQuery(&fsr4_context, &q.header);
+        g_vkBackendOverride = NULL;
+    }
+
+    float jx = 0.f, jy = 0.f;
+    if (phase_count > 0) {
+        ffxQueryDescUpscaleGetJitterOffset q;
+        memset(&q, 0, sizeof(q));
+        q.header.type = FFX_API_QUERY_DESC_TYPE_UPSCALE_GET_JITTER_OFFSET;
+        q.header.pNext = NULL;
+        q.index        = (int32_t)(qvk.frame_counter % (uint64_t)phase_count);
+        q.phaseCount   = phase_count;
+        q.pOutX        = &jx;
+        q.pOutY        = &jy;
+        g_vkBackendOverride = &fsr4_backend;
+        ffxQuery(&fsr4_context, &q.header);
+        g_vkBackendOverride = NULL;
+    }
+
+    /* Transition TAA output: GENERAL -> SHADER_READ_ONLY_OPTIMAL */
+    {
+        VkImageSubresourceRange sr = {
+            VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+        };
+        IMAGE_BARRIER(cmd_buf,
+            .image            = qvk.images[VKPT_IMG_TAA_OUTPUT],
+            .subresourceRange = sr,
+            .srcAccessMask    = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask    = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout        = VK_IMAGE_LAYOUT_GENERAL,
+            .newLayout        = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        );
+    }
+
+    /* Build the dispatch descriptor */
+    ffxDispatchDescUpscale d;
+    memset(&d, 0, sizeof(d));
+    d.header.type = FFX_API_DISPATCH_DESC_TYPE_UPSCALE;
+    d.header.pNext = NULL;
+
+#define FILL_TEX(field, img_idx, fmt, w, h)                                 \
+    do {                                                                     \
+        d.field.resource              = (void *)qvk.images_views[img_idx]; \
+        d.field.description.type      = FFX_RESOURCE_TYPE_TEXTURE2D;       \
+        d.field.description.format    = (fmt);                              \
+        d.field.description.width     = (w);                                \
+        d.field.description.height    = (h);                                \
+    } while(0)
+
+    FILL_TEX(color,        VKPT_IMG_TAA_OUTPUT,      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+             qvk.extent_render.width,   qvk.extent_render.height);
+
+    FILL_TEX(depth,        VKPT_IMG_PT_MOTION,       FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+             qvk.extent_render.width,   qvk.extent_render.height);
+
+    FILL_TEX(motionVectors, VKPT_IMG_PT_MOTION,      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+             qvk.extent_render.width,   qvk.extent_render.height);
+
+    FILL_TEX(output,       VKPT_IMG_FSR_EASU_OUTPUT, FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+             qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+
+#undef FILL_TEX
+
+    d.renderSize.width   = qvk.extent_render.width;
+    d.renderSize.height  = qvk.extent_render.height;
+    d.upscaleSize.width  = qvk.extent_unscaled.width;
+    d.upscaleSize.height = qvk.extent_unscaled.height;
+
+    d.jitterOffset.x = jx;
+    d.jitterOffset.y = jy;
+
+    /* PT_MOTION is in pixel-space, scaled by the render resolution */
+    d.motionVectorScale.x = (float)qvk.extent_render.width;
+    d.motionVectorScale.y = (float)qvk.extent_render.height;
+
+    d.frameTimeDelta   = 16.667f;   /* TODO: pass actual delta from main.c */
+    d.sharpness        = cvar_flt_fsr_sharpness->value;
+    d.enableSharpening = (cvar_flt_fsr_rcas->integer != 0) ? 1 : 0;
+    d.reset            = fsr4_reset_next ? 1 : 0;
+    d.commandList      = (FfxCommandList)cmd_buf;
+
+    fsr4_reset_next = false;
+
+    g_vkBackendOverride = &fsr4_backend;
+    ffxDispatch(&fsr4_context, &d.header);
+    g_vkBackendOverride = NULL;
+
+    /* Restore TAA output: SHADER_READ_ONLY_OPTIMAL -> GENERAL */
+    {
+        VkImageSubresourceRange sr = {
+            VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+        };
+        IMAGE_BARRIER(cmd_buf,
+            .image            = qvk.images[VKPT_IMG_TAA_OUTPUT],
+            .subresourceRange = sr,
+            .srcAccessMask    = VK_ACCESS_SHADER_READ_BIT,
+            .dstAccessMask    = VK_ACCESS_SHADER_WRITE_BIT,
+            .oldLayout        = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .newLayout        = VK_IMAGE_LAYOUT_GENERAL,
+        );
+    }
+
+    END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    return VK_SUCCESS;
 }
 
 VkResult vkpt_fsr_final_blit(VkCommandBuffer cmd_buf, bool warp)
 {
-	int output_image = cvar_flt_fsr_rcas->integer != 0 ? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_FSR_EASU_OUTPUT;
-	return vkpt_final_blit(cmd_buf, output_image, qvk.extent_unscaled, false, warp);
+    return vkpt_final_blit(cmd_buf, VKPT_IMG_FSR_EASU_OUTPUT,
+                           qvk.extent_unscaled, false, warp);
 }
