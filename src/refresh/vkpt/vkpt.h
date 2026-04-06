@@ -96,10 +96,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	SHADER_MODULE_DO(QVK_MOD_GOD_RAYS_FILTER_COMP)                   \
 	SHADER_MODULE_DO(QVK_MOD_SHADOW_MAP_VERT)                        \
 	SHADER_MODULE_DO(QVK_MOD_COMPOSITING_COMP)                       \
-	SHADER_MODULE_DO(QVK_MOD_FSR_EASU_FP16_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_EASU_FP32_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_RCAS_FP16_COMP)                     \
-	SHADER_MODULE_DO(QVK_MOD_FSR_RCAS_FP32_COMP)                     \
+	/* FSR1 shader modules removed: FSR4 loads SPIR-V directly at runtime */\
 	SHADER_MODULE_DO(QVK_MOD_NORMALIZE_NORMAL_MAP_COMP)              \
 	SHADER_MODULE_DO(QVK_MOD_DEBUG_LINE_FRAG)                        \
 	SHADER_MODULE_DO(QVK_MOD_DEBUG_LINE_VERT)                        \
@@ -492,8 +489,6 @@ void create_orthographic_matrix(mat4_t matrix, float xmin, float xmax,
 	PROFILER_DO(BLOOM,                      1) \
 	PROFILER_DO(TONE_MAPPING,               1) \
 	PROFILER_DO(FSR,                        1) \
-	PROFILER_DO(FSR_EASU,                   2) \
-	PROFILER_DO(FSR_RCAS,                   2) \
 	PROFILER_DO(UPDATE_ENVIRONMENT,         1) \
 	PROFILER_DO(GOD_RAYS,                   1) \
 	PROFILER_DO(GOD_RAYS_REFLECT_REFRACT,   1) \
@@ -699,6 +694,13 @@ bool vkpt_fsr_needs_upscale(void);
 void vkpt_fsr_update_ubo(QVKUniformBuffer_t *ubo);
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf);
 VkResult vkpt_fsr_final_blit(VkCommandBuffer cmd_buf, bool warp);
+
+/* FSR4: global backend override pointer.
+   Set to &fsr4_backend before calling ffxCreate/Dispatch/Query,
+   then cleared to NULL.  Defined in fsr.c, used by ffx_functions_q2rtx.c
+   to route all FFX API calls through the Vulkan backend. */
+#include "fsr4/ffx_fsr4_vk.h"
+extern FfxInterface *g_vkBackendOverride;
 
 VkResult vkpt_bloom_initialize(void);
 VkResult vkpt_bloom_destroy(void);

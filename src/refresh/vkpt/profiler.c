@@ -343,8 +343,6 @@ draw_profiler(int enable_asvgf)
 	if(cvar_flt_fsr_enable->integer != 0)
 	{
 		PROFILER_DO(PROFILER_FSR, 1);
-		PROFILER_DO(PROFILER_FSR_EASU, 2);
-		PROFILER_DO(PROFILER_FSR_RCAS, 2);
 	}
 #undef PROFILER_DO
 

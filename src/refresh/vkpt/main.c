@@ -467,7 +467,8 @@ static const char *optional_instance_extension_name[NUM_OPTIONAL_INSTANCE_EXTENS
 #define OPTIONAL_DEVICE_EXTENSIONS					\
 	VK_OPT_EXT_DO(VK_KHR_LINE_RASTERIZATION)		\
 	VK_OPT_EXT_DO(VK_KHR_SHADER_NON_SEMANTIC_INFO)	\
-	VK_OPT_EXT_DO(VK_EXT_DEBUG_MARKER)
+	VK_OPT_EXT_DO(VK_EXT_DEBUG_MARKER)				\
+	VK_OPT_EXT_DO(VK_KHR_COMPUTE_SHADER_DERIVATIVES)
 
 enum optional_device_extension_id
 {
@@ -489,7 +490,7 @@ static const VkApplicationInfo vk_app_info = {
 	.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
 	.pEngineName        = "vkpt",
 	.engineVersion      = VK_MAKE_VERSION(1, 0, 0),
-	.apiVersion         = VK_API_VERSION_1_2,
+	.apiVersion         = VK_API_VERSION_1_3,
 };
 
 /* use this to override file names */
@@ -1347,6 +1348,7 @@ init_vulkan(void)
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 		.descriptorIndexing = VK_TRUE,
 		.shaderFloat16 = qvk.supports_fp16,
+		.shaderInt8 = VK_TRUE,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
 		.runtimeDescriptorArray = VK_TRUE,
@@ -1354,9 +1356,14 @@ init_vulkan(void)
 		.bufferDeviceAddress = VK_TRUE,
 		.bufferDeviceAddressMultiDevice = qvk.device_count > 1 ? VK_TRUE : VK_FALSE,
 	};
+	VkPhysicalDeviceVulkan13Features device_features_vk13 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		.pNext = &device_features_vk12,
+		.shaderIntegerDotProduct = VK_TRUE,
+	};
 	VkPhysicalDeviceFeatures2 device_features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR,
-		.pNext = &device_features_vk12,
+		.pNext = &device_features_vk13,
 		.features = {
 			.robustBufferAccess = VK_TRUE,
 			.fullDrawIndexUint32 = VK_TRUE,
@@ -1390,7 +1397,7 @@ init_vulkan(void)
 			.shaderStorageImageExtendedFormats = VK_TRUE,
 			.shaderStorageImageMultisample = VK_FALSE,
 			.shaderStorageImageReadWithoutFormat = VK_FALSE,
-			.shaderStorageImageWriteWithoutFormat = VK_FALSE,
+			.shaderStorageImageWriteWithoutFormat = VK_TRUE,
 			.shaderUniformBufferArrayDynamicIndexing = VK_TRUE,
 			.shaderSampledImageArrayDynamicIndexing = VK_TRUE,
 			.shaderStorageBufferArrayDynamicIndexing = VK_TRUE,
@@ -1464,6 +1471,15 @@ init_vulkan(void)
 	if (qvk.supports_smooth_lines) {
 		line_rast_feat.pNext = device_features.pNext;
 		device_features.pNext = &line_rast_feat;
+	}
+
+	VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR cs_deriv_feat = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR,
+		.computeDerivativeGroupLinear = VK_TRUE,
+	};
+	if (available_optional_device_extensions[OPT_EXT_VK_KHR_COMPUTE_SHADER_DERIVATIVES]) {
+		cs_deriv_feat.pNext = device_features.pNext;
+		device_features.pNext = &cs_deriv_feat;
 	}
 
 	/* create device and queue */
@@ -2913,7 +2929,7 @@ prepare_ubo(refdef_t *fd, mleaf_t* viewleaf, const reference_mode_t* ref_mode, c
 		ubo->flt_taa = 0;
 	}
 
-	if (qvk.effective_aa_mode == AA_MODE_UPSCALE)
+	if (qvk.effective_aa_mode == AA_MODE_UPSCALE || fsr_enabled)
 	{
 		int taa_index = (int)(qvk.frame_counter % NUM_TAA_SAMPLES);
 		ubo->sub_pixel_jitter[0] = taa_samples[taa_index][0];

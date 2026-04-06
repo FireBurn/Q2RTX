@@ -205,11 +205,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	GLOBAL_UBO_VAR_LIST_DO(vec3,            padding) \
 	GLOBAL_UBO_VAR_LIST_DO(int,             pt_projection) \
 	\
-	GLOBAL_UBO_VAR_LIST_DO(uvec4,           easu_const0) \
-	GLOBAL_UBO_VAR_LIST_DO(uvec4,           easu_const1) \
-	GLOBAL_UBO_VAR_LIST_DO(uvec4,           easu_const2) \
-	GLOBAL_UBO_VAR_LIST_DO(uvec4,           easu_const3) \
-	GLOBAL_UBO_VAR_LIST_DO(uvec4,           rcas_const0) \
+	/* FSR1 constants removed: FSR4 uses push-constants not the UBO. \
+	   Padding preserves struct layout for any shader accessing by offset. */ \
+	GLOBAL_UBO_VAR_LIST_DO(uvec4,           fsr_padding0) \
+	GLOBAL_UBO_VAR_LIST_DO(uvec4,           fsr_padding1) \
+	GLOBAL_UBO_VAR_LIST_DO(uvec4,           fsr_padding2) \
+	GLOBAL_UBO_VAR_LIST_DO(uvec4,           fsr_padding3) \
+	GLOBAL_UBO_VAR_LIST_DO(uvec4,           fsr_padding4) \
 	\
 	GLOBAL_UBO_VAR_LIST_DO(vec2,            sub_pixel_jitter) \
 	GLOBAL_UBO_VAR_LIST_DO(float,           prev_adapted_luminance) \
