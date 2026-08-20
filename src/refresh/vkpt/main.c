@@ -3745,8 +3745,12 @@ R_BeginFrame_RTX(void)
 	
 	VkExtent2D extent_screen_images = get_screen_image_extent();
 
+	const bool temporal_debug_requested = cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF;
+	const bool framegen_present_requested = cvar_flt_frame_generation &&
+		cvar_flt_frame_generation->integer != 0 && !temporal_debug_requested;
 	const bool framegen_pacing_changed = qvk.surf_framegen_fifo !=
-		(cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0);
+		framegen_present_requested;
 	if(!extents_equal(extent_screen_images, qvk.extent_screen_images) || (!!cvar_hdr->integer != qvk.surf_is_hdr) || (!!cvar_vsync->integer != qvk.surf_vsync) || framegen_pacing_changed)
 	{
 		qvk.extent_screen_images = extent_screen_images;
@@ -3762,7 +3766,7 @@ R_BeginFrame_RTX(void)
 	 * If the surface cannot supply minImageCount+2 images, the attempt flag prevents a
 	 * recreate loop and FG remains safely disabled. */
 	static bool framegen_swapchain_upgrade_attempted;
-	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
+	if (!framegen_present_requested)
 		framegen_swapchain_upgrade_attempted = false;
 	else if (qvk.num_swap_chain_images < qvk.framegen_required_swap_chain_images &&
 		!framegen_swapchain_upgrade_attempted) {
@@ -3774,11 +3778,14 @@ R_BeginFrame_RTX(void)
 	 * one-image acquisition path as the fallback whenever its compute/presenter
 	 * prerequisites are not met. Three images avoid blocking a two-acquire frame
 	 * behind the presentation engine on minimum-double-buffer swapchains. */
-	qvk.framegen_present_active = !qvk.frame_menu_mode &&
+	qvk.framegen_present_active = framegen_present_requested && !qvk.frame_menu_mode &&
 		qvk.num_swap_chain_images >= qvk.framegen_required_swap_chain_images &&
 		vkpt_fsr_frame_generation_prepare_present();
 	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
 		vkpt_fsr_frame_generation_publish_status(false, "off");
+	else if (temporal_debug_requested)
+		vkpt_fsr_frame_generation_publish_status(false,
+			"suspended: temporal input debug view active");
 	else if (qvk.frame_menu_mode)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"paused/menu frame: analytical frame generation suspended");
@@ -3929,6 +3936,10 @@ R_EndFrame_RTX(void)
 {
 	LOG_FUNC();
 	bool framegen_generated_presented = false;
+	bool temporal_debug_active = false;
+	unsigned int temporal_debug_image = VKPT_IMG_CLEAR;
+	VkExtent2D temporal_debug_extent = { 0, 0 };
+	VkptTemporalDebugView temporal_debug_view = VKPT_TEMPORAL_DEBUG_OFF;
 
 	if (!qvk.swap_chain)
 	{
@@ -3940,6 +3951,12 @@ R_EndFrame_RTX(void)
 		draw_profiler(cvar_flt_enable->integer != 0);
 	if(cvar_tm_debug->integer)
 		vkpt_tone_mapping_draw_debug();
+	if (frame_ready && cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) {
+		temporal_debug_active = vkpt_temporal_debug_select(
+			&temporal_debug_image, &temporal_debug_extent,
+			&temporal_debug_view, NULL, 0);
+	}
 
 	if (qvk.framegen_present_active) {
 		const uint32_t generated_index = qvk.framegen_generated_swap_chain_image_index;
@@ -3985,7 +4002,12 @@ R_EndFrame_RTX(void)
 	if (frame_ready)
 	{
 		bool waterwarp = (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) && cvar_pt_waterwarp->integer;
-		if (vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
+		if (temporal_debug_active)
+		{
+			vkpt_temporal_debug_blit(cmd_buf, temporal_debug_image,
+				temporal_debug_extent, temporal_debug_view);
+		}
+		else if (vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
 		{
 			vkpt_fsr_final_blit(cmd_buf, waterwarp);
 		}

@@ -221,6 +221,7 @@ cvar_t *cvar_flt_frame_generation_active = NULL;
 cvar_t *cvar_flt_frame_generation_reason = NULL;
 cvar_t *cvar_flt_frame_generation_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
+cvar_t *cvar_flt_temporal_debug_view = NULL;
 static unsigned fsr3_fg_last_present_msec;
 static float fsr3_fg_filtered_rendered_fps;
 static unsigned fsr3_fg_low_rate_frames;
@@ -1196,6 +1197,12 @@ void vkpt_fsr_init_cvars(void)
         "flt_frame_generation_rendered_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_frame_generation_generated_fps = Cvar_Get(
         "flt_frame_generation_generated_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
+    /* Presentation-only input inspection. A nonzero view temporarily takes
+     * ownership of the real-frame final blit, so analytical frame generation
+     * is explicitly suspended rather than mixing a generated scene with a
+     * debug real frame. */
+    cvar_flt_temporal_debug_view = Cvar_Get("flt_temporal_debug_view", "0",
+        CVAR_ARCHIVE);
     cvar_flt_upscaler_active = Cvar_Get("flt_upscaler_active", "0",
         CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_upscaler_reason = Cvar_Get("flt_upscaler_reason", "startup",
@@ -1443,10 +1450,15 @@ static FfxVkPortableImage fsr3_screen_image(
 
 bool vkpt_fsr_frame_generation_is_ready(void)
 {
-    const int upscaler = requested_upscaler();
+	const int upscaler = requested_upscaler();
 
-    if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
-        return false;
+	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
+		return false;
+	/* A debug view replaces the final scene blit with a temporal input. Do not
+	 * generate a second presentation from a different scene representation. */
+	if (cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF)
+		return false;
     /* Optical flow and frame interpolation consume the provider-neutral
      * temporal contract and presentation-domain scene color, not either
      * upscaler's private history. The public 3.1.5 upscaler therefore has the
@@ -1582,8 +1594,11 @@ void vkpt_fsr_frame_generation_note_present_pair(void)
 
 bool vkpt_fsr_frame_generation_prepare_present(void)
 {
-    if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
-        return false;
+	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
+		return false;
+	if (cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF)
+		return false;
     if (!fsr3_frame_generation_rate_is_eligible()) {
         char reason[128];
         Q_snprintf(reason, sizeof(reason),

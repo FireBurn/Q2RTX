@@ -69,6 +69,7 @@ typedef struct {
 
 typedef struct {
 	vec2_t input_dimensions;
+	uint32_t temporal_debug_view;
 } FinalBlitPushConstants_t;
 
 static clipRect_t clip_rect;
@@ -82,6 +83,7 @@ static VkPipelineLayout        pipeline_layout_final_blit;
 static VkRenderPass            render_pass_stretch_pic;
 static VkPipeline              pipeline_stretch_pic[STRETCH_PIC_NUM_PIPELINES];
 static VkPipeline              pipeline_final_blit[FINAL_BLIT_NUM_PIPELINES];
+static VkPipeline              pipeline_temporal_debug;
 static VkFramebuffer*          framebuffer_stretch_pic = NULL;
 static BufferResource_t        buf_stretch_pic_queue[MAX_FRAMES_IN_FLIGHT];
 static BufferResource_t        buf_ubo[MAX_FRAMES_IN_FLIGHT];
@@ -484,6 +486,7 @@ vkpt_draw_destroy_pipelines()
 	for(int i = 0; i < FINAL_BLIT_NUM_PIPELINES; i++) {
 		vkDestroyPipeline(qvk.device, pipeline_final_blit[i], NULL);
 	}
+	vkDestroyPipeline(qvk.device, pipeline_temporal_debug, NULL);
 	vkDestroyPipelineLayout(qvk.device, pipeline_layout_stretch_pic, NULL);
 	vkDestroyPipelineLayout(qvk.device, pipeline_layout_final_blit, NULL);
 	for(int i = 0; i < qvk.num_swap_chain_images; i++) {
@@ -685,6 +688,15 @@ vkpt_draw_create_pipelines()
 		ATTACH_LABEL_VARIABLE(pipeline_final_blit[i], PIPELINE);
 	}
 
+	VkPipelineShaderStageCreateInfo shader_info_temporal_debug[] = {
+		SHADER_STAGE(QVK_MOD_FINAL_BLIT_VERT, VK_SHADER_STAGE_VERTEX_BIT),
+		SHADER_STAGE(QVK_MOD_TEMPORAL_DEBUG_FRAG, VK_SHADER_STAGE_FRAGMENT_BIT)
+	};
+	pipeline_info.pStages = shader_info_temporal_debug;
+	_VK(vkCreateGraphicsPipelines(qvk.device, VK_NULL_HANDLE, 1, &pipeline_info,
+		NULL, &pipeline_temporal_debug));
+	ATTACH_LABEL_VARIABLE(pipeline_temporal_debug, PIPELINE);
+
 	framebuffer_stretch_pic = malloc(qvk.num_swap_chain_images * sizeof(*framebuffer_stretch_pic));
 	for(int i = 0; i < qvk.num_swap_chain_images; i++) {
 		VkImageView attachments[] = {
@@ -830,7 +842,10 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 		final_blit_set
 	};
 
-	FinalBlitPushConstants_t push_constants = {.input_dimensions = {extent.width, extent.height}};
+	FinalBlitPushConstants_t push_constants = {
+		.input_dimensions = {extent.width, extent.height},
+		.temporal_debug_view = VKPT_TEMPORAL_DEBUG_OFF
+	};
 
 	vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -842,6 +857,53 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 	vkCmdDraw(cmd_buf, 4, 1, 0, 0);
 	vkCmdEndRenderPass(cmd_buf);
 
+	return VK_SUCCESS;
+}
+
+VkResult
+vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
+	VkExtent2D extent, VkptTemporalDebugView view)
+{
+	VkDescriptorSet final_blit_set = desc_set_final_blit[
+		qvk.current_frame_index * FINAL_BLIT_SETS_PER_FRAME];
+	VkDescriptorImageInfo img_info_input = {
+		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.imageView = qvk.images_views[image_index],
+		.sampler = qvk.tex_sampler,
+	};
+	VkWriteDescriptorSet write = {
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.dstSet = final_blit_set,
+		.dstBinding = 0,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.pImageInfo = &img_info_input,
+	};
+	VkRenderPassBeginInfo render_pass_info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = render_pass_stretch_pic,
+		.framebuffer = framebuffer_stretch_pic[qvk.current_swap_chain_image_index],
+		.renderArea.offset = { 0, 0 },
+		.renderArea.extent = vkpt_draw_get_extent(),
+	};
+	VkDescriptorSet desc_sets[] = { qvk.desc_set_ubo, final_blit_set };
+	FinalBlitPushConstants_t push_constants = {
+		.input_dimensions = { extent.width, extent.height },
+		.temporal_debug_view = (uint32_t)view,
+	};
+
+	if (view <= VKPT_TEMPORAL_DEBUG_OFF || view > VKPT_TEMPORAL_DEBUG_ROUGHNESS)
+		return VK_ERROR_INITIALIZATION_FAILED;
+	vkUpdateDescriptorSets(qvk.device, 1, &write, 0, NULL);
+	vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		pipeline_layout_final_blit, 0, LENGTH(desc_sets), desc_sets, 0, 0);
+	vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		pipeline_temporal_debug);
+	vkCmdPushConstants(cmd_buf, pipeline_layout_final_blit,
+		VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
+	vkCmdDraw(cmd_buf, 4, 1, 0, 0);
+	vkCmdEndRenderPass(cmd_buf);
 	return VK_SUCCESS;
 }
 

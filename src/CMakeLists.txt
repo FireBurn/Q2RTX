@@ -350,6 +350,7 @@ set(SRC_SHADERS
 	refresh/vkpt/shader/stretch_pic.vert
 	refresh/vkpt/shader/final_blit.frag
 	refresh/vkpt/shader/final_blit.vert
+	refresh/vkpt/shader/temporal_debug.frag
 	# FSR1 shaders removed; FSR4 SPIR-V loaded at runtime
 	refresh/vkpt/shader/debug_line.frag
 	refresh/vkpt/shader/debug_line.vert

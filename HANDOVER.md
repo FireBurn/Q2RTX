@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Q2RTX now provides `flt_temporal_debug_view`, a presentation-only selector
+  for all dense temporal inputs: pre-tone-map scene HDR, current-to-previous
+  motion, conventional device depth, positive-forward view-Z, reactive and
+  composition masks, normals, albedo, and roughness. It reuses the final-blit
+  descriptor with a semantic debug fragment shader and never mutates provider
+  inputs or temporal history. View-Z is log-scaled to Q2RTX's 10,000-unit sky;
+  motion displays signed pixel direction in RG and magnitude in B. Analytical
+  frame generation is suspended while active, and debug mode removes its FIFO
+  swapchain request. A `vk_validation=1` RX 6800M FSR4 Quality run at
+  644x361 -> 960x540 captured a coherent view-Z image with no VUID/error:
+  `/home/fireburn/Screenshot_temporal_view_z_20260820.png`.
+
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
   values are `UV_after - UV_before`.  It preserves the existing neutral SDK
@@ -836,8 +848,9 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 3. Run GPU-assisted validation and a RenderDoc frame; prove every FSR4 pass's
    descriptors, initializer upload, activation ranges, barriers, and bounds.
 4. Expand live FSR4 coverage to resize/tier transitions, reset/map transition,
-   weapon and emissive motion, disocclusion, camera cuts, and long runs.  Add
-   debug views for color, motion, view-Z, history, and reconstructed output.
+   weapon and emissive motion, disocclusion, camera cuts, and long runs. Add
+   provider-history and reconstructed-output views beyond the now-present
+   temporal-input diagnostics.
 5. Extend the corrected acquire/present lifecycle into an offscreen scene/UI
    target, safe screenshot readback, and generated-frame presentation scheduler.
 6. Add discrete model-backed quality presets and validate SPD exposure across
@@ -853,7 +866,8 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   an explicit in-flight retirement API, reflected per-pipeline layouts,
   resource state tracking, and memory accounting.
 - Conventional device depth is available only for single-device rendering and
-  has no debug view yet.  Device-group input gathering remains unimplemented.
+  is now inspectable through the temporal-input diagnostic. Device-group input
+  gathering remains unimplemented.
 - First-person weapon motion still needs visual tuning and broader coverage;
   it now supplies a conservative reactive-mask signal.
 - FSR4 v07 supports five fixed quality models and its separate DRS model.

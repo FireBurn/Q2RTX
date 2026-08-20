@@ -521,6 +521,80 @@ vkpt_temporal_get_frame(void)
 }
 
 bool
+vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
+	VkptTemporalDebugView *view, char *reason, size_t reason_size)
+{
+	const VkptTemporalFrame *frame = &temporal_state.frame;
+	const VkptTemporalImage *image = NULL;
+	unsigned int selected_image = VKPT_IMG_CLEAR;
+	VkptTemporalDebugView selected_view;
+
+	if (reason && reason_size)
+		reason[0] = '\0';
+	if (!image_index || !extent || !view || !cvar_flt_temporal_debug_view ||
+		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
+		return false;
+	if (cvar_flt_temporal_debug_view->integer > VKPT_TEMPORAL_DEBUG_ROUGHNESS)
+		return temporal_validation_fail(reason, reason_size,
+			"unknown temporal debug view %d",
+			cvar_flt_temporal_debug_view->integer);
+
+	selected_view = (VkptTemporalDebugView)cvar_flt_temporal_debug_view->integer;
+	switch (selected_view) {
+	case VKPT_TEMPORAL_DEBUG_SCENE_COLOR:
+		image = &frame->inputs.scene_color;
+		selected_image = VKPT_IMG_FLAT_COLOR;
+		break;
+	case VKPT_TEMPORAL_DEBUG_MOTION:
+		image = &frame->inputs.motion_vectors;
+		selected_image = VKPT_IMG_FLAT_MOTION;
+		break;
+	case VKPT_TEMPORAL_DEBUG_DEVICE_DEPTH:
+		image = &frame->inputs.device_depth;
+		selected_image = VKPT_IMG_TEMPORAL_DEVICE_DEPTH;
+		break;
+	case VKPT_TEMPORAL_DEBUG_VIEW_Z:
+		image = &frame->inputs.view_z;
+		selected_image = VKPT_IMG_TEMPORAL_VIEW_Z;
+		break;
+	case VKPT_TEMPORAL_DEBUG_REACTIVE_MASK:
+		image = &frame->inputs.reactive_mask;
+		selected_image = VKPT_IMG_TEMPORAL_REACTIVE_MASK;
+		break;
+	case VKPT_TEMPORAL_DEBUG_COMPOSITION_MASK:
+		image = &frame->inputs.transparency_and_composition_mask;
+		selected_image = VKPT_IMG_TEMPORAL_COMPOSITION_MASK;
+		break;
+	case VKPT_TEMPORAL_DEBUG_NORMALS:
+		image = &frame->inputs.normals;
+		selected_image = VKPT_IMG_TEMPORAL_NORMALS;
+		break;
+	case VKPT_TEMPORAL_DEBUG_ALBEDO:
+		image = &frame->inputs.albedo;
+		selected_image = VKPT_IMG_TEMPORAL_ALBEDO;
+		break;
+	case VKPT_TEMPORAL_DEBUG_ROUGHNESS:
+		image = &frame->inputs.roughness;
+		selected_image = VKPT_IMG_TEMPORAL_ROUGHNESS;
+		break;
+	default:
+		return temporal_validation_fail(reason, reason_size,
+			"unknown temporal debug view");
+	}
+
+	if (!image || !(image->flags & VKPT_TEMPORAL_RESOURCE_VALID) ||
+		!image->image || !image->view || !image->valid_extent.width ||
+		!image->valid_extent.height || image->layout != VK_IMAGE_LAYOUT_GENERAL)
+		return temporal_validation_fail(reason, reason_size,
+			"selected temporal debug input is unavailable");
+
+	*image_index = selected_image;
+	*extent = image->valid_extent;
+	*view = selected_view;
+	return true;
+}
+
+bool
 vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 	char *reason, size_t reason_size)
 {

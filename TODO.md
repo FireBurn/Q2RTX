@@ -121,14 +121,19 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Use the compute producer stage in ray-query mode and add invocation bounds
   guards to all rounded-up ray-query dispatches; validate query and pipeline
   shader variants.
-- [ ] Add device-depth and view-Z debug visualization.
+- [x] Add device-depth and view-Z debug visualization, plus direct
+  presentation-only views for scene HDR, motion, both masks, normals, albedo,
+  and roughness. The shader uses semantic mappings (logarithmic positive
+  view-Z, signed pixel motion, and HDR/albedo debug tone maps) rather than
+  presenting raw storage values. A live RX 6800M `vk_validation=1` view-Z run
+  was coherent and validation-clean; selecting a view suspends analytical FG.
 - [x] Add dense primary-material reactive and transparency/composition masks
   for FSR3. Transparent, water/glass, warped, screen/camera paths feed both
   masks; view-model pixels feed reactive history rejection. A 1280x720 RX
   6800M run recreated the menu context, activated FSR3, and passed Vulkan
   validation with both masks registered.
 - [ ] Add dedicated HUDless offscreen scene target and separate alpha UI target.
-- [ ] Add per-input debug views in the live renderer. The contract validator is
+- [x] Add per-input debug views in the live renderer. The contract validator is
   already executed immediately before FSR3, FSR4 v07, and analytical FG imports.
 - [ ] Support/gather temporal inputs for device-group rendering.
 

@@ -65,6 +65,10 @@ Q2RTX signal conventions currently exposed by the contract:
 - `TEMPORAL_DEVICE_DEPTH`: dense R32F conventional finite device depth derived
   from the same positive-forward projection as view Z; near is 0, far/sky is
   1.  It is also currently valid only on one GPU.
+- `flt_temporal_debug_view`: a presentation-only semantic inspector for every
+  dense temporal input. It must use the input's `valid_extent`, not its
+  allocation extent; it does not mutate provider state. It suspends analytical
+  frame generation and removes its FIFO swapchain request while nonzero.
 - `TEMPORAL_REACTIVE_MASK` and `TEMPORAL_COMPOSITION_MASK`: dense R8 UNORM
   FSR3 history-control inputs authored by primary-ray material classification.
   Transparent/water/glass/warped/screen paths receive both masks; view-model

@@ -900,6 +900,19 @@ The Video menu's **temporal diagnostics...** page displays this read-only
 status, together with the frame-generation reason and presentation cadence; it
 never treats these diagnostic cvars as editable settings.
 
+#### `flt_temporal_debug_view`
+
+Selects a presentation-only visualization of the exact dense temporal input
+exported by Q2RTX: pre-tone-map scene HDR, current-to-previous motion,
+conventional device depth, positive-forward view-Z, reactive/composition
+masks, geometric normals, albedo, or roughness. Scene HDR is shown with a
+simple debug tone map; motion uses RG for signed direction and B for pixel
+magnitude; view-Z is log-scaled from the near surface to the 10,000-unit sky.
+It does not alter any input, provider dispatch, or history. Analytical FSR3
+frame generation is suspended while a view is active so both presentations
+cannot describe different scene representations. Set it back to `0` (Off)
+before assessing normal upscaling or frame-generation image quality.
+
 Temporal history is also reset automatically for a provider/preset/extent/
 projection transition and for a conservative camera-cut detection: a
 single-frame teleport over 256 Q2 units, a turn over 90 degrees, or a vertical

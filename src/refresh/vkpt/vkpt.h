@@ -74,6 +74,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	SHADER_MODULE_DO(QVK_MOD_STRETCH_PIC_FRAG)                       \
 	SHADER_MODULE_DO(QVK_MOD_FINAL_BLIT_FRAG)                        \
 	SHADER_MODULE_DO(QVK_MOD_FINAL_BLIT_VERT)                        \
+	SHADER_MODULE_DO(QVK_MOD_TEMPORAL_DEBUG_FRAG)                    \
 	SHADER_MODULE_DO(QVK_MOD_INSTANCE_GEOMETRY_COMP)                 \
 	SHADER_MODULE_DO(QVK_MOD_ANIMATE_MATERIALS_COMP)                 \
 	SHADER_MODULE_DO(QVK_MOD_ASVGF_GRADIENT_IMG_COMP)                \
@@ -638,6 +639,24 @@ VkResult vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkEx
 VkResult vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, bool filtered, bool warped,
 	unsigned int descriptor_slot);
+/* Present a provider-neutral temporal input with a semantic debug mapping.
+ * The caller supplies one of VkptTemporalDebugView and an input image whose
+ * valid extent is `extent`. This is intentionally presentation-only: it does
+ * not change the producer image or its external-provider state. */
+typedef enum VkptTemporalDebugView_e {
+	VKPT_TEMPORAL_DEBUG_OFF = 0,
+	VKPT_TEMPORAL_DEBUG_SCENE_COLOR,
+	VKPT_TEMPORAL_DEBUG_MOTION,
+	VKPT_TEMPORAL_DEBUG_DEVICE_DEPTH,
+	VKPT_TEMPORAL_DEBUG_VIEW_Z,
+	VKPT_TEMPORAL_DEBUG_REACTIVE_MASK,
+	VKPT_TEMPORAL_DEBUG_COMPOSITION_MASK,
+	VKPT_TEMPORAL_DEBUG_NORMALS,
+	VKPT_TEMPORAL_DEBUG_ALBEDO,
+	VKPT_TEMPORAL_DEBUG_ROUGHNESS
+} VkptTemporalDebugView;
+VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
+	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);
 VkResult vkpt_draw_clear_stretch_pics(void);
 
 VkResult vkpt_uniform_buffer_create(void);
@@ -724,6 +743,9 @@ void vkpt_temporal_begin_ui_composition(void);
 void vkpt_temporal_end_ui_composition(void);
 void vkpt_temporal_end_frame(bool presented);
 const VkptTemporalFrame *vkpt_temporal_get_frame(void);
+/* Resolve the selected debug cvar to an input that is valid this frame. */
+bool vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
+	VkptTemporalDebugView *view, char *reason, size_t reason_size);
 /* Validate the current provider-neutral frame before importing borrowed
  * images into an external temporal effect. `reason` is optional. */
 bool vkpt_temporal_validate_current_frame(uint32_t required_inputs,
@@ -744,6 +766,7 @@ extern cvar_t *cvar_flt_frame_generation_active;
 extern cvar_t *cvar_flt_frame_generation_reason;
 extern cvar_t *cvar_flt_frame_generation_rendered_fps;
 extern cvar_t *cvar_flt_frame_generation_generated_fps;
+extern cvar_t *cvar_flt_temporal_debug_view;
 extern cvar_t *cvar_flt_upscaler_active;
 extern cvar_t *cvar_flt_upscaler_reason;
 void vkpt_fsr_request_reset(void);
