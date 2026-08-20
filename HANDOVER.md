@@ -26,6 +26,7 @@ Current truth:
   embedded-SPIR-V pipelines, then destroys them cleanly. It also records the
   reset Optical-Flow → FI Prepare → FI Dispatch graph against a strict mock:
   15 dynamic registrations, 12 staged constant buffers, and 30 FI jobs. The
+  18 modules also create actual Vulkan compute pipelines on the RX 6800M. The
   host is still not connected to a Vulkan scheduler/backend bridge or portable
   presenter. The existing
   upscaler host source compiles as an
