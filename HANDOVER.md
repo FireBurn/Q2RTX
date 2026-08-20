@@ -38,6 +38,14 @@ Current truth:
   reached active presentation with no VUID/error and a coherent HUDless scene
   plus replayed UI: `/home/fireburn/Screenshot_FSR3_FG_post_debug_20260820.png`.
 
+- Presentation audit: `VKPT_IMG_TAA_OUTPUT` is already the dedicated
+  display-resolution, tone-mapped-but-HUDless offscreen scene for both FI
+  backends. The current presenter composes the same uploaded stretch-pic queue
+  once over each generated and real swapchain image, which is safe for Q2RTX's
+  direct UI. The remaining architectural gap is a reusable alpha UI texture
+  and compositor for non-replayable UI, external presentation, and safe
+  capture—not a missing HUDless scene target.
+
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
   values are `UV_after - UV_before`.  It preserves the existing neutral SDK

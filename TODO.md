@@ -132,7 +132,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   masks; view-model pixels feed reactive history rejection. A 1280x720 RX
   6800M run recreated the menu context, activated FSR3, and passed Vulkan
   validation with both masks registered.
-- [ ] Add dedicated HUDless offscreen scene target and separate alpha UI target.
+- [-] Keep the dedicated HUDless offscreen scene target and add a separate
+  alpha UI target. `TAA_OUTPUT` already is the display-resolution,
+  tone-mapped-but-HUDless scene consumed by both FSR3 FI implementations; the
+  current generated→real path safely replays the one uploaded UI queue onto
+  both swapchain images. What remains is a reusable alpha-UI texture and
+  compositor for screenshots, external presentation, and non-replayable UI.
 - [x] Add per-input debug views in the live renderer. The contract validator is
   already executed immediately before FSR3, FSR4 v07, and analytical FG imports.
 - [x] Add FSR reconstructed-output and private FSR4 history/reprojected views
