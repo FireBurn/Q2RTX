@@ -707,11 +707,13 @@ smoke records and submits two consecutive frames through only the C ABI.
   prefix now respects the package's `/usr` setting.  A clean package-style
   staging install verified every path, media/shader archive, and current menu
   entry.
-- The ebuild intentionally sets `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS=OFF`.
-  The source checkout has no tracked v07 model initializers/weights, and a
-  developer's untracked local copy must never cause their accidental
-  distribution.  This does not package official FSR4.1.1, RR, or ML-FG;
-  their DX12/hardware limitations remain unchanged.
+- The ebuild sets `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS=OFF`.  A clean live
+  worktree demonstrates why: although the generated v07 SPIR-V graphs and
+  manifests are tracked, each indispensable 89,216-byte initializer and
+  1,024-byte pre-pass weight blob is ignored as a local artifact.  Installing
+  that partial directory would make the menu expose a non-working FSR4 option,
+  so `src_install` asserts it is absent.  This does not package official
+  FSR4.1.1, RR, or ML-FG; their DX12/hardware limitations remain unchanged.
 - The Video-menu test uncovered an upgrade-path issue: an older user-local
   `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make
   the new `flt_upscaler=3` value display as `???`. The package now installs a

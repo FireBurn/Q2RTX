@@ -399,9 +399,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   tools, release media/shareware import, `/usr/bin` launcher/server,
   `/usr/share/quake2rtx` data, and current menu/config archive updates.  A
   package-style staged install passed.  The release's all-rights-reserved media
-  is correctly `bindist`/`mirror` restricted.  It deliberately excludes
-  untracked, provenance-sensitive v07 FSR4 model assets; FSR3 and analytical
-  FSR3 frame generation remain built in.
+  is correctly `bindist`/`mirror` restricted.  The v07 FSR4 SPIR-V graph is
+  tracked, but its required initializer/weight blobs are deliberately ignored
+  local artifacts; the ebuild detects this and excludes the unusable partial
+  directory.  FSR3 and analytical FSR3 frame generation remain built in.
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
