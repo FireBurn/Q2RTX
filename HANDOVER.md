@@ -355,10 +355,11 @@ Current truth:
 - DXC source: `/home/fireburn/DirectXShaderCompiler`
 - Known-good native DXC:
   `/home/fireburn/DirectXShaderCompiler/build-release/bin/dxc`
-  (`libdxcompiler.so 1.10`, build id `5322-c64a5165`).  This local DXC tree was
-  configured with LLVM exceptions/RTTI and has two small Objective-C rewriter
-  compatibility fixes outside the Q2RTX repository; preserve or document them
-  before rebuilding DXC.
+  (`libdxcompiler.so 1.10`, build id `5322-c64a5165`).  The converter checkout
+  is clean at `3b80347af` (`Fix Objective-C rewriter build with current LLVM`),
+  a focused committed pair of Objective-C rewriter compatibility fixes on top
+  of `c64a5165`; it is currently one local commit ahead of its `FireBurn`
+  remote. Preserve that commit before rebuilding DXC.
 - Wine: `/etc/eselect/wine/bin/wine` (11.15 staging)
 - Proton Experimental FFX DLL:
   `/home/fireburn/.local/share/Steam/steamapps/common/Proton - Experimental/contrib/amdxcffx64.dll`

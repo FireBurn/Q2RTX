@@ -236,8 +236,11 @@ the ABI/reflection validator documented beside the FSR4 compile script.  Live
 tests must capture the full Vulkan validation message, not a clipped overlay.
 
 The known-good FSR4 shader compiler is
-`/home/fireburn/DirectXShaderCompiler/build-release/bin/dxc`.  Generate and
-validate every fixed preset plus DRS with:
+`/home/fireburn/DirectXShaderCompiler/build-release/bin/dxc`, built from the
+separate converter checkout at commit `3b80347af` (`Fix Objective-C rewriter
+build with current LLVM`).  That compatibility change is committed in the
+converter repository rather than being an untracked local workaround. Generate
+and validate every fixed preset plus DRS with:
 
 ```sh
 DXC_BIN=/home/fireburn/DirectXShaderCompiler/build-release/bin/dxc \
