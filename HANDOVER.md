@@ -64,8 +64,10 @@ Current truth:
   device depth, and RGBA16F motion input, and retires imports at the frame-slot
   fence. A validation-enabled 30-second RX 6800M 1280x720 `base1` run recreated
   its contexts then reached active FIFO paired presentation with no VUID,
-  prepare, dispatch, or interpolation-skip messages. It remains an SDR-only,
-  experimental selection pending broad visual/lifecycle coverage. The reusable
+  prepare, dispatch, or interpolation-skip messages. It now forwards the
+  public sRGB/PQ/scRGB transfer mode and luminance range to both OF and FI;
+  Q2RTX selects scRGB for HDR presentation. This remains experimental pending
+  a physical-HDR run and broad visual/lifecycle coverage. The reusable
   suite additionally has a validation-enabled exact-Q2RTX fixture: RGBA16F
   scene/output and `FLAT_MOTION`-style RGBA16F motion with the vector in RG.
   The read-only active reason distinguishes the selected 1.1.4 and 3.1.6 FI/OF

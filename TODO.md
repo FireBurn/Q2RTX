@@ -190,10 +190,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   HDR and broader lifecycle/visual coverage remain deliberately experimental.
   The active status now identifies the selected 1.1.4 or 3.1.6 FI/OF scheduler
   rather than labelling both generically.
+  The reusable API now also passes the public sRGB/PQ/scRGB transfer function
+  and luminance range through both OF and FI; Q2RTX selects scRGB in HDR mode.
+  A physical HDR-surface run remains outstanding.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
-  passes 30/30. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
+  passes 31/31. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
   the normalized vector in RG while Q2RTX preserves derivative metadata in BA.
+  A separate scRGB-luminance smoke validates the HDR runtime constants.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves

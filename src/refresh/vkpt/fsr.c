@@ -905,13 +905,9 @@ static VkResult fsr3_create_frame_generation_context(void)
         FfxVkFsr3_3_1_6FrameGenerationCreateInfo create_316;
         FfxVkFsr3_3_1_6FrameGenerationResult result_316;
 
-        /* The checked SDK 2.3 Vulkan profile is LDR; Q2RTX's HUDless
-         * presentation image is nevertheless RGBA16F in SDR mode. HDR output
-         * retains the proven 1.1.4 path until the HDR permutation is covered. */
-        if (qvk.surf_is_hdr) {
-            Com_WPrintf("FSR3 FG 3.1.6: HDR presentation is not enabled in the Vulkan profile.\n");
-            return VK_ERROR_FEATURE_NOT_PRESENT;
-        }
+        /* Q2RTX's HUDless presentation surface remains RGBA16F in either
+         * mode. The public FI/OF source selects sRGB or scRGB at dispatch
+         * time, so no distinct shader permutation is required for HDR. */
         memset(&create_316, 0, sizeof(create_316));
         create_316.physicalDevice = qvk.physical_device;
         create_316.device = qvk.device;
@@ -1625,6 +1621,11 @@ static VkResult fsr3_316_frame_generation_record_after_inputs(
     prepare.motionVectorScaleY = frame->inputs.motion_description.to_render_pixels[1];
     prepare.frameTimeMilliseconds = frame->frame_time_ms > 0.0f
         ? frame->frame_time_ms : 16.667f;
+    prepare.minLuminance = 0.0f;
+    prepare.maxLuminance = qvk.surf_is_hdr ? 1000.0f : 1.0f;
+    prepare.transferFunction = qvk.surf_is_hdr
+        ? FFX_VK_FSR3_3_1_6_FRAMEGEN_TRANSFER_SCRGB
+        : FFX_VK_FSR3_3_1_6_FRAMEGEN_TRANSFER_SRGB;
     prepare.cameraNear = frame->camera.near_plane;
     prepare.cameraFar = frame->camera.far_plane;
     prepare.viewSpaceToMeters = frame->camera.view_space_to_meters;
@@ -1657,8 +1658,9 @@ static VkResult fsr3_316_frame_generation_record_after_inputs(
     dispatch.cameraFar = prepare.cameraFar;
     dispatch.viewSpaceToMeters = prepare.viewSpaceToMeters;
     dispatch.cameraVerticalFovRadians = prepare.cameraVerticalFovRadians;
-    dispatch.minLuminance = 0.0f;
-    dispatch.maxLuminance = 1.0f;
+    dispatch.minLuminance = prepare.minLuminance;
+    dispatch.maxLuminance = prepare.maxLuminance;
+    dispatch.transferFunction = prepare.transferFunction;
     dispatch.frameId = prepare.frameId;
     dispatch.reset = prepare.reset;
     result = ffxVkFsr3_3_1_6FrameGenerationContextRecordDispatch(

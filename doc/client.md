@@ -852,8 +852,10 @@ input contract shared. `0` (default) uses the longer-tested native Vulkan FSR3
 Flow and Frame Interpolation Vulkan profile. The latter imports Q2RTX's
 RGBA16F HUDless color/output, R32F device depth, and RGBA16F motion surface;
 only the normalized motion in RG is sampled, leaving the engine's BA metadata
-untouched. It is SDR-only and experimental pending broader visual/lifecycle
-coverage. `flt_frame_generation_reason` identifies the active scheduler.
+untouched. It selects sRGB in SDR and scRGB with Q2RTX HDR presentation; the
+public shader profile handles that at runtime. It remains experimental pending
+physical-HDR and broader visual/lifecycle coverage.
+`flt_frame_generation_reason` identifies the active scheduler.
 
 #### `flt_frame_generation_min_rendered_fps`
 
