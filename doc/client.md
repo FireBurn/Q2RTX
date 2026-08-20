@@ -844,6 +844,17 @@ that contract is in use. This is a correctness-first policy, not yet a
 low-latency/VRR timing implementation. If interpolation rejects the temporal
 frame, both presentation paths safely use the real scene instead.
 
+#### `flt_frame_generation_backend`
+
+Selects the FI/OF scheduler while leaving the presentation policy and temporal
+input contract shared. `0` (default) uses the longer-tested native Vulkan FSR3
+1.1.4 implementation. `1` selects the reusable public-SDK FSR3 3.1.6 Optical
+Flow and Frame Interpolation Vulkan profile. The latter imports Q2RTX's
+RGBA16F HUDless color/output, R32F device depth, and RGBA16F motion surface;
+only the normalized motion in RG is sampled, leaving the engine's BA metadata
+untouched. It is SDR-only and experimental pending broader visual/lifecycle
+coverage. `flt_frame_generation_reason` identifies the active scheduler.
+
 #### `flt_frame_generation_min_rendered_fps`
 
 The minimum completed render rate required before the analytical presenter

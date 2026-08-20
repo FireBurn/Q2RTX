@@ -4074,7 +4074,10 @@ R_EndFrame_RTX(void)
 		/* This is the first point at which "active" means that an actual
 		 * interpolated frame and its following real frame both reached WSI. */
 		vkpt_fsr_frame_generation_publish_status(true,
-			"FSR3 analytical frame generation active (FIFO pacing)");
+			cvar_flt_frame_generation_backend &&
+			cvar_flt_frame_generation_backend->integer == 1
+				? "FSR3 3.1.6 FI/OF frame generation active (FIFO pacing)"
+				: "FSR3 1.1.4 frame generation active (FIFO pacing)");
 		vkpt_fsr_frame_generation_note_present_pair();
 	} else if (qvk.framegen_present_active && qvk.framegen_generated_frame_ready) {
 		vkpt_fsr_frame_generation_publish_status(false,

@@ -188,6 +188,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   recreated the context at startup/resize and reached active FIFO-paired
   presentation with no VUID, prepare, dispatch, or interpolation-skip log.
   HDR and broader lifecycle/visual coverage remain deliberately experimental.
+  The active status now identifies the selected 1.1.4 or 3.1.6 FI/OF scheduler
+  rather than labelling both generically.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 30/30. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
