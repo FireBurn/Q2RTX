@@ -36,9 +36,11 @@ Current truth:
   FI/OF context-creation attempt exposed its `rw_counters`/`r_counters`
   storage buffers. Commit `1c51d094` now binds those measured counter resources
   end-to-end through reflection, scheduler buffer tables, Vulkan storage-buffer
-  descriptors, and compute-job recording. The reflection rule is intentionally
-  narrow (the known `counters` names), not a claim of arbitrary SPIR-V buffer
-  type reflection. The bridge test now queries/enables storage-image
+  descriptors, and compute-job recording. Reflection now parses SPIR-V
+  variables, pointer storage classes, and image declarations to distinguish
+  images, buffers, samplers, and CBVs; only the SDK `r_`/`rw_` convention
+  selects buffer direction because Vulkan has one storage-buffer descriptor
+  type. The bridge test now queries/enables storage-image
   read/write-without-format only when the logical device supports both bits;
   it creates the real FI and OF contexts and submits their initialization work
   on RX 6800M with validation clean. That proves context/pipeline/resource

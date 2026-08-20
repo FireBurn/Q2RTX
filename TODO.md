@@ -159,15 +159,15 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   route with an unnamed FI module. Wire it to the FI/OF contexts next.
   The bridge now handles the measured FI/OF storage-buffer counter bindings
   (`rw_counters`/`r_counters`) end-to-end: reflection, SDK resource tables,
-  Vulkan storage-buffer descriptors, and recorded compute jobs. This is a
-  deliberately narrow name-based classification, not arbitrary SPIR-V buffer
-  type reflection. The bridge test now queries and enables the two required
+  Vulkan storage-buffer descriptors, and recorded compute jobs. Reflection now
+  uses SPIR-V variables, pointer storage classes, and image declarations to
+  select descriptor kinds. Only the SDK `r_`/`rw_` convention selects buffer
+  direction because Vulkan has one storage-buffer descriptor type. The bridge
+  test now queries and enables the two required
   storage-image-without-format feature bits only when supported, and on the
   RX 6800M creates both live FI/OF contexts and submits their initialization
   work with validation clean. Next, import all real frame resources and record
-  reset plus temporal OF -> FI Prepare -> FI Dispatch frames; replace the
-  narrow classifier with type-aware reflection if another public module needs
-  it.
+  reset plus temporal OF -> FI Prepare -> FI Dispatch frames.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
