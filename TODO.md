@@ -157,11 +157,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The existing SDK-2.3 resource/job bridge now accepts direct SPIR-V scheduler
   blobs before its legacy 3.1.5 catalogue fallback; its GPU test proves that
   route with an unnamed FI module. Wire it to the FI/OF contexts next.
-  The first live attachment attempt is intentionally deferred: FI/OF uses
-  storage-buffer descriptors (`rw_counters`/`r_counters`) that the current
-  texture-only reflection misclassifies, and its modules require negotiated
-  storage-image-read/write-without-format support. Add these generic Vulkan
-  descriptor/feature capabilities before retrying context creation.
+  The bridge now handles the measured FI/OF storage-buffer counter bindings
+  (`rw_counters`/`r_counters`) end-to-end: reflection, SDK resource tables,
+  Vulkan storage-buffer descriptors, and recorded compute jobs. This is a
+  deliberately narrow name-based classification, not arbitrary SPIR-V buffer
+  type reflection. The remaining live-attachment prerequisite is negotiated
+  storage-image-read/write-without-format support; then retry context creation
+  under validation and replace the narrow classifier with type-aware
+  reflection if another public module needs it.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
