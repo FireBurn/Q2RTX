@@ -149,10 +149,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   unsupported permutations; a dedicated test verifies all 18 returned blobs,
   error paths, and Wave64 queries. Its real host-graph test links the FI/OF
   schedulers with the public SDK core, creates 42 persistent resources and all
-  18 embedded-SPIR-V pipelines, then destroys them cleanly. A real Vulkan
-  scheduler bridge and portable presenter integration remain separate work.
-  GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
-  passes 26/26.
+  18 embedded-SPIR-V pipelines, then destroys them cleanly. It records the
+  reset Optical-Flow → FI Prepare → FI Dispatch graph against a strict mock
+  with 15 dynamic registrations, 12 constant buffers, and 30 FI jobs. A real
+  Vulkan scheduler bridge and portable presenter integration remain separate
+  work. GCC 16 and Clang 22 both build this coexistence gate while the reusable
+  suite passes 26/26.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves

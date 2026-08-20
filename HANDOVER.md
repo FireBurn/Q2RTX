@@ -23,8 +23,11 @@ Current truth:
   reject unsupported permutations; a dedicated test verifies all 18 SPIR-V
   blobs plus error and Wave64-query paths. A real 3.1.6 FI/OF host-graph test
   now links the public SDK core, creates 42 persistent resources and all 18
-  embedded-SPIR-V pipelines, then destroys them cleanly. The host is still not
-  connected to a Vulkan scheduler/backend bridge or portable presenter. The existing
+  embedded-SPIR-V pipelines, then destroys them cleanly. It also records the
+  reset Optical-Flow → FI Prepare → FI Dispatch graph against a strict mock:
+  15 dynamic registrations, 12 staged constant buffers, and 30 FI jobs. The
+  host is still not connected to a Vulkan scheduler/backend bridge or portable
+  presenter. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
