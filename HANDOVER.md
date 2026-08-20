@@ -755,6 +755,12 @@ smoke records and submits two consecutive frames through only the C ABI.
   coherent under `vk_validation=1` with no VUID/FSR error, capture:
   `/home/fireburn/Screenshot_FSR315_camera_tracking_smoke_20260820.png`.
   The actual cut branch still needs an explicit live stimulus/threshold test.
+- The reusable FSR3 upscaler now rejects a device contract that merely has
+  physical `shaderStorageImageWriteWithoutFormat` support but did not enable
+  that feature on its logical device. The checked Accumulate modules require
+  it. Q2RTX passes its enabled feature bit, while the RX 6800M public-API
+  smoke explicitly verifies rejection with the bit cleared and successful
+  two-frame dispatch with it enabled.
 
 Live FSR4 command (the doubled `++` is required to pass literal Quake key
 commands through command-line parsing):

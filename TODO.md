@@ -142,7 +142,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   both frames fully overwrite finite RGBA output with zero Vulkan validation
   warnings/errors. The current standalone suite passes 20/20; the original
   portable C API slice passed its 8/8 GCC and Clang coverage before the later
-  asset/contract tests were added.
+  asset/contract tests were added. The public context also requires the
+  caller to attest that `shaderStorageImageWriteWithoutFormat` was enabled on
+  its logical device, rather than treating physical-device support as enough;
+  the RX 6800M smoke covers both rejection and successful enabled dispatch.
 - [-] Port the public SDK 2.3 algorithms to the reusable backend while keeping
   the pinned 1.1.4 runtime as the reproducible reference implementation.
   The exact v2.3.0 public FSR3.1.5 plus FI/OF 3.1.6 source closure is now

@@ -681,6 +681,8 @@ static void fsr3_fill_device_info(FfxVkPortableDeviceInfo *device_info)
     device_info->debugUtilsEnabled = VK_TRUE;
     device_info->shaderStorageBufferArrayNonUniformIndexingEnabled = VK_TRUE;
     device_info->accelerationStructureEnabled = VK_TRUE;
+    device_info->shaderStorageImageWriteWithoutFormatEnabled =
+        qvk.supports_storage_image_write_without_format ? VK_TRUE : VK_FALSE;
 }
 
 static FfxVkFsr3_3_1_5Resource fsr3_315_import_image(
