@@ -142,12 +142,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The exact v2.3.0 public FSR3.1.5 plus FI/OF 3.1.6 source closure is now
   imported with pristine and current SHA-256 manifests (166 source files).
   The FI/OF 3.1.6 sources are provenance-complete and compile as a separate
-  private `ffxVk316...` object-only portability target, but are deliberately
-  not linked yet. All 11 FI and 7 OF public HLSL entry points now generate as
-  a source/output-hashed, Vulkan-1.2-validated compact-descriptor SPIR-V
-  bundle; their genuine shader blob catalogue, scheduler bridge, and portable
+  private `ffxVk316...` object-only portability target. All 11 FI and 7 OF
+  public HLSL entry points generate as a source/output-hashed,
+  Vulkan-1.2-validated compact-descriptor SPIR-V bundle. Its actual fixed
+  Q2RTX-profile SDK blob accessors now return every embedded module and reject
+  unsupported permutations; a dedicated test verifies all 18 returned blobs,
+  error paths, and Wave64 queries. A real Vulkan scheduler bridge and portable
   presenter integration remain separate work. GCC 16 and Clang 22 both build
-  this coexistence gate while the reusable suite passes 23/23.
+  this coexistence gate while the reusable suite passes 24/24.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves

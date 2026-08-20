@@ -16,12 +16,13 @@ Current truth:
   SHA-256 manifests (166 source files). This now includes the official public
   FSR3 Frame Interpolation 3.1.6 and Optical Flow source closure. It is
   provenance-checked and compiles in an isolated object-only target under the
-  private `ffxVk316...` namespace, but is not linked because its real shader
-  blob catalogue and scheduler bridge have not been ported. All 18 public
-  HLSL compute entry points (11 FI, 7 OF) are now regenerated as a
-  source/output-hashed and Vulkan-1.2-validated portable SPIR-V bundle with
-  compact per-pass descriptor ranges; this also remains unlinked until the
-  actual scheduler bridge is implemented. The existing
+  private `ffxVk316...` namespace. All 18 public HLSL compute entry points
+  (11 FI, 7 OF) regenerate as a source/output-hashed and Vulkan-1.2-validated
+  portable SPIR-V bundle with compact per-pass descriptor ranges. The real
+  fixed-profile SDK blob accessors return the embedded modules by pass and
+  reject unsupported permutations; a dedicated test verifies all 18 SPIR-V
+  blobs plus error and Wave64-query paths. The host is still not connected to
+  a Vulkan scheduler/backend bridge or portable presenter. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
