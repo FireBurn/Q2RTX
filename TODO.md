@@ -85,6 +85,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   packaging now preserves NVIDIA's release media archive and updates its
   source-controlled menu/config entries, so it does not silently omit the
   released texture/model/audio tree.
+- [x] Version and package the complete older source-v07 FSR4 model set: six
+  manifest-checked 89,216-byte initializers and six 1,024-byte pre-pass
+  weights. The retained `LICENSE-FSR4-v07.txt` records its upstream revision
+  and MIT notice; this does not change the separate FSR4.1.1 research boundary.
 
 ## P1 — provider-neutral Q2RTX inputs and presentation split
 

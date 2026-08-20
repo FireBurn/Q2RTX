@@ -116,11 +116,12 @@ The INT8/DOT4 v07 model requires all of the following:
   restore the 1.0 identity rather than reuse an old exposure value;
 - staging resources kept alive until their recorded uploads finish.
 
-The generated SPIR-V graphs and manifests are versioned, but the model
-initializer/weight `.bin` files are intentionally ignored local artifacts.
-Do not enable `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS` in a distributable package
-unless a complete, provenance-reviewed asset source is supplied; an installed
-shader graph without those blobs cannot dispatch correctly.
+The generated SPIR-V graphs, manifests, and six model-specific initializer/
+pre-pass-weight `.bin` pairs are versioned together.  Their source MIT notice
+and exact upstream revision are retained in
+`baseq2/fsr4_shaders/LICENSE-FSR4-v07.txt`; keep every pair synchronized with
+its manifest. `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS` may package this complete
+set, but it remains the older source-v07 model rather than FSR 4.1.1.
 
 The backend must fail closed: mandatory pipeline creation, descriptor
 allocation/writes, resource registration, scheduling, and execution errors are

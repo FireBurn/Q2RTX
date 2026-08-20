@@ -22,6 +22,10 @@ music/
 *.sublime-*
 
 *.bin
+!baseq2/fsr4_shaders/fsr4_model_v07_i8_*_initializers.bin
+!baseq2/fsr4_shaders/fsr4_model_v07_i8_*_pre_weights.bin
+baseq2/fsr4_shaders/fsr4_initializers.bin
+baseq2/fsr4_shaders/fsr4_pre_weights.bin
 *.bsp
 *.cin
 *.dds
@@ -46,4 +50,5 @@ save
 baseq2/**/*.txt
 !baseq2/*.txt
 !baseq2/maps/sky/*.txt
+!baseq2/fsr4_shaders/LICENSE-FSR4-v07.txt
 !baseq2/pics/flashlight_profile.png

@@ -766,9 +766,9 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
         DESTINATION share/quake2rtx/baseq2
         COMPONENT shareware)
 
-    # The v07 FSR4 model assets are optional and have separate provenance from
-    # the normal source tree.  Distribution packages can explicitly leave them
-    # out while retaining the native FSR3/analytical-FG implementation.
+    # The complete source-v07 FSR4 graph and its model initializer/weight pairs
+    # are versioned together. Downstream packages may still opt out explicitly,
+    # but the default delivers a runnable experimental FSR4 selection.
     IF(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS AND
        EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
         INSTALL(DIRECTORY

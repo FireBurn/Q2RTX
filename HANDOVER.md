@@ -529,9 +529,10 @@ SPD auto-exposure graph is implemented behind `flt_fsr4_auto_exposure`.
   image formats, and `OpImageWrite` component counts.  The old generated set is
   correctly rejected because DX12-style `float3` writes are invalid for an
   explicit Vulkan `Rgba16f` image.
-- Model assets are 89,216-byte `fsr4_initializers.bin` and 1,024-byte
-  `fsr4_pre_weights.bin`.  They remain ignored by the root `*.bin` rule; do not
-  publish them without resolving provenance/licensing.
+- All six model-specific 89,216-byte initializer and 1,024-byte pre-pass
+  weight files are versioned with their graphs. Their SHA-256 checks are in
+  each model manifest and their source MIT notice/provenance is retained in
+  `baseq2/fsr4_shaders/LICENSE-FSR4-v07.txt`.
 
 ### Reusable module and capture tools
 
@@ -725,15 +726,11 @@ smoke records and submits two consecutive frames through only the C ABI.
   prefix now respects the package's `/usr` setting.  A clean package-style
   staging install verified every path, media/shader archive, and current menu
   entry.
-- The ebuild sets `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS=OFF`.  A clean live
-  worktree demonstrates why: although the generated v07 SPIR-V graphs and
-  manifests are tracked, each indispensable 89,216-byte initializer and
-  1,024-byte pre-pass weight blob is ignored as a local artifact.  Installing
-  that partial directory would make the menu expose a non-working FSR4 option,
-  so `src_install` asserts it is absent; the runtime reports the exact missing
-  asset in `flt_upscaler_reason` rather than a generic context failure. This
-  does not package official
-  FSR4.1.1, RR, or ML-FG; their DX12/hardware limitations remain unchanged.
+- The ebuild now installs the complete FSR4 v07 graph and its six matching
+  model initializer/weight pairs. A package-style staging test must continue
+  to verify every model asset and the retained MIT notice. This still does not
+  package official FSR4.1.1, RR, or ML-FG; their DX12/hardware limitations
+  remain unchanged.
 - The Video-menu test uncovered an upgrade-path issue: an older user-local
   `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make
   the new `flt_upscaler=3` value display as `???`. The package now installs a
