@@ -732,8 +732,12 @@ smoke records and submits two consecutive frames through only the C ABI.
   `46144a8d` Release staging build (with the ebuild's declared submodules and
   release data) installed exactly the 12 tracked `.bin` model assets and
   `LICENSE-FSR4-v07.txt` under `usr/share/quake2rtx/baseq2/fsr4_shaders`.
-  This still does not package official FSR4.1.1, RR, or ML-FG; their
-  DX12/hardware limitations remain unchanged.
+  The installed client then ran on RX 6800M with `vk_validation=1`, FSR4
+  Quality, RCAS 0.50, and SPD auto exposure; it recreated from 640x480 to
+  960x540, reported `FSR4 v07 INT8/DOT4 Quality active`, and logged no FSR4
+  VUID, dispatch failure, or asset fallback. This still does not package
+  official FSR4.1.1, RR, or ML-FG; their DX12/hardware limitations remain
+  unchanged.
 - The Video-menu test uncovered an upgrade-path issue: an older user-local
   `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make
   the new `flt_upscaler=3` value display as `???`. The package now installs a

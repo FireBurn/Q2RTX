@@ -90,7 +90,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   weights. The retained `LICENSE-FSR4-v07.txt` records its upstream revision
   and MIT notice. A clean Release package staging install built the client and
   installed exactly those 12 model binaries plus the notice; this does not
-  change the separate FSR4.1.1 research boundary.
+  change the separate FSR4.1.1 research boundary. The staged installed client
+  also launched on RX 6800M with validation enabled and reported `FSR4 v07
+  INT8/DOT4 Quality active` at 644x361 -> 960x540 with no FSR4 VUID, dispatch,
+  or asset-fallback message.
 
 ## P1 — provider-neutral Q2RTX inputs and presentation split
 
