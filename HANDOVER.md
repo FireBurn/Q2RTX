@@ -740,6 +740,10 @@ smoke records and submits two consecutive frames through only the C ABI.
   shows coherent scene/viewmodel/HUD output without the old render-extent
   rectangle or history trail. This still does not package official FSR4.1.1,
   RR, or ML-FG; their DX12/hardware limitations remain unchanged.
+- Root CTest now includes `fsr4_v07_assets`: the dependency-free verifier
+  confirms each of the six source-v07 initializer/pre-pass-weight pairs is
+  present and matches the size and SHA-256 in its own model manifest. It passed
+  alongside `fsr4_schedule` (2/2) and the separate reusable suite (31/31).
 - The Video-menu test uncovered an upgrade-path issue: an older user-local
   `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make
   the new `flt_upscaler=3` value display as `???`. The package now installs a

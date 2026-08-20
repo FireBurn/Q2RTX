@@ -293,11 +293,18 @@ SET(SRC_VKPT
 
 IF(BUILD_TESTING)
     add_executable(fsr4_schedule_test
-		refresh/vkpt/fsr4/ffx_fsr4_schedule.c
-		refresh/vkpt/fsr4/ffx_fsr4_assets.c
-		refresh/vkpt/fsr4/tests/test_fsr4_schedule.c)
+        refresh/vkpt/fsr4/ffx_fsr4_schedule.c
+        refresh/vkpt/fsr4/ffx_fsr4_assets.c
+        refresh/vkpt/fsr4/tests/test_fsr4_schedule.c)
     target_include_directories(fsr4_schedule_test PRIVATE refresh/vkpt/fsr4)
     add_test(NAME fsr4_schedule COMMAND fsr4_schedule_test)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME fsr4_v07_assets
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_fsr4_v07_assets.py
+                ${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders)
+    endif()
 ENDIF()
 
 SET(HEADERS_VKPT

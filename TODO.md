@@ -94,6 +94,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   also launched on RX 6800M with validation enabled and reported `FSR4 v07
   INT8/DOT4 Quality active` at 644x361 -> 960x540 with no FSR4 VUID, dispatch,
   or asset-fallback message.
+  Root CTest now runs `fsr4_v07_assets`, which independently verifies all six
+  pairs against their manifest size and SHA-256 before source changes land.
 
 ## P1 — provider-neutral Q2RTX inputs and presentation split
 

@@ -120,8 +120,10 @@ The generated SPIR-V graphs, manifests, and six model-specific initializer/
 pre-pass-weight `.bin` pairs are versioned together.  Their source MIT notice
 and exact upstream revision are retained in
 `baseq2/fsr4_shaders/LICENSE-FSR4-v07.txt`; keep every pair synchronized with
-its manifest. `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS` may package this complete
-set, but it remains the older source-v07 model rather than FSR 4.1.1.
+its manifest. `fsr4_v07_assets` verifies every tracked pair against its
+manifest's size and SHA-256. `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS` may package
+this complete set, but it remains the older source-v07 model rather than FSR
+4.1.1.
 
 The backend must fail closed: mandatory pipeline creation, descriptor
 allocation/writes, resource registration, scheduling, and execution errors are
