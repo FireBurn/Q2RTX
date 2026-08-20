@@ -32,7 +32,12 @@ Current truth:
   SPIR-V scheduler blobs before its 3.1.5 catalogue fallback, the reusable
   seam required to attach FI/OF without duplicating its allocation/barrier/
   descriptor executor. A RX 6800M bridge test supplies an unnamed FI blob and
-  proves this direct-SPIR-V route rather than the fallback. The existing
+  proves this direct-SPIR-V route rather than the fallback. The first real
+  FI/OF context-creation attempt exposed the next concrete bridge gap: its
+  `rw_counters`/`r_counters` bindings are storage buffers but the current
+  reflection is texture-only, and the modules require negotiated
+  storage-image read/write-without-format features. Keep the attachment off
+  until those generic descriptor/feature capabilities are implemented. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
