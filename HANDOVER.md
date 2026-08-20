@@ -182,6 +182,9 @@ Current truth:
   RCAS 0.50 and SPD auto exposure also stayed validation-clean and produced a
   coherent post-transition viewmodel capture:
   `/home/fireburn/Screenshot_FSR4_v07_map_transition_20260820.png`.
+  Its normal menu-to-game extent recreation from 640x480 to 960x540 selected
+  a fresh 644x361 -> 960x540 graph and remained coherent under validation:
+  `/home/fireburn/Screenshot_FSR4_v07_resize_20260820.png`.
   This is a working experimental 4.0.2-era model path, **not yet an FSR 4.1.1
   implementation** and not yet a production-quality feature.
 - The FSR4 backend now fails closed on missing pipelines and descriptor,

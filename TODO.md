@@ -48,7 +48,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   crossed `base1 -> base2` with no validation/dispatch error and a coherent
   post-transition viewmodel scene:
   `/home/fireburn/Screenshot_FSR4_v07_map_transition_20260820.png`.
-  Resize, reset, emissive, and disocclusion coverage remains outstanding.
+  The menu-to-game 640x480 -> 960x540 extent recreation also selected a new
+  644x361 -> 960x540 context with no validation error and coherent output:
+  `/home/fireburn/Screenshot_FSR4_v07_resize_20260820.png`. Arbitrary live
+  resize, reset, emissive, and disocclusion coverage remains outstanding.
 - [x] Implement and validate RCAS as a real separate pass; expose the separate
   `flt_fsr4_sharpening` [0,1] control only after it works.  A 0.50 live
   640x360 -> 1280x720 Performance run passed Vulkan validation on RX 6800M.
