@@ -38,9 +38,13 @@ Current truth:
   end-to-end through reflection, scheduler buffer tables, Vulkan storage-buffer
   descriptors, and compute-job recording. The reflection rule is intentionally
   narrow (the known `counters` names), not a claim of arbitrary SPIR-V buffer
-  type reflection. The remaining hard prerequisite is negotiated
-  storage-image read/write-without-format features; keep the attachment off
-  until a validation-clean context create proves them. The existing
+  type reflection. The bridge test now queries/enables storage-image
+  read/write-without-format only when the logical device supports both bits;
+  it creates the real FI and OF contexts and submits their initialization work
+  on RX 6800M with validation clean. That proves context/pipeline/resource
+  creation, not yet an interpolated frame. Next import the real FI/OF frame
+  resources and record reset plus temporal OF -> FI Prepare -> FI Dispatch
+  under validation. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

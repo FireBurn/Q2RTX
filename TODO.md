@@ -161,10 +161,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   (`rw_counters`/`r_counters`) end-to-end: reflection, SDK resource tables,
   Vulkan storage-buffer descriptors, and recorded compute jobs. This is a
   deliberately narrow name-based classification, not arbitrary SPIR-V buffer
-  type reflection. The remaining live-attachment prerequisite is negotiated
-  storage-image-read/write-without-format support; then retry context creation
-  under validation and replace the narrow classifier with type-aware
-  reflection if another public module needs it.
+  type reflection. The bridge test now queries and enables the two required
+  storage-image-without-format feature bits only when supported, and on the
+  RX 6800M creates both live FI/OF contexts and submits their initialization
+  work with validation clean. Next, import all real frame resources and record
+  reset plus temporal OF -> FI Prepare -> FI Dispatch frames; replace the
+  narrow classifier with type-aware reflection if another public module needs
+  it.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
