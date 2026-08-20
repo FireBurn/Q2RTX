@@ -28,7 +28,10 @@ Current truth:
   15 dynamic registrations, 12 staged constant buffers, and 30 FI jobs. The
   18 modules also create actual Vulkan compute pipelines on the RX 6800M. The
   host is still not connected to a Vulkan scheduler/backend bridge or portable
-  presenter. The existing
+  presenter. The existing SDK-2.3 resource/job bridge now accepts direct
+  SPIR-V scheduler blobs before its 3.1.5 catalogue fallback, the reusable
+  seam required to attach FI/OF without duplicating its allocation/barrier/
+  descriptor executor. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
