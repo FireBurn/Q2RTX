@@ -65,7 +65,10 @@ Current truth:
   fence. A validation-enabled 30-second RX 6800M 1280x720 `base1` run recreated
   its contexts then reached active FIFO paired presentation with no VUID,
   prepare, dispatch, or interpolation-skip messages. It remains an SDR-only,
-  experimental selection pending broad visual/lifecycle coverage. The existing
+  experimental selection pending broad visual/lifecycle coverage. The reusable
+  suite additionally has a validation-enabled exact-Q2RTX fixture: RGBA16F
+  scene/output and `FLAT_MOTION`-style RGBA16F motion with the vector in RG.
+  The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

@@ -189,7 +189,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   presentation with no VUID, prepare, dispatch, or interpolation-skip log.
   HDR and broader lifecycle/visual coverage remain deliberately experimental.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
-  passes 29/29.
+  passes 30/30. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
+  and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
+  the normalized vector in RG while Q2RTX preserves derivative metadata in BA.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves
