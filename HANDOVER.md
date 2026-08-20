@@ -44,9 +44,14 @@ Current truth:
   read/write-without-format only when the logical device supports both bits;
   it creates the real FI and OF contexts and submits their initialization work
   on RX 6800M with validation clean. That proves context/pipeline/resource
-  creation, not yet an interpolated frame. Next import the real FI/OF frame
-  resources and record reset plus temporal OF -> FI Prepare -> FI Dispatch
-  under validation. The existing
+  creation and now a real reset FI/OF frame: the RX 6800M test imports all
+  application/shared images and records/submits Optical Flow -> FI Prepare ->
+  FI Dispatch through the reusable bridge with zero Vulkan warnings/errors.
+  Its source-derived SPIR-V now explicitly matches the SDK's R8_UINT luma,
+  R16G16_SINT flow-vector, and R16G16_FLOAT dilated-motion storage formats;
+  DX12's looser typed-UAV declaration rule was not portable to Vulkan.
+  Temporal FI/OF frames, a stable public 3.1.6 lifecycle API, and a portable
+  presenter remain next. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

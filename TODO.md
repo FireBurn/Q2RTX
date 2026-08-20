@@ -166,8 +166,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   test now queries and enables the two required
   storage-image-without-format feature bits only when supported, and on the
   RX 6800M creates both live FI/OF contexts and submits their initialization
-  work with validation clean. Next, import all real frame resources and record
-  reset plus temporal OF -> FI Prepare -> FI Dispatch frames.
+  work with validation clean. A real RX 6800M reset-frame test now imports the
+  public SDK's application/shared images and records/submits Optical Flow ->
+  FI Prepare -> FI Dispatch through the same reusable bridge with zero Vulkan
+  warnings/errors. Its Vulkan source overlay gives the storage images the
+  exact public resource formats (R8_UINT luma, R16G16_SINT optical flow, and
+  R16G16_FLOAT dilated motion) rather than relying on DX12's looser typed-UAV
+  rules. Temporal FI/OF frames, a stable public 3.1.6 lifecycle API, and
+  portable presenter integration remain.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
