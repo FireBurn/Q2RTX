@@ -523,6 +523,52 @@ static void Parse_Blank(menuFrameWork_t *menu)
     Menu_AddItem(menu, s);
 }
 
+static void Parse_Static(menuFrameWork_t *menu)
+{
+    static const cmd_option_t o_static[] = {
+        { "s:", "status" },
+        { "w:", "width" },
+        { NULL }
+    };
+    menuStatic_t *s;
+    char *status = NULL;
+    int max_chars = 0;
+    int c;
+
+    while ((c = Cmd_ParseOptions(o_static)) != -1) {
+        switch (c) {
+        case 's':
+            status = cmd_optarg;
+            break;
+        case 'w':
+            max_chars = Q_atoi(cmd_optarg);
+            break;
+        default:
+            return;
+        }
+    }
+
+    if (Cmd_Argc() - cmd_optind < 1 || Cmd_Argc() - cmd_optind > 2) {
+        Com_Printf("Usage: static [--width <chars>] <name> [cvar]\n");
+        return;
+    }
+
+    if (max_chars < 0 || max_chars >= MAX_STRING_CHARS) {
+        Com_Printf("static width must be between 0 and %d\n", MAX_STRING_CHARS - 1);
+        return;
+    }
+
+    s = UI_Mallocz(sizeof(*s));
+    s->generic.type = MTYPE_STATIC;
+    s->generic.name = UI_CopyString(Cmd_Argv(cmd_optind));
+    s->generic.status = UI_CopyString(status);
+    s->maxChars = max_chars;
+    if (Cmd_Argc() - cmd_optind == 2)
+        s->cvar = Cvar_WeakGet(Cmd_Argv(cmd_optind + 1));
+
+    Menu_AddItem(menu, s);
+}
+
 static void Parse_Background(menuFrameWork_t *menu)
 {
     char *s = Cmd_Argv(1);
@@ -744,6 +790,8 @@ static bool Parse_File(const char *path, int depth)
                     Parse_Field(menu);
                 } else if (!strcmp(cmd, "blank")) {
                     Parse_Blank(menu);
+				} else if (!strcmp(cmd, "static")) {
+					Parse_Static(menu);
 				} else if (!strcmp(cmd, "ifeq")) {
 					Parse_If(menu, true);
 				} else if (!strcmp(cmd, "ifneq")) {
@@ -834,4 +882,3 @@ void UI_LoadScript(void)
 {
     Parse_File("q2rtx.menu", 0);
 }
-

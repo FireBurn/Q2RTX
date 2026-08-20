@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-08-19, Europe/London.  Update this file at every meaningful
+Last updated: 2026-08-20, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -13,7 +13,16 @@ Current truth:
 - Existing renderer fallback builds and runs.
 - The reusable tree now contains a separate, pinned public SDK v2.3.0 FSR3.1.5
   source closure (`upstream/ffx-2.3.0`) with both pristine and current
-  SHA-256 manifests (103 source files). The new host source compiles as an
+  SHA-256 manifests (166 source files). This now includes the official public
+  FSR3 Frame Interpolation 3.1.6 and Optical Flow source closure. It is
+  provenance-checked and compiles in an isolated object-only target under the
+  private `ffxVk316...` namespace, but is not linked because its real shader
+  blob catalogue and scheduler bridge have not been ported. All 18 public
+  HLSL compute entry points (11 FI, 7 OF) are now regenerated as a
+  source/output-hashed and Vulkan-1.2-validated portable SPIR-V bundle with
+  compact per-pass descriptor ranges; this also remains unlinked until the
+  actual scheduler bridge is implemented. The existing
+  upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
   storage for four-byte `wchar_t`. Its always-on host-graph test records a
@@ -42,9 +51,9 @@ Current truth:
   back through Vulkan. All 49,152 RGB components are finite, nonzero, and no
   component retains poison; Khronos validation remains clean. This is a real
   graph-and-output invariant, not a visual-quality claim: it retains
-  per-dispatch descriptors/constants until context destruction, cannot import
-  application VkImages, and is not linked into Q2RTX. It must not be mixed
-  with the working 1.1.4 backend.
+  per-dispatch descriptors/constants until context destruction. It is now
+  integrated experimentally into Q2RTX, but uses a private SDK-3.1.5 symbol
+  namespace so it can coexist safely with the working 1.1.4 backend.
   The bridge now exports a borrowed native `VkImage` for an owned API-resource
   token, solely for explicit diagnostics/readback and synchronization; the
   smoke test uses it for the output invariant above.
@@ -57,9 +66,8 @@ Current truth:
   rejects descriptor collisions, and produces a checked manifest. Reflection,
   Vulkan 1.2 validation, a byte-for-byte checked embedded-C bundle, and a real
   11/11 compute-pipeline creation test are part of the standalone suite. These
-  modules are not connected to a
-  resource/job backend or Q2RTX yet; generic profile/wave/FP16 permutations
-  remain unfinished.
+  modules are connected through the experimental resource/job bridge and
+  Q2RTX path; generic profile/wave/FP16 permutations remain unfinished.
 - `extern/ffx-vulkan` now has a small tested C SPIR-V reflection helper for
   that generated profile. It consumes `OpName`/`Binding` directly from the
   shader bytes and returns sorted SRV/UAV/sampler/CBV descriptors; a short
@@ -84,7 +92,16 @@ Current truth:
   temporary descriptor/UBO lifetime is deliberately conservative until an
   embedding fence can reclaim it. Its deterministic temporal output readback
   has a full RGB finite/nonzero/no-poison invariant with a clean validation-layer
-  run. It still has no application-resource import or Q2RTX integration.
+  run. The bridge now imports caller-owned 2D images with explicit Vulkan
+  format/layout/state and creates only its image views; unregister restores
+  the caller's layout/state and release never destroys caller image memory.
+  The import/transition/restore test and the full scheduler test are both
+  validation-clean. A reusable C upscaler lifecycle now owns that bridge and
+  scheduler, exposes the three shared-resource descriptions, and records a
+  first reset dispatch using nine caller-owned imported images; it emits the
+  SDK initialization copies before frame work in the same caller command
+  buffer. That full public-API dispatch is validation-clean and is now used by
+  Q2RTX's experimental `flt_upscaler 3` path.
 - The generated profile now has a tested pass/permutation catalogue. It maps
   the SDK's exact base permutation (Lanczos + HDR + low-resolution motion) and
   the separate `ACCUMULATE_SHARPEN` permutation to checked module names, and
@@ -97,6 +114,11 @@ Current truth:
   run at 640x360 -> 1280x720 has no Vulkan-validation messages. Sustained forward/turning motion was
   coherent; the old quadrant boundary, black output, and history train were not
   present.  Repeat GPU-assisted validation is clean at that target resolution.
+  After the SDK-3.1.5 additions shifted the renderer's global-image table, a
+  fresh 1280x720 Performance + RCAS 0.50 + SPD-auto-exposure `base1` smoke
+  again reported the exact active FSR4 v07 model with no VUID/error and a
+  coherent viewmodel/HUD frame:
+  `/home/fireburn/Screenshot_FSR4_v07_FIFO_table_smoke_20260820.png`.
   This is a working experimental 4.0.2-era model path, **not yet an FSR 4.1.1
   implementation** and not yet a production-quality feature.
 - The FSR4 backend now fails closed on missing pipelines and descriptor,
@@ -134,8 +156,16 @@ Current truth:
   reusable Vulkan module. Q2RTX now has an experimental active two-acquire,
   generated-then-real single-queue presentation path. Read-only rolling
   rendered/generated presentation cadence is published only after successful
-  interpolated-generated→real pairs and resets on fallback; explicit WSI pacing, Ray
-  Regeneration, and neural frame generation remain incomplete.
+  interpolated-generated→real pairs and resets on fallback. Frame-generation
+  requests now recreate the swapchain in FIFO mode—even with `vid_vsync 0`—so
+  Mailbox/Immediate cannot discard or tear the pair; the active status exposes
+  `FIFO pacing`. This is correctness-first WSI policy, not a finished
+  low-latency/VRR scheduler. A fresh 1280x720 `vk_validation=1`,
+  `vid_vsync=0`, FSR3.1.5+FG `base1` run logged FIFO selection at both
+  startup and resize, then `FSR3 analytical frame generation active (FIFO
+  pacing)` with no VUID/error output. The active gameplay frame is coherent,
+  including the viewmodel/HUD: `/home/fireburn/Screenshot_FSR315_FG_FIFO_20260820.png`.
+  Ray Regeneration and neural frame generation remain incomplete.
 - Frame generation's HDR flag now matches its actual post-tone-map HUDless
   `TAA_OUTPUT` source (the upscaler independently remains pre-tone-map HDR).
   Generic temporal resets plus acquire/present/interpolation fallbacks reset
@@ -510,7 +540,7 @@ smoke records and submits two consecutive frames through only the C ABI.
 ### Experimental FSR3 Frame Generation presenter (2026-08-19)
 
 - `flt_frame_generation 1` is now an explicitly labelled experimental control.
-  It is gated to active native FSR3, one GPU, rectilinear projection,
+  It is gated to active FSR3 3.1.4 or public-SDK 3.1.5, one GPU, rectilinear projection,
   display-sized `TAA_OUTPUT`, valid device depth/motion, and a swapchain with
   at least `minImageCount + 2` images (five on the RX 6800M/RADV test surface).
 - Q2RTX acquires generated then real swapchain images, records Optical Flow +
@@ -537,7 +567,117 @@ smoke records and submits two consecutive frames through only the C ABI.
   fresh 36-second no-replay-wait run emitted no validation error after the
   dynamic-view-ring correction; its active desktop capture is
   `/home/fireburn/Screenshot_FSR3_FG_NoWait_20260819.png`. It needs RenderDoc,
-  resize, menu, and low-FPS testing.
+  menu, and low-FPS testing.
+
+## 2026-08-20 packaging and FSR3.1.5 checkpoint
+
+- The public SDK-2.3/FSR3.1.5 Vulkan bridge is now linked into the Q2RTX
+  client alongside the stable 1.1.4 path.  Its public header deliberately uses
+  opaque bridge types, avoiding a collision with the bespoke v07 FSR4 types.
+  Both SDK closures also exported the same unversioned C symbols; the initial
+  mixed executable therefore crashed by invoking the 3.1.5 implementation
+  with a 1.1.4 context ABI. The complete 3.1.5 source closure is now compiled
+  with a private `ffxVk315...` symbol prefix, leaving the stable 1.1.4 ABI
+  untouched; `nm` confirms both symbol families in the final executable.
+  A full root build plus all standalone bridge/backend tests pass. A
+  validation-enabled 1280x720 `base1` live run at 50% rendered coherent
+  static and moving output with `flt_upscaler 3`; no VUID, dispatch failure,
+  or fallback was logged. Proof captures are
+  `/home/fireburn/Screenshot_FSR315_20260820.png` and
+  `/home/fireburn/Screenshot_FSR315_motion_20260820.png`. A separate
+  `flt_upscaler 1` regression launch also activated FSR3 1.1.4 cleanly.
+  GPU-assisted validation then exposed shared-memory races in the generated
+  generic-wave SPD luma and shading-change pyramid passes. The source
+  generator now selects AMD's LDS-only SPD permutation
+  (`FFX_SPD_NO_WAVE_OPERATIONS=1`), which uses explicit workgroup barriers.
+  The regenerated 11-module bundle passed SPIR-V/pipeline/bridge tests, and a
+  30-second `VK_LAYER_GPUAV_ENABLE=1` live run at 1280x720/50% had no FSR
+  data-race, VUID, dispatch-failure, or fallback output. A post-change visual
+  capture is `/home/fireburn/Screenshot_FSR315_GPUAV_clean_20260820.png`.
+  A direct live `gamemap base2` transition from an active `base1` FSR3.1.5
+  session then loaded the second map and rendered coherently without a VUID,
+  dispatch-failure, or fallback log entry; capture:
+  `/home/fireburn/Screenshot_FSR315_map_transition_20260820.png`.
+  An in-process window resize from 1280x720 to 960x540 and back recreated the
+  3.1.5 context at its physical 960x544 allocation extent and then 1280x720,
+  with no validation or fallback message; post-resize capture:
+  `/home/fireburn/Screenshot_FSR315_resize_20260820.png`.
+  The shared Quality preset was also verified in the 3.1.5 path at 67% input
+  scale (`viewsize 67`) with a coherent active frame; capture:
+  `/home/fireburn/Screenshot_FSR315_quality_20260820.png`.
+  Analytical FSR3 Optical Flow/Frame Interpolation no longer needlessly
+  rejects this 3.1.5 selection: they consume the provider-neutral temporal
+  contract and presentation color, not either upscaler's private history. A
+  3.1.5 + `flt_frame_generation 1` 1280x720 live run created both contexts,
+  reported `active=1` and a generated→real cadence (214.7/429.3 FPS), and
+  stayed validation-clean; capture:
+  `/home/fireburn/Screenshot_FSR315_FG_active_20260820.png`.
+  The combined path has now also completed an in-process 1280x720 -> 960x540
+  -> 1280x720 resize under `vk_validation=1`: both upscaler and FI/OF contexts
+  recreated at each extent, resumed `active=1`, and reported 218.9/437.9 FPS
+  after returning to 1280x720, with no VUID, dispatch failure, or fallback
+  error in the full console log. Captures are
+  `/home/fireburn/Screenshot_FSR315_FG_resize_960_20260820.png` and
+  `/home/fireburn/Screenshot_FSR315_FG_resize_return_20260820.png`.
+  A live `gamemap base2` transition from that active 1280x720 configuration
+  also reconnected into base2, retained `flt_upscaler_active=3` and
+  `flt_frame_generation_active=1`, and reported 174.0/348.0 FPS with no VUID,
+  dispatch failure, or fallback error; capture:
+  `/home/fireburn/Screenshot_FSR315_FG_map_transition_20260820.png`.
+  Paused Video-menu frames are now excluded before the two-acquire presenter
+  reserves a generated image. A live pause reported `active=0`, the explicit
+  `paused/menu frame` reason, and zeroed cadence; closing the menu reset and
+  resumed `active=1` at 57.5/115.0 FPS without a VUID or dispatch error.
+  `/home/fireburn/Screenshot_FSR315_FG_menu_resume_20260820.png` captures the
+  returned gameplay frame.
+  This is still experimental lifecycle and visual-quality coverage, not a
+  production readiness claim.
+- `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild` has been made a
+  complete package recipe.  It imports NVIDIA's 1.8 release media/shareware
+  assets, preserves the release media archive while updating Q2RTX's current
+  menu/config entries, builds native FSR3 plus analytical FSR3 frame
+  generation, and installs the wrapper/server in `/usr/bin` with data under
+  `/usr/share/quake2rtx`.  It is restricted from binary distribution/mirroring
+  because the release includes all-rights-reserved media.  The CMake install
+  prefix now respects the package's `/usr` setting.  A clean package-style
+  staging install verified every path, media/shader archive, and current menu
+  entry.
+- The ebuild intentionally sets `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS=OFF`.
+  The source checkout has no tracked v07 model initializers/weights, and a
+  developer's untracked local copy must never cause their accidental
+  distribution.  This does not package official FSR4.1.1, RR, or ML-FG;
+  their DX12/hardware limitations remain unchanged.
+- The Video-menu test uncovered an upgrade-path issue: an older user-local
+  `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make
+  the new `flt_upscaler=3` value display as `???`. The package now installs a
+  revisioned loose `q2rtx.menu`, and `q2rtx.sh` migrates it into the user
+  `baseq2` override directory before launch, making a one-time
+  `.pre-fsr-menu-update` backup. `Q2RTX_SKIP_MENU_UPDATE=1` opts out for
+  manual menu management. A fixture proved the old menu was backed up
+  byte-for-byte, and a live migrated-menu capture renders
+  `FSR3 3.1.5 (experimental)` correctly:
+  `/home/fireburn/Screenshot_FSR315_FG_video_menu_migrated_20260820.png`.
+- The menu parser now supports a generic read-only `static --width <chars>
+  "label" cvar` item. Unlike reusing an editable pair/spinner for ROM
+  diagnostics, it displays a live cvar value, truncates it safely, owns its
+  script allocations, and is never selectable. Video now links to a compact
+  `temporal diagnostics...` page showing the resolved upscaler and
+  frame-generation reasons plus rendered/generated cadence. Root build/CTest
+  and the 20-test reusable Vulkan suite pass. A fresh 2560x1440
+  `vk_validation=1` run opened the page after UI initialization and rendered
+  the startup upscaler state, the expected no-world FG fallback, zero cadence,
+  and an ellipsized long reason. Its log has no VUID, validation, parser, or
+  FSR error. Capture:
+  `/home/fireburn/Screenshot_temporal_diagnostics_window_20260820.png`.
+- The temporal contract is now version 4. It stores the last successfully
+  presented camera and sets `VKPT_TEMPORAL_RESET_CAMERA_CUT` on a conservative
+  discontinuity (>256 Q2 units in one logical frame, >90° forward-vector
+  change, or >0.35-radian vertical-FOV jump). Ordinary motion remains
+  motion-vector reprojectable; providers discard history only for the marked
+  frame. A fresh 1280x720 FSR3.1.5 `base1` gameplay run stayed active and
+  coherent under `vk_validation=1` with no VUID/FSR error, capture:
+  `/home/fireburn/Screenshot_FSR315_camera_tracking_smoke_20260820.png`.
+  The actual cut branch still needs an explicit live stimulus/threshold test.
 
 Live FSR4 command (the doubled `++` is required to pass literal Quake key
 commands through command-line parsing):

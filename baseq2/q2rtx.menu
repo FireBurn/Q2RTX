@@ -123,7 +123,8 @@ begin photomode
 end
 
 begin video
-    //title "Video Setup"
+// Q2RTX menu revision: 2026-08-fsr3-fsr4-v07
+//title "Video Setup"
     background #212F3CD0
     style --compact
     banner m_banner_video
@@ -146,9 +147,9 @@ begin video
 		pairs --status "used whenever the selected temporal upscaler is off or unavailable" \
 			"fallback anti-aliasing" flt_taa \
 			"none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
-		pairs --status "FSR3 is the open-source 3.1.4 Vulkan path; FSR4 is the source-v07 INT8 model family, not 4.1.1. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
+		pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment; FSR4 is the source-v07 INT8 model family, not 4.1.1. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
 			"temporal upscaler" flt_upscaler \
-			"Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2
+			"Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
 		pairs --status "selects matching FSR3 or FSR4 v07 model ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. Changing it rebuilds FSR4's complete model graph and resets history." \
 			"FSR quality" flt_fsr_quality \
 			"Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
@@ -160,11 +161,13 @@ begin video
 			"FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
 		toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
 			"FSR4 auto exposure" flt_fsr4_auto_exposure
-		pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3, rectilinear single-GPU rendering, and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait; presentation pacing remains experimental." \
+		pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3 3.1.4 or experimental 3.1.5, rectilinear single-GPU rendering, and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait. Enabling it recreates the swapchain with FIFO pacing so Mailbox/Immediate cannot discard or tear the generated-real pair." \
 			"FSR3 frame generation" flt_frame_generation \
 			"Off" 0 "Analytical (experimental)" 1
 		range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation and eight samples at threshold plus 2 FPS resume it." \
 			"FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
+		action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
+			"temporal diagnostics..." pushmenu temporal_diagnostics
         pairs "global illumination" pt_num_bounce_rays low 0.5 medium 1 high 2
         pairs "reflection/refraction depth" pt_reflect_refract off 0 1 1 2 2 4 4 8 8
 		toggle --status "turn some monitors in the game into security camera views" \
@@ -204,6 +207,19 @@ begin video
         blank
         toggle "use new textures and models" gl_use_hd_assets
     endif
+end
+
+begin temporal_diagnostics
+    title "Temporal Diagnostics"
+    background #212F3CD0
+    style --compact
+    static --width 52 --status "active temporal-upscaler provider or the exact fallback reason" \
+        "upscaler" flt_upscaler_reason
+    static --width 52 --status "active analytical-frame-generation state or the exact suspension/fallback reason" \
+        "frame generation" flt_frame_generation_reason
+    static --width 12 "rendered FPS" flt_frame_generation_rendered_fps
+    static --width 12 "generated FPS" flt_frame_generation_generated_fps
+    action "back" popmenu
 end
 
 begin options

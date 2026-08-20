@@ -701,14 +701,23 @@ create_swapchain(void)
 	}
 
 	qvk.surf_vsync = (cvar_vsync->integer != 0);
+	/* A generated/real pair is only meaningful if the presentation engine
+	 * displays both in order. FIFO is universally available and preserves that
+	 * queueing contract; MAILBOX may replace the generated image and IMMEDIATE
+	 * may tear it. This correctness-first policy intentionally overrides the
+	 * normal low-latency mode while frame generation is requested. */
+	qvk.surf_framegen_fifo = cvar_flt_frame_generation &&
+		cvar_flt_frame_generation->integer != 0;
 
-	if (qvk.surf_vsync) {
+	if (qvk.surf_vsync || qvk.surf_framegen_fifo) {
 		qvk.present_mode = VK_PRESENT_MODE_FIFO_KHR;
 	} else if (immediate_mode_available) {
 		qvk.present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 	} else {
 		qvk.present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
 	}
+	if (qvk.surf_framegen_fifo)
+		Com_Printf("FSR3 FG: FIFO presentation pacing selected for generated-real pairs.\n");
 
 	if(surf_capabilities.currentExtent.width != ~0u) {
 		qvk.extent_unscaled = surf_capabilities.currentExtent;
@@ -728,7 +737,7 @@ create_swapchain(void)
 	qvk.framegen_required_swap_chain_images =
 		surf_capabilities.minImageCount + 2u;
 	uint32_t requested_image_count =
-		(cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0)
+		qvk.surf_framegen_fifo
 			? qvk.framegen_required_swap_chain_images : 2u;
 	uint32_t num_images = max(surf_capabilities.minImageCount, requested_image_count);
 	if(surf_capabilities.maxImageCount > 0)
@@ -3676,6 +3685,13 @@ void
 R_BeginFrame_RTX(void)
 {
 	LOG_FUNC();
+	/* Presentation images are acquired before R_RenderFrame_RTX determines
+	 * whether a paused menu has a renderable world behind it.  Conservatively
+	 * treat any paused UI as a menu frame here: interpolating a static/menu
+	 * scene is both useless and can reserve a second swapchain image with stale
+	 * temporal history.  R_RenderFrame_RTX refines the flag with render_world
+	 * for its post-processing decisions. */
+	qvk.frame_menu_mode = cl_paused->integer == 1 && uis.menuDepth > 0;
 
 	qvk.current_frame_index = qvk.frame_counter % MAX_FRAMES_IN_FLIGHT;
 
@@ -3725,7 +3741,9 @@ R_BeginFrame_RTX(void)
 	
 	VkExtent2D extent_screen_images = get_screen_image_extent();
 
-	if(!extents_equal(extent_screen_images, qvk.extent_screen_images) || (!!cvar_hdr->integer != qvk.surf_is_hdr) || (!!cvar_vsync->integer != qvk.surf_vsync))
+	const bool framegen_pacing_changed = qvk.surf_framegen_fifo !=
+		(cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0);
+	if(!extents_equal(extent_screen_images, qvk.extent_screen_images) || (!!cvar_hdr->integer != qvk.surf_is_hdr) || (!!cvar_vsync->integer != qvk.surf_vsync) || framegen_pacing_changed)
 	{
 		qvk.extent_screen_images = extent_screen_images;
 		recreate_swapchain();
@@ -3752,11 +3770,14 @@ R_BeginFrame_RTX(void)
 	 * one-image acquisition path as the fallback whenever its compute/presenter
 	 * prerequisites are not met. Three images avoid blocking a two-acquire frame
 	 * behind the presentation engine on minimum-double-buffer swapchains. */
-	qvk.framegen_present_active =
+	qvk.framegen_present_active = !qvk.frame_menu_mode &&
 		qvk.num_swap_chain_images >= qvk.framegen_required_swap_chain_images &&
 		vkpt_fsr_frame_generation_prepare_present();
 	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
 		vkpt_fsr_frame_generation_publish_status(false, "off");
+	else if (qvk.frame_menu_mode)
+		vkpt_fsr_frame_generation_publish_status(false,
+			"paused/menu frame: analytical frame generation suspended");
 	else if (qvk.num_swap_chain_images < qvk.framegen_required_swap_chain_images)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"fallback: surface did not provide minImageCount+2 swapchain images");
@@ -4049,7 +4070,7 @@ R_EndFrame_RTX(void)
 		/* This is the first point at which "active" means that an actual
 		 * interpolated frame and its following real frame both reached WSI. */
 		vkpt_fsr_frame_generation_publish_status(true,
-			"FSR3 analytical frame generation active");
+			"FSR3 analytical frame generation active (FIFO pacing)");
 		vkpt_fsr_frame_generation_note_present_pair();
 	} else if (qvk.framegen_present_active && qvk.framegen_generated_frame_ready) {
 		vkpt_fsr_frame_generation_publish_status(false,

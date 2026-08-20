@@ -76,6 +76,10 @@ Q2RTX signal conventions currently exposed by the contract:
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.
+- Contract version 4 records the last successfully presented camera and emits
+  `VKPT_TEMPORAL_RESET_CAMERA_CUT` for conservative teleport, >90-degree
+  transform, or substantial lens discontinuities. Do not turn ordinary
+  motion-vector reprojection into a reset.
 - A dedicated UI texture and the full Ray Regeneration signal set are not yet
   available.
 - Non-rectilinear projections must fall back to the existing renderer.
@@ -164,18 +168,23 @@ queues unavailable on this machine; build a portable explicit presenter.
   context.
   It also contains the exact public SDK v2.3.0 FSR3.1.5 source closure under
   `upstream/ffx-2.3.0`. Its object-only `fsr3-host-3.1.5-scaffold` target and
-  always-on graph test are host-port gates, not a runnable implementation. The
-  graph test proves the reset and temporal-RCAS scheduler resource/job contract
-  before the dedicated SDK-2.3 Vulkan `FfxInterface` resource/job bridge is
-  introduced; only then can it replace or augment the proven 1.1.4 path. Its
-  first pipeline callback layer now selects the embedded module by scheduler
-  name and returns its reflected resource slots. It now owns SDK-created
-  buffers/images and mip views and records its ordered initialization copies,
-  but does not yet import application images or record barriers/compute jobs.
+  graph test remain host-port gates, but the dedicated SDK-2.3 Vulkan
+  `FfxInterface` bridge is now runnable through the opaque 3.1.5 public ABI
+  and experimental Q2RTX `flt_upscaler 3` path. It selects embedded modules
+  by scheduler name, imports application images, owns SDK resources/mip views,
+  records initialization copies, barriers, descriptors, and compute jobs, and
+  restores caller image states after unregistering them. The complete 3.1.5
+  source closure is compiled with a private `ffxVk315...` prefix because its
+  public C symbols otherwise collide with the simultaneously linked 1.1.4
+  runtime. The portable ABI intentionally remains versioned and opaque.
   The fixed Q2-compatible 3.1.5 SPIR-V set is now
   generated under `generated/ffx-2.3.0/vk/fsr3upscaler-q2-v2` (ten pass
   wrappers plus AccumulateSharpen) with a pinned DXC,
-  SHA-256, and Vulkan 1.2 validation. It deliberately uses distinct binding
+  SHA-256, and Vulkan 1.2 validation. It uses the documented LDS-only SPD
+  permutation (`FFX_SPD_NO_WAVE_OPERATIONS=1`) so every intermediate
+  reduction has an explicit workgroup barrier; GPU-AV found races in the
+  generic wave-based variant on the RDNA2 Vulkan target. It deliberately uses
+  distinct binding
   ranges for SRV/UAV/samplers/CBVs; do not mix it with DX12 table bindings. A
   small public reflection helper reads those bindings from the actual SPIR-V;
   the SDK-2.3 bridge must use it rather than hand-copy DX12 root signatures.

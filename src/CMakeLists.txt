@@ -579,7 +579,12 @@ IF (TARGET client)
         TARGET_LINK_LIBRARIES(client vulkan)
         ENDIF()
         IF (CONFIG_VKPT_FSR3)
-            TARGET_LINK_LIBRARIES(client ffx-vulkan::portable)
+            # Keep the stable 1.1.4 portable path and the public-SDK 3.1.5
+            # scheduler bridge available to the same C renderer target.  The
+            # latter is selected only by its explicit experimental cvar.
+            TARGET_LINK_LIBRARIES(client
+                ffx-vulkan::portable
+                ffx-vulkan::fsr3-vk-backend-3.1.5)
             TARGET_COMPILE_DEFINITIONS(client PRIVATE VKPT_FSR3=1)
         ENDIF()
     ENDIF()
@@ -741,7 +746,7 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
     IF(TARGET client)
         INSTALL(TARGETS client DESTINATION share/quake2rtx/bin COMPONENT shareware)
     ENDIF()
-    INSTALL(TARGETS server DESTINATION games COMPONENT shareware)
+    INSTALL(TARGETS server DESTINATION bin COMPONENT shareware)
 
     IF(NOT CONFIG_LINUX_PACKAGING_SKIP_PKZ)
 	    # Compress NVIDIA custom content
@@ -749,11 +754,22 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
 	        SCRIPT "${CMAKE_SOURCE_DIR}/setup/package_media.cmake"
 	        SCRIPT "${CMAKE_SOURCE_DIR}/setup/package_shaders.cmake"
 	        COMPONENT shareware)
-	ENDIF()
+    ENDIF()
     INSTALL(TARGETS game DESTINATION share/quake2rtx/baseq2 COMPONENT shareware)
 
-    # Install pre-built FSR4 SPIR-V shaders if present in the source tree
-    IF(EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+    # Keep the versioned menu loose as well as in q2rtx_media.pkz.  The
+    # launcher installs it into the user's baseq2 override directory so an old
+    # per-user media archive cannot hide new cvar enum entries after upgrade.
+    INSTALL(FILES
+        "${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu"
+        DESTINATION share/quake2rtx/baseq2
+        COMPONENT shareware)
+
+    # The v07 FSR4 model assets are optional and have separate provenance from
+    # the normal source tree.  Distribution packages can explicitly leave them
+    # out while retaining the native FSR3/analytical-FG implementation.
+    IF(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS AND
+       EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
         INSTALL(DIRECTORY
             "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders"
             DESTINATION share/quake2rtx/baseq2
@@ -800,7 +816,7 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
     # Install Client Wrapper
     INSTALL(FILES
         "${CMAKE_SOURCE_DIR}/setup/q2rtx.sh"
-        DESTINATION games/
+        DESTINATION bin/
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
         COMPONENT shareware
 	RENAME q2rtx)

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ -n "${XDG_DATA_HOME}" ]]; then
-	XDG_DATA_HOME = "${HOME}/.local/share"
+if [[ -z "${XDG_DATA_HOME:-}" ]]; then
+	XDG_DATA_HOME="${HOME}/.local/share"
 fi
 
 DEST_DIR="${XDG_DATA_HOME}/quake2rtx"
@@ -15,20 +15,20 @@ NO_COPY_RETAIL=1
 
 copy_retail_files() {
 	FULL_GAME_DIR="$1"
-	pushd "${FULL_GAME_DIR}"
+	pushd "${FULL_GAME_DIR}" >/dev/null || return 1
 	mkdir -p "${DEST_DIR}/baseq2"
 	cp baseq2/pak*.pak "${DEST_DIR}/baseq2"
 	cp -R baseq2/players "${DEST_DIR}/baseq2"
 	cp -R baseq2/music "${DEST_DIR}/baseq2"
 	# GoG version of game puts music in basedir
 	cp -R music "${DEST_DIR}/baseq2"
-	popd
+	popd >/dev/null || return 1
 }
 
 
 # which zenity
-if [[ -f "/usr/bin/zenity" ]]; then
-	ZEN="$(which zenity)"
+if command -v zenity >/dev/null 2>&1; then
+	ZEN="$(command -v zenity)"
 	# XXX[ljm] WAR steam-runtime bug: https://github.com/ValveSoftware/steam-runtime/issues/104
 	# The steam-runtime copy of zenity relies on a older zenity.ui file
 	# version, and won't work on more modern distros
@@ -37,9 +37,8 @@ if [[ -f "/usr/bin/zenity" ]]; then
 	ZEN_INFO="${ZEN} --info --text"
 	ZEN_DIR_SELECT="${ZEN} --file-selection --directory"
 else
-	which kdialog
-	if [[ ! -z "$?" ]]; then
-		ZEN="$(which kdialog)"
+	if command -v kdialog >/dev/null 2>&1; then
+		ZEN="$(command -v kdialog)"
 		ZEN_QUESTION="${ZEN} --title Q2RTX --warningyesnocancel"
 		ZEN_INFO="${ZEN} --title Q2RTX --msgbox"
 		ZEN_DIR_SELECT="${ZEN} --title Q@RTX --getexistingdirectory"

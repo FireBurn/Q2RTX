@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 3u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 4u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -60,7 +60,10 @@ typedef enum VkptTemporalResetReasonBits_e {
 	VKPT_TEMPORAL_RESET_SETTINGS_CHANGED     = 1u << 7,
 	VKPT_TEMPORAL_RESET_MENU_TRANSITION      = 1u << 8,
 	VKPT_TEMPORAL_RESET_NO_WORLD             = 1u << 9,
-	VKPT_TEMPORAL_RESET_PROVIDER_CHANGED     = 1u << 10
+	VKPT_TEMPORAL_RESET_PROVIDER_CHANGED     = 1u << 10,
+	/* A discontinuous camera transform, rather than ordinary motion-vector
+	 * reprojection. Consumers must discard temporal/optical-flow history. */
+	VKPT_TEMPORAL_RESET_CAMERA_CUT           = 1u << 11
 } VkptTemporalResetReasonBits;
 
 typedef enum VkptTemporalFrameFlagBits_e {

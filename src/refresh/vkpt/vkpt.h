@@ -186,6 +186,10 @@ typedef struct QVK_s {
 	VkSurfaceFormatKHR          surf_format;
 	bool                        surf_is_hdr;
 	bool                        surf_vsync;
+	/* Frame generation needs FIFO: Mailbox may replace, and Immediate may tear,
+	 * a generated->real present pair. This records swapchain creation policy
+	 * independently from the user's normal vid_vsync preference. */
+	bool                        surf_framegen_fifo;
 	VkPresentModeKHR            present_mode;
 	VkExtent2D                  extent_screen_images;
 	VkExtent2D                  extent_render;

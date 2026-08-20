@@ -97,22 +97,46 @@ STATIC CONTROL
 
 /*
 =================
+Static_Free
+=================
+*/
+static void Static_Free(menuStatic_t *s)
+{
+    Z_Free(s->generic.name);
+    Z_Free(s->generic.status);
+    Z_Free(s);
+}
+
+/*
+=================
 Static_Init
 =================
 */
 static void Static_Init(menuStatic_t *s)
 {
+    int value_width = 0;
+
     Q_assert(s->generic.name);
 
     if (!s->maxChars) {
-        s->maxChars = MAX_STRING_CHARS;
+        /* Scripted labels retained the historical effectively-unlimited
+         * default. A cvar-backed status needs a practical column width so a
+         * script author who omits --width does not make the menu bounds span
+         * MAX_STRING_CHARS characters. */
+        s->maxChars = s->cvar ? 32 : MAX_STRING_CHARS;
     }
 
-    s->generic.rect.x = s->generic.x;
+    s->generic.rect.x = s->generic.x + (s->cvar ? LCOLUMN_OFFSET : 0);
     s->generic.rect.y = s->generic.y;
 
     UI_StringDimensions(&s->generic.rect,
-                        s->generic.uiFlags, s->generic.name);
+                        s->generic.uiFlags | (s->cvar ? UI_RIGHT : 0),
+                        s->generic.name);
+
+    if (s->cvar) {
+        value_width = min(s->maxChars, MAX_STRING_CHARS - 1) * CHAR_WIDTH;
+        s->generic.rect.width += (RCOLUMN_OFFSET - LCOLUMN_OFFSET) + value_width;
+    }
 }
 
 /*
@@ -122,10 +146,42 @@ Static_Draw
 */
 static void Static_Draw(menuStatic_t *s)
 {
+    const char *value;
+    char display[MAX_STRING_CHARS];
+    size_t length, maximum;
+
     if (s->generic.flags & QMF_CUSTOM_COLOR) {
         R_SetColor(s->generic.color.u32);
     }
-    UI_DrawString(s->generic.x, s->generic.y, s->generic.uiFlags, s->generic.name);
+
+    if (!s->cvar) {
+        UI_DrawString(s->generic.x, s->generic.y, s->generic.uiFlags, s->generic.name);
+    } else {
+        UI_DrawString(s->generic.x + LCOLUMN_OFFSET, s->generic.y,
+                      s->generic.uiFlags | UI_RIGHT | UI_ALTCOLOR,
+                      s->generic.name);
+
+        value = s->cvar->string;
+        if (!value || !*value)
+            value = "<unavailable>";
+
+        maximum = min(s->maxChars, sizeof(display) - 1);
+        length = strlen(value);
+        if (length > maximum) {
+            if (maximum > 3) {
+                memcpy(display, value, maximum - 3);
+                memcpy(display + maximum - 3, "...", 4);
+            } else {
+                Q_strlcpy(display, "...", sizeof(display));
+            }
+        } else {
+            Q_strlcpy(display, value, sizeof(display));
+        }
+
+        UI_DrawString(s->generic.x + RCOLUMN_OFFSET, s->generic.y,
+                      s->generic.uiFlags, display);
+    }
+
     if (s->generic.flags & QMF_CUSTOM_COLOR) {
         R_ClearColor();
     }
@@ -1883,7 +1939,8 @@ void Menu_Init(menuFrameWork_t *menu)
     if (!focus && menu->nitems) {
 		for (i = 0; i < menu->nitems; i++) {
 			item = menu->items[i];
-			if (!(((menuCommon_t *)item)->flags & QMF_HIDDEN) && (((menuCommon_t *)item)->type != MTYPE_SEPARATOR)) {
+            if (!(((menuCommon_t *)item)->flags & QMF_HIDDEN) &&
+                UI_IsItemSelectable((menuCommon_t *)item)) {
 				((menuCommon_t *)item)->flags |= QMF_HASFOCUS;
 				if (((menuCommon_t *)item)->status) {
 					menu->status = ((menuCommon_t *)item)->status;
@@ -2614,6 +2671,9 @@ void Menu_Free(menuFrameWork_t *menu)
         case MTYPE_SEPARATOR:
             Z_Free(item);
             break;
+        case MTYPE_STATIC:
+            Static_Free(item);
+            break;
         case MTYPE_BITMAP:
             Bitmap_Free(item);
             break;
@@ -2627,4 +2687,3 @@ void Menu_Free(menuFrameWork_t *menu)
     Z_Free(menu->name);
     Z_Free(menu);
 }
-

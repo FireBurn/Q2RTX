@@ -86,8 +86,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	IMG_DO(TEMPORAL_NORMALS,          42, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(TEMPORAL_ALBEDO,           43, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(TEMPORAL_ROUGHNESS,        44, R16_SFLOAT,          r16f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	/* Persistent public-SDK FSR3.1.5 interop images. These are not consumed
+	 * by Q2RTX shaders; the reusable Vulkan bridge imports them as shared
+	 * SDK resources and restores GENERAL after every dispatch. */ \
+	IMG_DO(FSR3_315_DILATED_DEPTH,    45, R32_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(FSR3_315_DILATED_MOTION,   46, R16G16_SFLOAT,       rg16f,   IMG_WIDTH,           IMG_HEIGHT     ) \
+	IMG_DO(FSR3_315_PREVIOUS_DEPTH,   47, R32_UINT,            r32ui,   IMG_WIDTH,           IMG_HEIGHT     ) \
 
-#define NUM_IMAGES_BASE     45
+#define NUM_IMAGES_BASE     48
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \

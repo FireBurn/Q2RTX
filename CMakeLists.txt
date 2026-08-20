@@ -29,6 +29,8 @@ execute_process(
 OPTION(CONFIG_GL_RENDERER "Enable GL renderer" ON)
 OPTION(CONFIG_VKPT_RENDERER "Enable VKPT renderer" ON)
 OPTION(CONFIG_VKPT_FSR3 "Build the native Vulkan FSR 3 upscaler" ON)
+OPTION(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS
+    "Install optional experimental FSR4 v07 shader/model assets when present" ON)
 OPTION(CONFIG_VKPT_ENABLE_DEVICE_GROUPS "Enable device groups (multi-gpu) support" ON)
 OPTION(CONFIG_VKPT_ENABLE_IMAGE_DUMPS "Enable image dumping functionality" OFF)
 OPTION(CONFIG_USE_CURL "Use CURL for HTTP support" ON)
@@ -103,14 +105,22 @@ ELSEIF(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" OR CMAKE_SYSTEM_PROCESSOR STREQUA
 ENDIF()
 
 # Work around CMAKE_INSTALL_PREFIX being a relative directory when using -B
-# on Windows, which in turn trips up 'file(RELATIVE_PATH ...)' used in SDL2
-set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/extern/install)
+# on Windows, which in turn trips up 'file(RELATIVE_PATH ...)' used in SDL2.
+# extern is configured as a self-contained dependency tree, but its temporary
+# prefix must not leak into the game's install rules.  In particular, distro
+# packages explicitly set CMAKE_INSTALL_PREFIX (normally /usr).
+set(Q2RTX_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(Q2RTX_INSTALL_PREFIX_WAS_DEFAULT "${CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT}")
+set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/extern/install")
 
 add_subdirectory(extern)
 
 link_directories(.)
 
-set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR}/install)
+if(Q2RTX_INSTALL_PREFIX_WAS_DEFAULT)
+    set(Q2RTX_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/install")
+endif()
+set(CMAKE_INSTALL_PREFIX "${Q2RTX_INSTALL_PREFIX}" CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
 
 SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${CONFIG_BUILD_IPO})
 

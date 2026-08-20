@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "vkpt.h"
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,8 @@ typedef struct VkptTemporalState_s {
 	uint64_t previous_frame_id;
 	VkExtent2D previous_display_size;
 	uint32_t previous_menu_mode;
+	VkptTemporalCamera previous_camera;
+	uint32_t have_previous_camera;
 	uint32_t have_previous_frame;
 	uint32_t frame_open;
 } VkptTemporalState;
@@ -40,6 +43,33 @@ static bool
 extent_is_equal(VkExtent2D a, VkExtent2D b)
 {
 	return a.width == b.width && a.height == b.height;
+}
+
+/*
+ * Ordinary camera motion is represented by FLAT_MOTION and must retain
+ * temporal history. A teleport, a large instantaneous turn, or a lens jump
+ * has no reliable reprojectable predecessor, so make that distinction
+ * explicit for every provider. The thresholds are deliberately conservative:
+ * Q2's normal maximum movement is a few world units per rendered frame, while
+ * 256 units is over six metres under the contract's one-inch unit scale.
+ */
+static bool
+camera_cut_detected(const VkptTemporalCamera *current,
+	const VkptTemporalCamera *previous)
+{
+	const float dx = current->position[0] - previous->position[0];
+	const float dy = current->position[1] - previous->position[1];
+	const float dz = current->position[2] - previous->position[2];
+	const float distance_squared = dx * dx + dy * dy + dz * dz;
+	const float forward_dot =
+		current->forward[0] * previous->forward[0] +
+		current->forward[1] * previous->forward[1] +
+		current->forward[2] * previous->forward[2];
+	const float fov_delta = fabsf(current->vertical_fov_radians -
+		previous->vertical_fov_radians);
+
+	return distance_squared > 256.0f * 256.0f ||
+		forward_dot < 0.0f || fov_delta > 0.35f;
 }
 
 static bool
@@ -255,6 +285,15 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	frame->camera.position[1] = frame->camera.view_inverse[13];
 	frame->camera.position[2] = frame->camera.view_inverse[14];
 
+	if (render_world && temporal_state.have_previous_camera &&
+		camera_cut_detected(&frame->camera, &temporal_state.previous_camera)) {
+		reset_reasons |= VKPT_TEMPORAL_RESET_CAMERA_CUT;
+		/* The initial assignment above predates camera population. Update the
+		 * externally visible values after this transform-based reset decision. */
+		frame->reset_reasons = reset_reasons;
+		frame->history_valid = 0;
+	}
+
 	frame->inputs.motion_description.space =
 		VKPT_TEMPORAL_MOTION_NORMALIZED_UV;
 	frame->inputs.motion_description.direction =
@@ -464,6 +503,8 @@ vkpt_temporal_end_frame(bool presented)
 		temporal_state.previous_display_size = frame->display_size;
 		temporal_state.previous_menu_mode =
 			(frame->flags & VKPT_TEMPORAL_FRAME_MENU_MODE) != 0;
+		temporal_state.previous_camera = frame->camera;
+		temporal_state.have_previous_camera = 1;
 		temporal_state.have_previous_frame = 1;
 	} else {
 		frame->stage = VKPT_TEMPORAL_STAGE_CLOSED;

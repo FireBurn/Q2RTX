@@ -26,6 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "fsr4/ffx_fsr4_assets.h"
 #ifdef VKPT_FSR3
 #include "ffx_vk_portable.h"
+#include "ffx_vk_fsr3_3_1_5_bridge.h"
 #endif
 #include <math.h>
 
@@ -49,7 +50,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
     Cvars
     -----
-    flt_upscaler      0 = Q2RTX, 1 = FSR3 3.1.4, 2 = FSR4 v07 model family
+    flt_upscaler      0 = Q2RTX, 1 = FSR3 3.1.4, 2 = FSR4 v07 model family,
+                      3 = FSR3 3.1.5 public-SDK Vulkan experiment
     flt_fsr_enable    deprecated alias that migrates to flt_upscaler 2
     flt_fsr_sharpness deprecated compatibility cvar; it has no effect
 
@@ -89,6 +91,7 @@ enum {
     VKPT_UPSCALER_Q2RTX = 0,
     VKPT_UPSCALER_FSR3 = 1,
     VKPT_UPSCALER_FSR4 = 2,
+    VKPT_UPSCALER_FSR3_315 = 3,
 };
 
 static int requested_fsr_quality(void);
@@ -121,6 +124,20 @@ static bool fsr3_frame_generation_context_ok = false;
 static bool fsr3_frame_generation_reset_next = true;
 static uint32_t fsr3_frame_generation_dw = 0;
 static uint32_t fsr3_frame_generation_dh = 0;
+static FfxVkFsr3_3_1_5UpscalerContext *fsr3_315_context = NULL;
+static bool fsr3_315_context_ok = false;
+static bool fsr3_315_reset_next = true;
+static uint32_t fsr3_315_ctx_dw = 0;
+static uint32_t fsr3_315_ctx_dh = 0;
+static FfxVkFsr3_3_1_5Resource fsr3_315_color;
+static FfxVkFsr3_3_1_5Resource fsr3_315_depth;
+static FfxVkFsr3_3_1_5Resource fsr3_315_motion;
+static FfxVkFsr3_3_1_5Resource fsr3_315_reactive;
+static FfxVkFsr3_3_1_5Resource fsr3_315_composition;
+static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_depth;
+static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_motion;
+static FfxVkFsr3_3_1_5Resource fsr3_315_previous_depth;
+static FfxVkFsr3_3_1_5Resource fsr3_315_output;
 #endif
 
 static uint32_t align_up_8(uint32_t value)
@@ -496,7 +513,7 @@ static int requested_upscaler(void)
 {
     int requested = cvar_flt_upscaler ? cvar_flt_upscaler->integer : 0;
 
-    if (requested >= VKPT_UPSCALER_FSR3 && requested <= VKPT_UPSCALER_FSR4)
+    if (requested >= VKPT_UPSCALER_FSR3 && requested <= VKPT_UPSCALER_FSR3_315)
         return requested;
     /* flt_fsr_enable is retained as a migration/console alias for the old
      * prototype.  The new provider cvar takes precedence whenever nonzero. */
@@ -562,6 +579,7 @@ int vkpt_fsr_requested_render_scale(void)
 {
     switch (requested_upscaler()) {
     case VKPT_UPSCALER_FSR3: return fsr3_requested_render_scale();
+    case VKPT_UPSCALER_FSR3_315: return fsr3_requested_render_scale();
     case VKPT_UPSCALER_FSR4: return fsr4_requested_render_scale();
     default: return 0;
     }
@@ -583,7 +601,7 @@ static bool upscaler_frame_is_eligible(int provider)
     /* Both providers use the same fixed user ratios. FSR4 selects a distinct
      * trained INT8 graph for each; it must never be dispatched at a ratio
      * belonging to another graph. */
-    if (provider == VKPT_UPSCALER_FSR3)
+    if (provider == VKPT_UPSCALER_FSR3 || provider == VKPT_UPSCALER_FSR3_315)
         return true;
     if (fsr4_dynamic_resolution_requested())
         return true;
@@ -616,6 +634,159 @@ static void fsr3_fill_device_info(FfxVkPortableDeviceInfo *device_info)
     device_info->debugUtilsEnabled = VK_TRUE;
     device_info->shaderStorageBufferArrayNonUniformIndexingEnabled = VK_TRUE;
     device_info->accelerationStructureEnabled = VK_TRUE;
+}
+
+static FfxVkFsr3_3_1_5Resource fsr3_315_import_image(
+    VkImage image, VkFormat format, VkExtent2D extent, uint32_t state)
+{
+    FfxVkFsr3_3_1_5ImportedImageDescription description;
+    FfxVkFsr3_3_1_5Bridge *bridge;
+
+    memset(&description, 0, sizeof(description));
+    if (!fsr3_315_context || image == VK_NULL_HANDLE ||
+        !extent.width || !extent.height)
+        return (FfxVkFsr3_3_1_5Resource){0};
+    bridge = ffxVkFsr3_3_1_5UpscalerContextGetBridge(fsr3_315_context);
+    if (!bridge)
+        return (FfxVkFsr3_3_1_5Resource){0};
+    description.image = image;
+    description.format = format;
+    description.width = extent.width;
+    description.height = extent.height;
+    description.mipCount = 1;
+    description.arrayLayers = 1;
+    /* Q2RTX's global images are held in GENERAL across compute passes. The
+     * renderer inserts the producer->compute dependency immediately before
+     * dispatch; the bridge returns every imported image to this same layout. */
+    description.layout = VK_IMAGE_LAYOUT_GENERAL;
+    description.state = state;
+    description.usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+        VK_IMAGE_USAGE_STORAGE_BIT |
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    return ffxVkFsr3_3_1_5BridgeImportImage(bridge, &description);
+}
+
+static void fsr3_315_release_images(void)
+{
+    FfxVkFsr3_3_1_5Bridge *bridge;
+    FfxVkFsr3_3_1_5Resource *resources[] = {
+        &fsr3_315_color, &fsr3_315_depth, &fsr3_315_motion,
+        &fsr3_315_reactive, &fsr3_315_composition,
+        &fsr3_315_dilated_depth, &fsr3_315_dilated_motion,
+        &fsr3_315_previous_depth, &fsr3_315_output,
+    };
+
+    if (!fsr3_315_context)
+        return;
+    bridge = ffxVkFsr3_3_1_5UpscalerContextGetBridge(fsr3_315_context);
+    if (bridge) {
+        for (size_t index = 0; index < LENGTH(resources); ++index) {
+            ffxVkFsr3_3_1_5BridgeReleaseImportedImage(bridge, *resources[index]);
+            memset(resources[index], 0, sizeof(*resources[index]));
+        }
+    }
+}
+
+static void fsr3_315_destroy_context(void)
+{
+    if (fsr3_315_context) {
+        _VK(vkDeviceWaitIdle(qvk.device));
+        /* Descriptor sets retain imported image views until the GPU is done.
+         * The context teardown fence above makes releasing those views safe. */
+        fsr3_315_release_images();
+        ffxVkFsr3_3_1_5UpscalerContextDestroy(fsr3_315_context);
+    }
+    fsr3_315_context = NULL;
+    fsr3_315_context_ok = false;
+    fsr3_315_ctx_dw = fsr3_315_ctx_dh = 0;
+    fsr3_315_reset_next = true;
+}
+
+static VkResult fsr3_315_create_context(void)
+{
+    FfxVkFsr3_3_1_5UpscalerCreateInfo create_info;
+    FfxVkFsr3_3_1_5SharedResourceDescriptions shared;
+    FfxVkFsr3_3_1_5Result result;
+    VkExtent2D extent = qvk.extent_screen_images;
+
+    fsr3_315_destroy_context();
+    if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height ||
+        !extent.width || !extent.height)
+        return VK_ERROR_INITIALIZATION_FAILED;
+    memset(&create_info, 0, sizeof(create_info));
+    create_info.physicalDevice = qvk.physical_device;
+    create_info.device = qvk.device;
+    create_info.maxRenderWidth = extent.width;
+    create_info.maxRenderHeight = extent.height;
+    create_info.maxUpscaleWidth = extent.width;
+    create_info.maxUpscaleHeight = extent.height;
+    create_info.hdrColorInput = VK_TRUE;
+    create_info.autoExposure = VK_TRUE;
+    result = ffxVkFsr3_3_1_5UpscalerContextCreate(&create_info, &fsr3_315_context);
+    if (result != FFX_VK_FSR3_3_1_5_OK) {
+        Com_WPrintf("FSR3.1.5: public Vulkan context unavailable (%d); using fallback.\n",
+                    (int)result);
+        fsr3_315_context = NULL;
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+    if (ffxVkFsr3_3_1_5UpscalerContextGetSharedResourceDescriptions(
+            fsr3_315_context, &shared) != FFX_VK_FSR3_3_1_5_OK ||
+        shared.dilatedDepth.format != VK_FORMAT_R32_SFLOAT ||
+        shared.dilatedMotionVectors.format != VK_FORMAT_R16G16_SFLOAT ||
+        shared.reconstructedPrevNearestDepth.format != VK_FORMAT_R32_UINT ||
+        shared.dilatedDepth.width > extent.width || shared.dilatedDepth.height > extent.height ||
+        shared.dilatedMotionVectors.width > extent.width ||
+        shared.dilatedMotionVectors.height > extent.height ||
+        shared.reconstructedPrevNearestDepth.width > extent.width ||
+        shared.reconstructedPrevNearestDepth.height > extent.height) {
+        Com_WPrintf("FSR3.1.5: SDK shared-resource contract is incompatible with Q2RTX images.\n");
+        fsr3_315_destroy_context();
+        return VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    fsr3_315_color = fsr3_315_import_image(qvk.images[VKPT_IMG_FLAT_COLOR],
+        VK_FORMAT_R16G16B16A16_SFLOAT, extent,
+        FFX_VK_FSR3_3_1_5_RESOURCE_STATE_COMPUTE_READ);
+    fsr3_315_depth = fsr3_315_import_image(qvk.images[VKPT_IMG_TEMPORAL_DEVICE_DEPTH],
+        VK_FORMAT_R32_SFLOAT, extent,
+        FFX_VK_FSR3_3_1_5_RESOURCE_STATE_COMPUTE_READ);
+    fsr3_315_motion = fsr3_315_import_image(qvk.images[VKPT_IMG_FLAT_MOTION],
+        VK_FORMAT_R16G16B16A16_SFLOAT, extent,
+        FFX_VK_FSR3_3_1_5_RESOURCE_STATE_COMPUTE_READ);
+    fsr3_315_reactive = fsr3_315_import_image(qvk.images[VKPT_IMG_TEMPORAL_REACTIVE_MASK],
+        VK_FORMAT_R8_UNORM, extent,
+        FFX_VK_FSR3_3_1_5_RESOURCE_STATE_COMPUTE_READ);
+    fsr3_315_composition = fsr3_315_import_image(
+        qvk.images[VKPT_IMG_TEMPORAL_COMPOSITION_MASK], VK_FORMAT_R8_UNORM,
+        extent, FFX_VK_FSR3_3_1_5_RESOURCE_STATE_COMPUTE_READ);
+    fsr3_315_dilated_depth = fsr3_315_import_image(
+        qvk.images[VKPT_IMG_FSR3_315_DILATED_DEPTH], VK_FORMAT_R32_SFLOAT,
+        extent, FFX_VK_FSR3_3_1_5_RESOURCE_STATE_UNORDERED_ACCESS);
+    fsr3_315_dilated_motion = fsr3_315_import_image(
+        qvk.images[VKPT_IMG_FSR3_315_DILATED_MOTION], VK_FORMAT_R16G16_SFLOAT,
+        extent, FFX_VK_FSR3_3_1_5_RESOURCE_STATE_UNORDERED_ACCESS);
+    fsr3_315_previous_depth = fsr3_315_import_image(
+        qvk.images[VKPT_IMG_FSR3_315_PREVIOUS_DEPTH], VK_FORMAT_R32_UINT,
+        extent, FFX_VK_FSR3_3_1_5_RESOURCE_STATE_UNORDERED_ACCESS);
+    fsr3_315_output = fsr3_315_import_image(qvk.images[VKPT_IMG_FSR_EASU_OUTPUT],
+        VK_FORMAT_R16G16B16A16_SFLOAT, extent,
+        FFX_VK_FSR3_3_1_5_RESOURCE_STATE_UNORDERED_ACCESS);
+    if (!fsr3_315_color.resource || !fsr3_315_depth.resource ||
+        !fsr3_315_motion.resource || !fsr3_315_reactive.resource ||
+        !fsr3_315_composition.resource || !fsr3_315_dilated_depth.resource ||
+        !fsr3_315_dilated_motion.resource || !fsr3_315_previous_depth.resource ||
+        !fsr3_315_output.resource) {
+        Com_WPrintf("FSR3.1.5: failed to import Q2RTX temporal images.\n");
+        fsr3_315_destroy_context();
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    fsr3_315_context_ok = true;
+    fsr3_315_reset_next = true;
+    fsr3_315_ctx_dw = qvk.extent_unscaled.width;
+    fsr3_315_ctx_dh = qvk.extent_unscaled.height;
+    Com_Printf("FSR3.1.5: public Vulkan experiment ready (max %ux%u).\n",
+               extent.width, extent.height);
+    return VK_SUCCESS;
 }
 
 static void fsr3_destroy_context(void)
@@ -761,6 +932,15 @@ static bool fsr3_is_enabled(void)
            fsr3_ctx_dh == qvk.extent_unscaled.height &&
            upscaler_frame_is_eligible(VKPT_UPSCALER_FSR3);
 }
+
+static bool fsr3_315_is_enabled(void)
+{
+    return requested_upscaler() == VKPT_UPSCALER_FSR3_315 &&
+           fsr3_315_context_ok && fsr3_315_context &&
+           fsr3_315_ctx_dw == qvk.extent_unscaled.width &&
+           fsr3_315_ctx_dh == qvk.extent_unscaled.height &&
+           upscaler_frame_is_eligible(VKPT_UPSCALER_FSR3_315);
+}
 #endif
 
 static bool fsr4_is_enabled(void)
@@ -833,6 +1013,20 @@ static bool resolve_upscaler(int *active, const char **reason)
         }
         *active = VKPT_UPSCALER_FSR3;
         *reason = "FSR3 3.1.4 native Vulkan active";
+        return true;
+    }
+    if (requested == VKPT_UPSCALER_FSR3_315) {
+        if (!fsr3_315_context_ok || !fsr3_315_context) {
+            *reason = "fallback: FSR3 3.1.5 Vulkan context unavailable";
+            return false;
+        }
+        if (fsr3_315_ctx_dw != qvk.extent_unscaled.width ||
+            fsr3_315_ctx_dh != qvk.extent_unscaled.height) {
+            *reason = "fallback: FSR3 3.1.5 context resize pending";
+            return false;
+        }
+        *active = VKPT_UPSCALER_FSR3_315;
+        *reason = "FSR3 3.1.5 public-SDK Vulkan experiment active";
         return true;
     }
 #endif
@@ -925,6 +1119,7 @@ void vkpt_fsr_request_reset(void)
     fsr4_reset_next = true;
 #ifdef VKPT_FSR3
     fsr3_reset_next = true;
+    fsr3_315_reset_next = true;
     /* Frame interpolation has independent optical-flow/history state. A
      * camera cut, projection change, provider switch, or temporal input reset
      * must invalidate it even when the upscaler remains usable. */
@@ -958,6 +1153,7 @@ VkResult vkpt_fsr_destroy(void)
 #ifdef VKPT_FSR3
     fsr3_destroy_frame_generation_context();
     fsr3_destroy_context();
+    fsr3_315_destroy_context();
 #endif
     fsr4_destroy_backend();
     if (fsr4_scratch) {
@@ -988,6 +1184,11 @@ VkResult vkpt_fsr_create_pipelines(void)
         fsr3_ctx_dh != qvk.extent_unscaled.height) {
         (void)fsr3_create_context();
     }
+    if (!fsr3_315_context_ok ||
+        fsr3_315_ctx_dw != qvk.extent_unscaled.width ||
+        fsr3_315_ctx_dh != qvk.extent_unscaled.height) {
+        (void)fsr3_315_create_context();
+    }
     if (cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0 &&
         (!fsr3_frame_generation_context_ok ||
          fsr3_frame_generation_dw != qvk.extent_unscaled.width ||
@@ -1017,6 +1218,7 @@ VkResult vkpt_fsr_destroy_pipelines(void)
 #ifdef VKPT_FSR3
     fsr3_destroy_frame_generation_context();
     fsr3_destroy_context();
+    fsr3_315_destroy_context();
 #endif
     fsr4_destroy_backend();
     return VK_SUCCESS;
@@ -1142,9 +1344,16 @@ static FfxVkPortableImage fsr3_screen_image(
 
 bool vkpt_fsr_frame_generation_is_ready(void)
 {
+    const int upscaler = requested_upscaler();
+
     if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
         return false;
-    if (requested_upscaler() != VKPT_UPSCALER_FSR3 || !fsr3_is_enabled())
+    /* Optical flow and frame interpolation consume the provider-neutral
+     * temporal contract and presentation-domain scene color, not either
+     * upscaler's private history. The public 3.1.5 upscaler therefore has the
+     * same valid analytical-FG input contract as the proven 1.1.4 path. */
+    if (!((upscaler == VKPT_UPSCALER_FSR3 && fsr3_is_enabled()) ||
+          (upscaler == VKPT_UPSCALER_FSR3_315 && fsr3_315_is_enabled())))
         return false;
     return fsr3_frame_generation_context_ok && fsr3_frame_generation_context &&
            fsr3_frame_generation_dw == qvk.extent_unscaled.width &&
@@ -1589,6 +1798,104 @@ static VkResult fsr3_dispatch(VkCommandBuffer cmd_buf)
     END_PERF_MARKER(cmd_buf, PROFILER_FSR);
     return VK_SUCCESS;
 }
+
+static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    FfxVkFsr3_3_1_5UpscalerDispatchInfo dispatch;
+    FfxVkFsr3_3_1_5Result result;
+    char temporal_reason[128];
+    VkImageSubresourceRange color_range = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+    };
+    const uint32_t required_inputs =
+        VKPT_TEMPORAL_INPUT_SCENE_COLOR |
+        VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+        VKPT_TEMPORAL_INPUT_DEVICE_DEPTH |
+        VKPT_TEMPORAL_INPUT_REACTIVE_MASK |
+        VKPT_TEMPORAL_INPUT_TRANSPARENCY_AND_COMPOSITION_MASK;
+
+    if (!fsr3_315_is_enabled())
+        return VK_SUCCESS;
+    if (!vkpt_temporal_validate_current_frame(required_inputs,
+            temporal_reason, sizeof(temporal_reason)) ||
+        !(frame->flags & VKPT_TEMPORAL_FRAME_RECTILINEAR_PROJECTION) ||
+        frame->inputs.device_depth_description.convention !=
+            VKPT_TEMPORAL_DEPTH_DEVICE_ZERO_TO_ONE ||
+        frame->inputs.scene_color.image != qvk.images[VKPT_IMG_FLAT_COLOR] ||
+        frame->inputs.motion_vectors.image != qvk.images[VKPT_IMG_FLAT_MOTION] ||
+        frame->inputs.device_depth.image != qvk.images[VKPT_IMG_TEMPORAL_DEVICE_DEPTH] ||
+        frame->inputs.reactive_mask.image != qvk.images[VKPT_IMG_TEMPORAL_REACTIVE_MASK] ||
+        frame->inputs.transparency_and_composition_mask.image !=
+            qvk.images[VKPT_IMG_TEMPORAL_COMPOSITION_MASK]) {
+        Com_WPrintf("FSR3.1.5: temporal inputs rejected: %s\n",
+            temporal_reason[0] ? temporal_reason : "unexpected image/depth/projection contract");
+        fsr3_315_reset_next = true;
+        return VK_NOT_READY;
+    }
+
+    BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    const VkptTemporalImage *provider_inputs[] = {
+        &frame->inputs.scene_color,
+        &frame->inputs.motion_vectors,
+        &frame->inputs.device_depth,
+        &frame->inputs.reactive_mask,
+        &frame->inputs.transparency_and_composition_mask
+    };
+    for (size_t index = 0; index < LENGTH(provider_inputs); ++index) {
+        const VkptTemporalImage *input = provider_inputs[index];
+        IMAGE_BARRIER_STAGES(cmd_buf, input->producer_stage,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            .image = input->image,
+            .subresourceRange = color_range,
+            .srcAccessMask = input->producer_access,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .oldLayout = input->layout,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        );
+    }
+
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.commandBuffer = cmd_buf;
+    dispatch.color = fsr3_315_color;
+    dispatch.depth = fsr3_315_depth;
+    dispatch.motionVectors = fsr3_315_motion;
+    dispatch.reactive = fsr3_315_reactive;
+    dispatch.transparencyAndComposition = fsr3_315_composition;
+    dispatch.dilatedDepth = fsr3_315_dilated_depth;
+    dispatch.dilatedMotionVectors = fsr3_315_dilated_motion;
+    dispatch.reconstructedPrevNearestDepth = fsr3_315_previous_depth;
+    dispatch.output = fsr3_315_output;
+    dispatch.jitterOffsetX = -frame->camera.jitter_render_pixels[0];
+    dispatch.jitterOffsetY = -frame->camera.jitter_render_pixels[1];
+    dispatch.motionVectorScaleX = frame->inputs.motion_description.to_render_pixels[0];
+    dispatch.motionVectorScaleY = frame->inputs.motion_description.to_render_pixels[1];
+    dispatch.renderWidth = frame->render_size.width;
+    dispatch.renderHeight = frame->render_size.height;
+    dispatch.upscaleWidth = frame->display_size.width;
+    dispatch.upscaleHeight = frame->display_size.height;
+    dispatch.frameTimeMilliseconds = frame->frame_time_ms > 0.0f
+        ? frame->frame_time_ms : 16.667f;
+    dispatch.preExposure = (float)STORAGE_SCALE_HDR;
+    dispatch.enableSharpening = cvar_flt_fsr3_sharpening->value > 0.0f ? VK_TRUE : VK_FALSE;
+    dispatch.sharpness = Q_clipf(cvar_flt_fsr3_sharpening->value, 0.0f, 1.0f);
+    dispatch.reset = (fsr3_315_reset_next || !frame->history_valid) ? VK_TRUE : VK_FALSE;
+    dispatch.cameraNear = frame->camera.near_plane;
+    dispatch.cameraFar = frame->camera.far_plane;
+    dispatch.cameraVerticalFovRadians = frame->camera.vertical_fov_radians;
+    dispatch.viewSpaceToMeters = frame->camera.view_space_to_meters;
+    result = ffxVkFsr3_3_1_5UpscalerContextRecordDispatch(fsr3_315_context, &dispatch);
+    if (result != FFX_VK_FSR3_3_1_5_OK) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        fsr3_315_reset_next = true;
+        Com_WPrintf("FSR3.1.5: dispatch failed (%d)\n", (int)result);
+        return VK_ERROR_UNKNOWN;
+    }
+    fsr3_315_reset_next = false;
+    copy_upscaled_output_to_taa(cmd_buf, frame);
+    END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    return VK_SUCCESS;
+}
 #endif
 
 static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
@@ -1802,6 +2109,8 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf)
 {
 #ifdef VKPT_FSR3
+    if (fsr3_315_is_enabled())
+        return fsr3_315_dispatch(cmd_buf);
     if (fsr3_is_enabled())
         return fsr3_dispatch(cmd_buf);
 #endif

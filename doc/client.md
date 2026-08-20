@@ -744,7 +744,8 @@ cannot run.
 #### `flt_upscaler`
 Selects the temporal reconstruction provider: 0 uses the Q2RTX `flt_taa`
 fallback, 1 selects the native Vulkan FSR 3.1.4 upscaler, and 2 selects the
-experimental FSR4 source-v07 INT8/DOT4 upscaler. The default is 0.
+experimental FSR4 source-v07 INT8/DOT4 upscaler. Value 3 selects the
+experimental public-SDK FSR3 3.1.5 Vulkan bridge. The default is 0.
 
 FSR3 and FSR4 v07 both use the discrete `flt_fsr_quality` choice. FSR4 loads a
 separate coherent INT8 graph, initializer payload, and pass-0 weights for each
@@ -757,6 +758,12 @@ provider cannot run, Q2RTX uses the `flt_taa` fallback instead.
 This experimental source-v07 path is based on an older FSR4 model payload; it
 must not be described as FSR 4.1.1. The implemented v07 static models cover the
 listed discrete quality ratios and expose a separate dynamic-resolution model.
+
+Linux package launches keep a revisioned loose `q2rtx.menu` in the user
+`baseq2` directory so an old user-local `q2rtx_media.pkz` cannot hide new
+upscaler values. On the first upgrade that needs it, an existing loose menu is
+saved as `q2rtx.menu.pre-fsr-menu-update`; set `Q2RTX_SKIP_MENU_UPDATE=1` when
+launching to manage a custom menu manually.
 
 #### `flt_fsr_quality`
 
@@ -815,10 +822,11 @@ value. This is independent from FSR4's dynamic-resolution-model selection.
 #### `flt_frame_generation`
 
 Enables the experimental analytical FSR3 Optical Flow and Frame Interpolation
-path. It requires the native FSR3 upscaler, a single GPU, rectilinear
-projection, display-resolution `TAA_OUTPUT`, valid device depth/motion inputs,
-and a swapchain with at least `minImageCount + 2` images (five on the tested
-RX 6800M/RADV surface). Q2RTX acquires two images, presents
+path. It requires either the native FSR3 3.1.4 upscaler or the experimental
+public-SDK FSR3 3.1.5 path, a single GPU, rectilinear projection,
+display-resolution `TAA_OUTPUT`, valid device depth/motion inputs, and a
+swapchain with at least `minImageCount + 2` images (five on the tested RX
+6800M/RADV surface). Q2RTX acquires two images, presents
 the generated HUDless scene with UI composited afterward, then presents the
 real frame with the same UI.
 
@@ -826,10 +834,15 @@ Generated and real commands use separate final-blit descriptors and one shared
 UI upload, then run in that order on Q2RTX's graphics/present queue. The normal
 real-frame fence retires both; there is no CPU replay wait. The second acquire
 waits for the image reserved by the `minImageCount + 2` contract rather than
-dropping generation on a zero-timeout probe. This remains an experimental
-functional integration, not yet a low-latency/VRR pacing implementation. If
-interpolation rejects the temporal frame, both presentation paths safely use
-the real scene instead. The remaining presenter work is explicit pacing.
+dropping generation on a zero-timeout probe.
+
+While frame generation is requested, Q2RTX recreates the swapchain with Vulkan
+FIFO presentation even when `vid_vsync` is off. This intentionally favors
+displaying every generated→real pair in order: Mailbox may replace a generated
+image and Immediate may tear it. The active diagnostic says `FIFO pacing` when
+that contract is in use. This is a correctness-first policy, not yet a
+low-latency/VRR timing implementation. If interpolation rejects the temporal
+frame, both presentation paths safely use the real scene instead.
 
 #### `flt_frame_generation_min_rendered_fps`
 
@@ -846,7 +859,9 @@ diagnostics. `active` becomes 1 only after an interpolated generated image and
 its following real image were both accepted by WSI. They distinguish that
 actual generated→real presentation sequence from explicit fallbacks such as
 insufficient swapchain images, unavailable FSR3 inputs, an interpolation-frame
-rejection, or a rejected present.
+rejection, a rejected present, or a paused menu frame. Paused menus deliberately
+use the normal one-image presentation path, reset FI/OF history, and report
+zero generated cadence until gameplay resumes.
 
 #### `flt_frame_generation_rendered_fps`, `flt_frame_generation_generated_fps`
 
@@ -860,10 +875,21 @@ rates, GPU timestamps, or a substitute for the remaining explicit pacing work.
 #### `flt_upscaler_active`, `flt_upscaler_reason`
 
 Read-only diagnostics published by the provider resolver. `flt_upscaler_active`
-is 0 for the Q2RTX fallback, 1 for native FSR3, and 2 for experimental FSR4
-v07. `flt_upscaler_reason` states the selected active backend or the precise
-fallback reason, such as missing context, invalid extent, multiple GPUs, or a
-non-rectilinear projection.
+is 0 for the Q2RTX fallback, 1 for native FSR3 3.1.4, 2 for experimental FSR4
+v07, and 3 for experimental public-SDK FSR3 3.1.5. `flt_upscaler_reason`
+states the selected active backend or the precise fallback reason, such as
+missing context, invalid extent, multiple GPUs, or a non-rectilinear
+projection.
+
+The Video menu's **temporal diagnostics...** page displays this read-only
+status, together with the frame-generation reason and presentation cadence; it
+never treats these diagnostic cvars as editable settings.
+
+Temporal history is also reset automatically for a provider/preset/extent/
+projection transition and for a conservative camera-cut detection: a
+single-frame teleport over 256 Q2 units, a turn over 90 degrees, or a vertical
+FOV jump over 0.35 radians. Ordinary camera motion remains motion-vector
+reprojected.
 
 #### `flt_fsr_enable`
 Deprecated compatibility alias. An existing nonzero value is migrated to
