@@ -33,6 +33,11 @@ Current truth:
   pre-tone-map debug images and therefore should not be brightness-compared to
   final presentation captures.
 
+- After adding those presentation branches, a fresh RX 6800M
+  `vk_validation=1` FSR3.1.6 generated→real FIFO run (debug view Off) again
+  reached active presentation with no VUID/error and a coherent HUDless scene
+  plus replayed UI: `/home/fireburn/Screenshot_FSR3_FG_post_debug_20260820.png`.
+
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
   values are `UV_after - UV_before`.  It preserves the existing neutral SDK
