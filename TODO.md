@@ -229,6 +229,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `FFX_SPD_NO_WAVE_OPERATIONS=1` permutation removed them. The regenerated
   bundle passed the bridge tests and a 30-second RX 6800M live GPU-AV run with
   no FSR race, VUID, dispatch-failure, or fallback output.
+  The generic Vulkan pipeline factory now reflects each module's actual
+  `OpEntryPoint` name rather than assuming `CS`: the SDK may supply direct
+  SPIR-V declaring `main`, while the generated catalogue declares `CS`.
+  Both forms are unit-tested. A fresh validation-enabled RX 6800M startup
+  creates the FSR3.1.5 contexts at 640x480 and after resize at 1280x720 with
+  no VUID, Vulkan error, or crash.
 - [x] Integrate it into Q2RTX as a supported fallback to experimental FSR4.
   The fixed-Performance `flt_upscaler 1` path completed a visual and
   Vulkan-validation live test at 640x360 -> 1280x720 on RX 6800M.

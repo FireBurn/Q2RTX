@@ -389,6 +389,12 @@ Highest-confidence code failures in the old provider:
   makes context creation deterministic for both upscaling and FI/OF backends.
 - Root build/ctest and standalone reusable suite pass. Standalone is now 20/20;
   live command used `vk_validation 1`, then ran for 55 seconds with no VUID.
+- The 2026-08-20 fresh live startup also fixed an SDK-direct-SPIR-V edge case:
+  the reusable pipeline factory reflects the sole GLCompute `OpEntryPoint`
+  rather than hard-coding `CS`. The SDK-supplied runtime blob declared `main`,
+  whereas the generated catalogue declares `CS`. Both are unit-tested; the
+  RX 6800M now creates FSR3.1.5 contexts at startup and resize with validation
+  clean instead of failing pipeline creation.
 
 The remaining FSR3 work is quality/preset/feature expansion, proper explicit
 failure transaction handling, RenderDoc inspection, and full resize/reset/motion
