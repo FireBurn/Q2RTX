@@ -147,9 +147,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Vulkan-1.2-validated compact-descriptor SPIR-V bundle. Its actual fixed
   Q2RTX-profile SDK blob accessors now return every embedded module and reject
   unsupported permutations; a dedicated test verifies all 18 returned blobs,
-  error paths, and Wave64 queries. A real Vulkan scheduler bridge and portable
-  presenter integration remain separate work. GCC 16 and Clang 22 both build
-  this coexistence gate while the reusable suite passes 24/24.
+  error paths, and Wave64 queries. Its real host-graph test links the FI/OF
+  schedulers with the public SDK core, creates 42 persistent resources and all
+  18 embedded-SPIR-V pipelines, then destroys them cleanly. A real Vulkan
+  scheduler bridge and portable presenter integration remain separate work.
+  GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
+  passes 26/26.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves
