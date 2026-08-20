@@ -49,9 +49,10 @@ Current truth:
   FI Dispatch through the reusable bridge with zero Vulkan warnings/errors.
   Its source-derived SPIR-V now explicitly matches the SDK's R8_UINT luma,
   R16G16_SINT flow-vector, and R16G16_FLOAT dilated-motion storage formats;
-  DX12's looser typed-UAV declaration rule was not portable to Vulkan.
-  Temporal FI/OF frames, a stable public 3.1.6 lifecycle API, and a portable
-  presenter remain next. The existing
+  DX12's looser typed-UAV declaration rule was not portable to Vulkan. The
+  same test then records/submits a non-reset temporal frame, proving that the
+  bridge restores imported layouts between logical frames. A stable public
+  3.1.6 lifecycle API and a portable presenter remain next. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

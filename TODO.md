@@ -172,8 +172,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   warnings/errors. Its Vulkan source overlay gives the storage images the
   exact public resource formats (R8_UINT luma, R16G16_SINT optical flow, and
   R16G16_FLOAT dilated motion) rather than relying on DX12's looser typed-UAV
-  rules. Temporal FI/OF frames, a stable public 3.1.6 lifecycle API, and
-  portable presenter integration remain.
+  rules. The same test then records/submits a non-reset temporal frame with
+  the bridge restoring imported resource layouts between frames. A stable
+  public 3.1.6 lifecycle API and portable presenter integration remain.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
