@@ -72,6 +72,10 @@ Current truth:
   scene/output and `FLAT_MOTION`-style RGBA16F motion with the vector in RG.
   The read-only active reason distinguishes the selected 1.1.4 and 3.1.6 FI/OF
   schedulers rather than reporting an ambiguous generic FSR3 label.
+  The 3.1.6 wrapper must pass reciprocal display dimensions as `opticalFlowScale`;
+  `{1,1}` produces a collapsed field extent and black generated frames. After
+  the correction, a validation-enabled RX 6800M capture shows a coherent
+  generated scene: `/home/fireburn/Screenshot_FSR316_FG_20260820.png`.
   The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,

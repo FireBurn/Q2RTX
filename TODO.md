@@ -198,6 +198,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
   the normalized vector in RG while Q2RTX preserves derivative metadata in BA.
   A separate scRGB-luminance smoke validates the HDR runtime constants.
+  The SDK-3.1.6 FI wrapper's optical-flow scale was corrected from `{1,1}` to
+  reciprocal display dimensions, matching the public provider. A fresh
+  validation-enabled RX 6800M capture now shows a coherent generated scene
+  rather than the former black output:
+  `/home/fireburn/Screenshot_FSR316_FG_20260820.png`.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves
