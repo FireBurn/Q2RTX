@@ -1696,6 +1696,11 @@ static VkResult fsr3_316_frame_generation_record_after_inputs(
     dispatch.color = prepare.color;
     dispatch.output = fsr3_316_image(VKPT_IMG_FSR_RCAS_OUTPUT,
         qvk.extent_unscaled, VK_IMAGE_LAYOUT_GENERAL);
+    /* Q2RTX's only full-screen displacement (underwater water warp) is
+     * intentionally applied by final_blit after FI to both the generated and
+     * real presentations.  Do not synthesize an input here: the SDK field
+     * means UV_after - UV_before for an actual pre-FI distortion pass.  Leave
+     * it null until the renderer owns such a surface. */
     dispatch.displayWidth = frame->display_size.width;
     dispatch.displayHeight = frame->display_size.height;
     dispatch.interpolationWidth = frame->display_size.width;
