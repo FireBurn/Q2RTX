@@ -173,8 +173,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   exact public resource formats (R8_UINT luma, R16G16_SINT optical flow, and
   R16G16_FLOAT dilated motion) rather than relying on DX12's looser typed-UAV
   rules. The same test then records/submits a non-reset temporal frame with
-  the bridge restoring imported resource layouts between frames. A stable
-  public 3.1.6 lifecycle API and portable presenter integration remain.
+  the bridge restoring imported resource layouts between frames. The reusable
+  `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target now exposes a versioned,
+  opaque `create -> prepare -> dispatch -> retire -> destroy` C lifecycle;
+  its public-only RX 6800M smoke records reset plus temporal frames with zero
+  validation warnings/errors. `RetireFrame` makes the caller's fence boundary
+  explicit so image views cannot be destroyed while the GPU still references
+  them. Portable presenter and Q2RTX integration remain.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles

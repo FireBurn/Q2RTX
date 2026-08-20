@@ -51,8 +51,14 @@ Current truth:
   R16G16_SINT flow-vector, and R16G16_FLOAT dilated-motion storage formats;
   DX12's looser typed-UAV declaration rule was not portable to Vulkan. The
   same test then records/submits a non-reset temporal frame, proving that the
-  bridge restores imported layouts between logical frames. A stable public
-  3.1.6 lifecycle API and a portable presenter remain next. The existing
+  bridge restores imported layouts between logical frames. Commit pending:
+  the reusable `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target now provides
+  the versioned opaque `create -> prepare -> dispatch -> retire -> destroy`
+  lifecycle. Its public-only RX 6800M smoke runs both reset and temporal
+  frames with zero validation warnings/errors; `RetireFrame` is deliberately
+  required after the application's submission fence, retaining imported views
+  safely until GPU completion. The portable presenter and Q2RTX integration
+  remain next. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context
