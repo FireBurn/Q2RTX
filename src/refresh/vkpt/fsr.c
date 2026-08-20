@@ -86,6 +86,11 @@ static uint32_t         fsr4_ctx_dw      = 0;  /* display res context was create
 static uint32_t         fsr4_ctx_dh      = 0;
 static char             fsr4_shader_tier[5] = {0};
 static char             fsr4_shader_model[16] = {0};
+/* Preserve a precise initialization failure for the requested-versus-active
+ * menu status. Distribution packages intentionally omit incomplete v07 model
+ * blobs, so a generic "context unavailable" is not actionable. */
+static char             fsr4_unavailable_reason[128] =
+    "fallback: FSR4 v07 context unavailable";
 
 enum {
     VKPT_UPSCALER_Q2RTX = 0,
@@ -239,10 +244,14 @@ static bool load_spv(const char *rel_path, const char *entry_point, FfxFsr4VkSha
     int   len = FS_LoadFile(full, (void **)&buf);
     if (len <= 0 || !buf) {
         Com_WPrintf("FSR4: shader not found: %s\n", full);
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 shader asset missing (%s)", rel_path);
         return false;
     }
     if (len & 3) {
         Com_WPrintf("FSR4: shader %s size %d not DWORD-aligned\n", full, len);
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 shader asset is invalid (%s)", rel_path);
         FS_FreeFile(buf);
         return false;
     }
@@ -271,6 +280,8 @@ static bool load_model_asset(const char *rel_path, void **out_data, size_t *out_
     file_size = FS_LoadFile(full, (void **)&file_data);
     if (file_size <= 0 || !file_data) {
         Com_WPrintf("FSR4: model asset not found: %s\n", full);
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 model asset missing (%s)", rel_path);
         return false;
     }
 
@@ -339,8 +350,12 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
     VkResult result;
     FfxFsr4ModelPreset preset;
 
-    if (!tier || !model || !fsr4_scratch)
+    if (!tier || !model || !fsr4_scratch) {
+        Q_strlcpy(fsr4_unavailable_reason,
+                  "fallback: FSR4 v07 backend initialization failed",
+                  sizeof(fsr4_unavailable_reason));
         return VK_ERROR_INITIALIZATION_FAILED;
+    }
     if (!strcmp(model, "native"))
         preset = FFX_FSR4_MODEL_PRESET_NATIVE_AA;
     else if (!strcmp(model, "quality"))
@@ -353,15 +368,23 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         preset = FFX_FSR4_MODEL_PRESET_ULTRA_PERFORMANCE;
     else if (!strcmp(model, "drs"))
         preset = FFX_FSR4_MODEL_PRESET_DRS;
-    else
+    else {
+        Q_strlcpy(fsr4_unavailable_reason,
+                  "fallback: FSR4 v07 requested model is unsupported",
+                  sizeof(fsr4_unavailable_reason));
         return VK_ERROR_INITIALIZATION_FAILED;
+    }
     if (!ffxFsr4V07BuildAssetSet(preset, qvk.extent_unscaled.width,
                                  qvk.extent_unscaled.height, &assets) ||
         strcmp(assets.tier, tier) != 0) {
         Com_WPrintf("FSR4: reusable asset selector rejected %s/%s.\n",
                     model, tier);
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 asset selector rejected %s/%s", model, tier);
         return VK_ERROR_INITIALIZATION_FAILED;
     }
+    Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+               "fallback: FSR4 v07 %s/%s assets unavailable", model, tier);
     memset(blobs, 0, sizeof(blobs));
 
     ok &= load_spv(assets.pre, "main", &blobs[0]);
@@ -391,12 +414,22 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         Com_WPrintf("FSR4: initializer has unexpected size %zu (expected %u)\n",
                     model_initializer_size,
                     (unsigned)FFX_FSR4_V07_INITIALIZER_BYTES);
+        if (model_initializer) {
+            Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                       "fallback: FSR4 v07 initializer size is invalid (%s)",
+                       assets.initializer);
+        }
         ok = false;
     }
     if (pre_pass_weights_size != FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES) {
         Com_WPrintf("FSR4: pre-pass weights have unexpected size %zu (expected %u)\n",
                     pre_pass_weights_size,
                     (unsigned)FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES);
+        if (pre_pass_weights) {
+            Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                       "fallback: FSR4 v07 pre-pass weights size is invalid (%s)",
+                       assets.prePassWeights);
+        }
         ok = false;
     }
     if (!ok) {
@@ -424,11 +457,15 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         fsr4_backend_ok = true;
         Q_strlcpy(fsr4_shader_tier, tier, sizeof(fsr4_shader_tier));
         Q_strlcpy(fsr4_shader_model, model, sizeof(fsr4_shader_model));
+        fsr4_unavailable_reason[0] = '\0';
         Com_Printf("FSR4: Vulkan backend ready (INT8/DOT4, %s, %s tier).\n",
                    model, tier);
     } else {
         Com_WPrintf("FSR4: Vulkan backend creation failed (%d); FSR4 disabled.\n",
                     result);
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 Vulkan backend creation failed (%s)",
+                   qvk_result_to_string(result));
         ffxFsr4VkDestroyContext((FfxFsr4VkContext *)fsr4_scratch);
         memset(&fsr4_backend, 0, sizeof(fsr4_backend));
     }
@@ -495,6 +532,9 @@ static VkResult fsr4_recreate_context(void)
 
     if (ret != FFX_API_RETURN_OK) {
         Com_WPrintf("FSR4: ffx::CreateContext failed (%d)\n", (int)ret);
+        Q_strlcpy(fsr4_unavailable_reason,
+                  "fallback: FSR4 v07 provider context creation failed",
+                  sizeof(fsr4_unavailable_reason));
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -1079,7 +1119,9 @@ static bool resolve_upscaler(int *active, const char **reason)
 #endif
 
     if (!fsr4_backend_ok || !fsr4_context_ok) {
-        *reason = "fallback: FSR4 v07 context unavailable";
+        *reason = fsr4_unavailable_reason[0]
+            ? fsr4_unavailable_reason
+            : "fallback: FSR4 v07 context unavailable";
         return false;
     }
     if (!fsr4_output_extent_supported(qvk.extent_unscaled)) {

@@ -720,7 +720,9 @@ smoke records and submits two consecutive frames through only the C ABI.
   manifests are tracked, each indispensable 89,216-byte initializer and
   1,024-byte pre-pass weight blob is ignored as a local artifact.  Installing
   that partial directory would make the menu expose a non-working FSR4 option,
-  so `src_install` asserts it is absent.  This does not package official
+  so `src_install` asserts it is absent; the runtime reports the exact missing
+  asset in `flt_upscaler_reason` rather than a generic context failure. This
+  does not package official
   FSR4.1.1, RR, or ML-FG; their DX12/hardware limitations remain unchanged.
 - The Video-menu test uncovered an upgrade-path issue: an older user-local
   `q2rtx_media.pkz` (or loose menu) can shadow the installed archive and make

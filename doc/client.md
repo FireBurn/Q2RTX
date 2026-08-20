@@ -892,7 +892,9 @@ is 0 for the Q2RTX fallback, 1 for native FSR3 3.1.4, 2 for experimental FSR4
 v07, and 3 for experimental public-SDK FSR3 3.1.5. `flt_upscaler_reason`
 states the selected active backend or the precise fallback reason, such as
 missing context, invalid extent, multiple GPUs, or a non-rectilinear
-projection.
+projection. When the experimental FSR4 v07 graph is incomplete, it identifies
+the missing or invalid shader/model asset rather than claiming a generic
+context failure.
 
 The Video menu's **temporal diagnostics...** page displays this read-only
 status, together with the frame-generation reason and presentation cadence; it

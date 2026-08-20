@@ -408,7 +408,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   is correctly `bindist`/`mirror` restricted.  The v07 FSR4 SPIR-V graph is
   tracked, but its required initializer/weight blobs are deliberately ignored
   local artifacts; the ebuild detects this and excludes the unusable partial
-  directory.  FSR3 and analytical FSR3 frame generation remain built in.
+  directory. The runtime now publishes the specific missing v07 asset through
+  `flt_upscaler_reason` instead of an ambiguous context failure. FSR3 and
+  analytical FSR3 frame generation remain built in.
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
