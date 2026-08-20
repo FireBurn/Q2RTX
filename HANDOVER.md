@@ -178,6 +178,10 @@ Current truth:
   again reported the exact active FSR4 v07 model with no VUID/error and a
   coherent viewmodel/HUD frame:
   `/home/fireburn/Screenshot_FSR4_v07_FIFO_table_smoke_20260820.png`.
+  A subsequent Quality 858x482 -> 1280x720 `base1 -> base2` transition with
+  RCAS 0.50 and SPD auto exposure also stayed validation-clean and produced a
+  coherent post-transition viewmodel capture:
+  `/home/fireburn/Screenshot_FSR4_v07_map_transition_20260820.png`.
   This is a working experimental 4.0.2-era model path, **not yet an FSR 4.1.1
   implementation** and not yet a production-quality feature.
 - The FSR4 backend now fails closed on missing pipelines and descriptor,

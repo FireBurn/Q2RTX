@@ -44,8 +44,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   weapon motion, emissives, disocclusions, resize, reset, and map transitions.
   Static output plus sustained forward/rotation motion are coherent and the old
   extent rectangle/history train is gone; a new RCAS-on capture is coherent.
-  Resize, reset, map-transition, emissive, and disocclusion coverage remains
-  outstanding.
+  A fresh Quality 858x482 -> 1280x720 run with RCAS 0.50 and SPD auto exposure
+  crossed `base1 -> base2` with no validation/dispatch error and a coherent
+  post-transition viewmodel scene:
+  `/home/fireburn/Screenshot_FSR4_v07_map_transition_20260820.png`.
+  Resize, reset, emissive, and disocclusion coverage remains outstanding.
 - [x] Implement and validate RCAS as a real separate pass; expose the separate
   `flt_fsr4_sharpening` [0,1] control only after it works.  A 0.50 live
   640x360 -> 1280x720 Performance run passed Vulkan validation on RX 6800M.
