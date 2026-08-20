@@ -487,6 +487,9 @@ static VkResult fsr4_recreate_context(void)
         Com_WPrintf("FSR4: output extent %ux%u exceeds the v07 7680x4320 "
                     "limit; using fallback.\n",
                     qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+        Q_strlcpy(fsr4_unavailable_reason,
+                  "fallback: FSR4 v07 output exceeds 8K limit",
+                  sizeof(fsr4_unavailable_reason));
         fsr4_destroy_backend();
         return VK_ERROR_FORMAT_NOT_SUPPORTED;
     }
