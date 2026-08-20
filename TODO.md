@@ -135,6 +135,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [ ] Add dedicated HUDless offscreen scene target and separate alpha UI target.
 - [x] Add per-input debug views in the live renderer. The contract validator is
   already executed immediately before FSR3, FSR4 v07, and analytical FG imports.
+- [x] Add FSR reconstructed-output and private FSR4 history/reprojected views
+  without exporting mutable provider resources. The diagnostic seam returns
+  only borrowed sampled image views after a successful FSR4 dispatch. A
+  validation-enabled RX 6800M history capture is coherent and full-frame:
+  `/home/fireburn/Screenshot_FSR4_v07_history_20260820.png`.
 - [ ] Support/gather temporal inputs for device-group rendering.
 
 ## P2 — reusable native Vulkan FSR3

@@ -653,10 +653,17 @@ typedef enum VkptTemporalDebugView_e {
 	VKPT_TEMPORAL_DEBUG_COMPOSITION_MASK,
 	VKPT_TEMPORAL_DEBUG_NORMALS,
 	VKPT_TEMPORAL_DEBUG_ALBEDO,
-	VKPT_TEMPORAL_DEBUG_ROUGHNESS
+	VKPT_TEMPORAL_DEBUG_ROUGHNESS,
+	/* Current reconstructed output is available from every active upscaler;
+	 * the remaining views are FSR4 v07 private temporal surfaces. */
+	VKPT_TEMPORAL_DEBUG_FSR_RECONSTRUCTED,
+	VKPT_TEMPORAL_DEBUG_FSR4_HISTORY,
+	VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED
 } VkptTemporalDebugView;
 VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);
+VkResult vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf,
+	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view);
 VkResult vkpt_draw_clear_stretch_pics(void);
 
 VkResult vkpt_uniform_buffer_create(void);
@@ -776,6 +783,10 @@ VkResult vkpt_fsr_create_pipelines(void);
 VkResult vkpt_fsr_destroy_pipelines(void);
 bool vkpt_fsr_is_requested(void);
 bool vkpt_fsr_is_enabled(void);
+/* Resolve a debug view backed by an active upscaler. FSR4's private history
+ * remains provider-owned; this borrows only its sampled VkImageView. */
+bool vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
+	VkptTemporalDebugView *view, char *reason, size_t reason_size);
 int vkpt_fsr_requested_render_scale(void);
 bool vkpt_fsr_needs_upscale(void);
 uint32_t vkpt_fsr_jitter_phase_count(void);

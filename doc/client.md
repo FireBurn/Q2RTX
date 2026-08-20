@@ -905,7 +905,9 @@ never treats these diagnostic cvars as editable settings.
 Selects a presentation-only visualization of the exact dense temporal input
 exported by Q2RTX: pre-tone-map scene HDR, current-to-previous motion,
 conventional device depth, positive-forward view-Z, reactive/composition
-masks, geometric normals, albedo, or roughness. Scene HDR is shown with a
+masks, geometric normals, albedo, roughness, or active FSR reconstructed
+output. FSR4 v07 additionally exposes its previous reconstructed history and
+pre/post reprojected bridge as borrowed read-only diagnostics. Scene HDR is shown with a
 simple debug tone map; motion uses RG for signed direction and B for pixel
 magnitude; view-Z is log-scaled from the near surface to the 10,000-unit sky.
 It does not alter any input, provider dispatch, or history. Analytical FSR3

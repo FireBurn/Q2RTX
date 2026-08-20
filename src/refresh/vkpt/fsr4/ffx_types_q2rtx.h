@@ -588,6 +588,14 @@ typedef struct ffxQueryDescUpscaleGetJitterOffset {
     float             *pOutY;
 } ffxQueryDescUpscaleGetJitterOffset;
 
+/* Narrow Q2RTX FSR4-v07 diagnostic seam. These are not an AMD public API:
+ * they expose a borrowed sampled resource for visual validation only, without
+ * transferring ownership or making the provider's resource graph mutable. */
+typedef enum FfxFsr4DebugResource_e {
+    FFX_FSR4_DEBUG_RESOURCE_HISTORY = 0,
+    FFX_FSR4_DEBUG_RESOURCE_REPROJECTED
+} FfxFsr4DebugResource;
+
 /* ── allocation callbacks (used by CreateContext/DestroyContext) ─────────── */
 
 typedef void *(*ffxAlloc)(void *pUserData, uint64_t size);
@@ -613,6 +621,9 @@ ffxReturnCode_t ffxQuery(ffxContext *ctx,
 
 ffxReturnCode_t ffxDispatch(ffxContext *ctx,
                             const ffxDispatchDescHeader *desc);
+
+int ffxFsr4GetDebugResource(ffxContext *ctx, FfxFsr4DebugResource resource,
+                            FfxApiResource *out_resource);
 
 ffxReturnCode_t ffxConfigure(ffxContext *ctx,
                              const ffxApiHeader *desc);

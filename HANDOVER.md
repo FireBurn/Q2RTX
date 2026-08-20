@@ -22,6 +22,17 @@ Current truth:
   644x361 -> 960x540 captured a coherent view-Z image with no VUID/error:
   `/home/fireburn/Screenshot_temporal_view_z_20260820.png`.
 
+- The same selector now also inspects current reconstructed FSR output and,
+  for the v07 provider, its display-resolution previous history and
+  reprojected pre/post bridge. `ffxFsr4GetDebugResource` is intentionally a
+  narrow private diagnostic seam: it returns only a borrowed sampled resource
+  description; it cannot schedule, clear, destroy, or mutate provider state.
+  A validation-enabled RX 6800M FSR4 Quality capture after temporal warm-up
+  shows coherent full-frame history with no VUID/error:
+  `/home/fireburn/Screenshot_FSR4_v07_history_20260820.png`. These views are
+  pre-tone-map debug images and therefore should not be brightness-compared to
+  final presentation captures.
+
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
   values are `UV_after - UV_before`.  It preserves the existing neutral SDK
@@ -848,9 +859,9 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 3. Run GPU-assisted validation and a RenderDoc frame; prove every FSR4 pass's
    descriptors, initializer upload, activation ranges, barriers, and bounds.
 4. Expand live FSR4 coverage to resize/tier transitions, reset/map transition,
-   weapon and emissive motion, disocclusion, camera cuts, and long runs. Add
-   provider-history and reconstructed-output views beyond the now-present
-   temporal-input diagnostics.
+   weapon and emissive motion, disocclusion, camera cuts, and long runs. Use
+   the now-present provider-history/reprojected/reconstructed-output and
+   temporal-input diagnostics to prove each case.
 5. Extend the corrected acquire/present lifecycle into an offscreen scene/UI
    target, safe screenshot readback, and generated-frame presentation scheduler.
 6. Add discrete model-backed quality presets and validate SPD exposure across

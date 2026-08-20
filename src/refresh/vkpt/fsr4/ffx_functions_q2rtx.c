@@ -745,6 +745,36 @@ dispatch_error:
     return FFX_API_RETURN_ERROR;
 }
 
+int
+ffxFsr4GetDebugResource(ffxContext *ctx, FfxFsr4DebugResource resource,
+    FfxApiResource *out_resource)
+{
+    Fsr4Context *c;
+    FfxResourceInternal internal;
+
+    if (!ctx || !*ctx || !out_resource)
+        return 0;
+    c = (Fsr4Context *)(*ctx);
+    if (!c->valid || !c->resources_ok || !c->iface.fpGetResource ||
+        !c->iface.fpGetResourceDescription)
+        return 0;
+    switch (resource) {
+    case FFX_FSR4_DEBUG_RESOURCE_HISTORY:
+        internal = c->ri_history;
+        break;
+    case FFX_FSR4_DEBUG_RESOURCE_REPROJECTED:
+        internal = c->ri_reprojected;
+        break;
+    default:
+        return 0;
+    }
+    *out_resource = c->iface.fpGetResource(&c->iface, internal);
+    out_resource->description = c->iface.fpGetResourceDescription(
+        &c->iface, internal);
+    return out_resource->resource && out_resource->description.width &&
+        out_resource->description.height;
+}
+
 /* ── ffxConfigure (stub — not needed for basic upscaling) ─────────────────── */
 
 ffxReturnCode_t ffxConfigure(ffxContext *ctx, const ffxApiHeader *desc)

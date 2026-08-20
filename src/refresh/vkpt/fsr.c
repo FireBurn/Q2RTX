@@ -1345,6 +1345,60 @@ bool vkpt_fsr_is_enabled(void)
     return enabled;
 }
 
+bool
+vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
+    VkptTemporalDebugView *view, char *reason, size_t reason_size)
+{
+    FfxApiResource resource;
+    FfxFsr4DebugResource resource_id;
+
+    if (reason && reason_size)
+        reason[0] = '\0';
+    if (!image_view || !extent || !view || !cvar_flt_temporal_debug_view)
+        return false;
+    *view = (VkptTemporalDebugView)cvar_flt_temporal_debug_view->integer;
+    if (*view == VKPT_TEMPORAL_DEBUG_FSR_RECONSTRUCTED) {
+        if (!vkpt_fsr_is_enabled()) {
+            if (reason && reason_size)
+                Q_snprintf(reason, reason_size,
+                    "no active temporal upscaler output");
+            return false;
+        }
+        *image_view = qvk.images_views[VKPT_IMG_FSR_EASU_OUTPUT];
+        *extent = qvk.extent_taa_images;
+        return *image_view && extent->width && extent->height;
+    }
+    if (!fsr4_is_enabled()) {
+        if (reason && reason_size)
+            Q_snprintf(reason, reason_size,
+                "FSR4 v07 private temporal resources are unavailable");
+        return false;
+    }
+    switch (*view) {
+    case VKPT_TEMPORAL_DEBUG_FSR4_HISTORY:
+        resource_id = FFX_FSR4_DEBUG_RESOURCE_HISTORY;
+        break;
+    case VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED:
+        resource_id = FFX_FSR4_DEBUG_RESOURCE_REPROJECTED;
+        break;
+    default:
+        return false;
+    }
+    memset(&resource, 0, sizeof(resource));
+    if (!ffxFsr4GetDebugResource(&fsr4_context, resource_id, &resource) ||
+        !resource.resource || !resource.description.width ||
+        !resource.description.height) {
+        if (reason && reason_size)
+            Q_snprintf(reason, reason_size,
+                "FSR4 v07 private temporal resource is unavailable");
+        return false;
+    }
+    *image_view = (VkImageView)resource.resource;
+    extent->width = resource.description.width;
+    extent->height = resource.description.height;
+    return true;
+}
+
 /* FSR4 handles its own upscaling – no separate pre-upscale step needed */
 bool vkpt_fsr_needs_upscale(void)
 {

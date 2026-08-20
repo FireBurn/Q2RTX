@@ -66,6 +66,11 @@ void main()
     case 9u: /* Perceptual roughness. */
         color = vec3(clamp(sample_value.r, 0.0, 1.0));
         break;
+    case 10u: /* Current reconstructed output, before Q2RTX post effects. */
+    case 11u: /* FSR4 history: previous display-resolution reconstructed HDR. */
+    case 12u: /* FSR4 pre/post bridge: reprojected display-resolution HDR. */
+        color = tonemap_debug(sample_value.rgb / 128.0);
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;

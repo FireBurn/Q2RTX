@@ -219,7 +219,8 @@ begin temporal_diagnostics
 	pairs --status "presentation-only inspection of the exact dense temporal input. Scene color is pre-tone-map HDR; motion is current-to-previous pixels (RG direction, B magnitude); view Z is logarithmic; masks and roughness are scalar. Analytical frame generation is suspended while this is non-Off." \
 		"temporal input view" flt_temporal_debug_view \
 		"Off" 0 "Scene HDR" 1 "Motion" 2 "Device depth" 3 "View Z" 4 \
-		"Reactive mask" 5 "Composition mask" 6 "Normals" 7 "Albedo" 8 "Roughness" 9
+		"Reactive mask" 5 "Composition mask" 6 "Normals" 7 "Albedo" 8 "Roughness" 9 \
+		"FSR output" 10 "FSR4 history" 11 "FSR4 reprojected" 12
     static --width 52 --status "active temporal-upscaler provider or the exact fallback reason" \
         "upscaler" flt_upscaler_reason
     static --width 52 --status "active analytical-frame-generation state or the exact suspension/fallback reason" \

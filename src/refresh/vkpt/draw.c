@@ -861,14 +861,14 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 }
 
 VkResult
-vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
+vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf, VkImageView image_view,
 	VkExtent2D extent, VkptTemporalDebugView view)
 {
 	VkDescriptorSet final_blit_set = desc_set_final_blit[
 		qvk.current_frame_index * FINAL_BLIT_SETS_PER_FRAME];
 	VkDescriptorImageInfo img_info_input = {
 		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-		.imageView = qvk.images_views[image_index],
+		.imageView = image_view,
 		.sampler = qvk.tex_sampler,
 	};
 	VkWriteDescriptorSet write = {
@@ -892,9 +892,22 @@ vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
 		.temporal_debug_view = (uint32_t)view,
 	};
 
-	if (view <= VKPT_TEMPORAL_DEBUG_OFF || view > VKPT_TEMPORAL_DEBUG_ROUGHNESS)
+	if (!image_view || view <= VKPT_TEMPORAL_DEBUG_OFF ||
+		view > VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED)
 		return VK_ERROR_INITIALIZATION_FAILED;
 	vkUpdateDescriptorSets(qvk.device, 1, &write, 0, NULL);
+	/* The private FSR4 diagnostic views are produced by the immediately
+	 * preceding compute graph and have no Q2RTX global-image transition. A
+	 * conservative memory dependency keeps this presentation-only path valid
+	 * for both those resources and the ordinary ray/compute temporal inputs. */
+	VkMemoryBarrier debug_read_barrier = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+	};
+	vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 1, &debug_read_barrier,
+		0, NULL, 0, NULL);
 	vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		pipeline_layout_final_blit, 0, LENGTH(desc_sets), desc_sets, 0, 0);
@@ -905,6 +918,14 @@ vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
 	vkCmdDraw(cmd_buf, 4, 1, 0, 0);
 	vkCmdEndRenderPass(cmd_buf);
 	return VK_SUCCESS;
+}
+
+VkResult
+vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
+	VkExtent2D extent, VkptTemporalDebugView view)
+{
+	return vkpt_temporal_debug_blit_view(cmd_buf, qvk.images_views[image_index],
+		extent, view);
 }
 
 VkResult

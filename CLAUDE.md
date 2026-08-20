@@ -69,6 +69,10 @@ Q2RTX signal conventions currently exposed by the contract:
   dense temporal input. It must use the input's `valid_extent`, not its
   allocation extent; it does not mutate provider state. It suspends analytical
   frame generation and removes its FIFO swapchain request while nonzero.
+  Values 10-12 additionally inspect current reconstructed FSR output and the
+  FSR4-v07 provider's borrowed history/reprojected surfaces. Those two private
+  surfaces must be obtained only through `ffxFsr4GetDebugResource`; do not
+  expose their handles as general renderer resources or record writes to them.
 - `TEMPORAL_REACTIVE_MASK` and `TEMPORAL_COMPOSITION_MASK`: dense R8 UNORM
   FSR3 history-control inputs authored by primary-ray material classification.
   Transparent/water/glass/warped/screen paths receive both masks; view-model

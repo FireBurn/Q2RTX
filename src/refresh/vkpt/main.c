@@ -3938,6 +3938,7 @@ R_EndFrame_RTX(void)
 	bool framegen_generated_presented = false;
 	bool temporal_debug_active = false;
 	unsigned int temporal_debug_image = VKPT_IMG_CLEAR;
+	VkImageView temporal_debug_image_view = VK_NULL_HANDLE;
 	VkExtent2D temporal_debug_extent = { 0, 0 };
 	VkptTemporalDebugView temporal_debug_view = VKPT_TEMPORAL_DEBUG_OFF;
 
@@ -3953,9 +3954,18 @@ R_EndFrame_RTX(void)
 		vkpt_tone_mapping_draw_debug();
 	if (frame_ready && cvar_flt_temporal_debug_view &&
 		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) {
-		temporal_debug_active = vkpt_temporal_debug_select(
-			&temporal_debug_image, &temporal_debug_extent,
-			&temporal_debug_view, NULL, 0);
+		if (cvar_flt_temporal_debug_view->integer <=
+			VKPT_TEMPORAL_DEBUG_ROUGHNESS) {
+			temporal_debug_active = vkpt_temporal_debug_select(
+				&temporal_debug_image, &temporal_debug_extent,
+				&temporal_debug_view, NULL, 0);
+			if (temporal_debug_active)
+				temporal_debug_image_view = qvk.images_views[temporal_debug_image];
+		} else {
+			temporal_debug_active = vkpt_fsr_debug_select(
+				&temporal_debug_image_view, &temporal_debug_extent,
+				&temporal_debug_view, NULL, 0);
+		}
 	}
 
 	if (qvk.framegen_present_active) {
@@ -4004,7 +4014,7 @@ R_EndFrame_RTX(void)
 		bool waterwarp = (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) && cvar_pt_waterwarp->integer;
 		if (temporal_debug_active)
 		{
-			vkpt_temporal_debug_blit(cmd_buf, temporal_debug_image,
+			vkpt_temporal_debug_blit_view(cmd_buf, temporal_debug_image_view,
 				temporal_debug_extent, temporal_debug_view);
 		}
 		else if (vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
