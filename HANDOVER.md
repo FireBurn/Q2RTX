@@ -31,7 +31,8 @@ Current truth:
   presenter. The existing SDK-2.3 resource/job bridge now accepts direct
   SPIR-V scheduler blobs before its 3.1.5 catalogue fallback, the reusable
   seam required to attach FI/OF without duplicating its allocation/barrier/
-  descriptor executor. The existing
+  descriptor executor. A RX 6800M bridge test supplies an unnamed FI blob and
+  proves this direct-SPIR-V route rather than the fallback. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

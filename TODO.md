@@ -155,8 +155,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   RX 6800M Vulkan test creates all 18 FI/OF compute pipelines. A real Vulkan
   scheduler bridge and portable presenter integration remain separate work.
   The existing SDK-2.3 resource/job bridge now accepts direct SPIR-V scheduler
-  blobs before its legacy 3.1.5 catalogue fallback; wire that reusable path to
-  the FI/OF contexts next.
+  blobs before its legacy 3.1.5 catalogue fallback; its GPU test proves that
+  route with an unnamed FI module. Wire it to the FI/OF contexts next.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
