@@ -207,6 +207,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
   the normalized vector in RG while Q2RTX preserves derivative metadata in BA.
   A separate scRGB-luminance smoke validates the HDR runtime constants.
+  `RecordDispatch` now also accepts the SDK's optional sampled R16G16_SFLOAT
+  distortion field (`UV_after - UV_before`) and retains its imported view until
+  the caller fence retires it; the RX 6800M reset/default-field then
+  temporal/external-field smoke passes in every RGBA8/RGBA16F/Q2-motion/scRGB
+  variant with validation clean. Q2RTX intentionally leaves this null until it
+  produces a post-processing distortion field of its own.
   The SDK-3.1.6 FI wrapper's optical-flow scale was corrected from `{1,1}` to
   reciprocal display dimensions, matching the public provider. A fresh
   validation-enabled RX 6800M capture now shows a coherent generated scene

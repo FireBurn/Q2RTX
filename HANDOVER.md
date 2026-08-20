@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
+  optional external distortion field as a sampled `R16G16_SFLOAT` image whose
+  values are `UV_after - UV_before`.  It preserves the existing neutral SDK
+  1x1 field when null, validates/imports an application field when present,
+  and retains that view through `RetireFrame` just like its color/output
+  imports.  All four RX 6800M validation smokes cover a reset frame without
+  the field followed by a temporal frame using it.  Q2RTX leaves it null until
+  it has a real post-process distortion producer, so this changes no current
+  renderer output while making the reusable API complete for that FI input.
+
 - Existing renderer fallback builds and runs.
 - The reusable tree now contains a separate, pinned public SDK v2.3.0 FSR3.1.5
   source closure (`upstream/ffx-2.3.0`) with both pristine and current
