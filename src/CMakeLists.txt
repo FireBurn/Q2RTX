@@ -584,7 +584,8 @@ IF (TARGET client)
             # latter is selected only by its explicit experimental cvar.
             TARGET_LINK_LIBRARIES(client
                 ffx-vulkan::portable
-                ffx-vulkan::fsr3-vk-backend-3.1.5)
+                ffx-vulkan::fsr3-vk-backend-3.1.5
+                ffx-vulkan::fsr3-vk-framegeneration-3.1.6)
             TARGET_COMPILE_DEFINITIONS(client PRIVATE VKPT_FSR3=1)
         ENDIF()
     ENDIF()

@@ -3703,6 +3703,10 @@ R_BeginFrame_RTX(void)
 		Com_EPrintf("Device lost!\n");
 		exit(1);
 	}
+	/* The per-slot fence covers the generated and real present submissions.
+	 * Release only the SDK 3.1.6 bridge views associated with this completed
+	 * slot; newer frame IDs may still be queued on the graphics queue. */
+	vkpt_fsr_frame_generation_retire(qvk.current_frame_index);
 
 	bool mode_changed = (qvk.draw_width != r_config.width) || (qvk.draw_height != r_config.height);
 	if (!qvk.swap_chain || mode_changed)
@@ -4281,6 +4285,7 @@ R_Init_RTX(bool total)
 	cvar_flt_fsr4_auto_exposure->changed = temporal_cvar_changed;
 	cvar_flt_fsr4_dynamic_resolution->changed = temporal_cvar_changed;
 	cvar_flt_frame_generation->changed = temporal_cvar_changed;
+	cvar_flt_frame_generation_backend->changed = temporal_cvar_changed;
 	cvar_flt_frame_generation_min_rendered_fps->changed = temporal_cvar_changed;
 
 	cvar_pt_dof->changed = accumulation_cvar_changed;

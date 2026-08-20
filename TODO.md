@@ -179,10 +179,17 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   its public-only RX 6800M smoke records reset plus temporal frames with zero
   validation warnings/errors in both RGBA8 and Q2RTX-compatible RGBA16F
   modes. Frame-ID retirement makes the caller's fence boundary explicit while
-  retaining multiple queue-ordered frames safely. Portable presenter and
-  Q2RTX integration remain.
+  retaining multiple queue-ordered frames safely. It is now selectable in
+  Q2RTX as `flt_frame_generation_backend 1`, while the longer-tested 1.1.4
+  backend remains the default (`0`). The integration imports Q2RTX's RGBA16F
+  HUDless color, R32F device depth, and RGBA16F motion surface (the SDK
+  samples its XY channels), then retires imports at the frame-slot fence. A
+  30-second RX 6800M `base1` run at 1280x720, with validation enabled,
+  recreated the context at startup/resize and reached active FIFO-paired
+  presentation with no VUID, prepare, dispatch, or interpolation-skip log.
+  HDR and broader lifecycle/visual coverage remain deliberately experimental.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
-  passes 27/27.
+  passes 29/29.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves
@@ -276,8 +283,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   it validates 352 FI + 56 OF lookups and submits reset plus temporal frames
   on RX 6800M with finite, fully-overwritten RGBA16F output and zero validation
   warnings/errors.
-- [ ] Port/reconcile the newer public SDK 2.3 FSR3 3.1.6 analytical frame
-  interpolation algorithms behind that reusable API.
+- [-] Port/reconcile the newer public SDK 2.3 FSR3 3.1.6 analytical frame
+  interpolation algorithms behind the reusable API. The fixed Vulkan profile
+  and Q2RTX experimental scheduler selection work on SDR/RX 6800M; HDR,
+  long-duration visual/lifecycle coverage, and a general-purpose profile
+  remain.
 - [-] Build a Linux/Windows portable explicit presenter. Q2RTX now has an
   experimental single-graphics-queue two-acquire/two-present path that renders
   the same queued UI on generated and real frames, with a blocking reserved

@@ -738,6 +738,7 @@ extern cvar_t *cvar_flt_fsr4_sharpening;
 extern cvar_t *cvar_flt_fsr4_auto_exposure;
 extern cvar_t *cvar_flt_fsr4_dynamic_resolution;
 extern cvar_t *cvar_flt_frame_generation;
+extern cvar_t *cvar_flt_frame_generation_backend;
 extern cvar_t *cvar_flt_frame_generation_min_rendered_fps;
 extern cvar_t *cvar_flt_frame_generation_active;
 extern cvar_t *cvar_flt_frame_generation_reason;
@@ -765,6 +766,9 @@ bool vkpt_fsr_frame_generation_prepare_present(void);
 void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason);
 void vkpt_fsr_frame_generation_note_present_pair(void);
 VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf);
+/* Called after Q2RTX's per-slot submission fence signals, so the SDK 2.3
+ * frame generator may safely free its retained imported-image views. */
+void vkpt_fsr_frame_generation_retire(uint32_t frame_slot);
 
 /* FSR4: global backend override pointer.
    Set to &fsr4_backend before calling ffxCreate/Dispatch/Query,

@@ -51,16 +51,21 @@ Current truth:
   R16G16_SINT flow-vector, and R16G16_FLOAT dilated-motion storage formats;
   DX12's looser typed-UAV declaration rule was not portable to Vulkan. The
   same test then records/submits a non-reset temporal frame, proving that the
-  bridge restores imported layouts between logical frames. Commit pending:
-  the reusable `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target now provides
+  bridge restores imported layouts between logical frames. Commit `05161ed6`
+  made the reusable `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target provide
   the versioned opaque `create -> prepare -> dispatch -> retire -> destroy`
   lifecycle. Its public-only RX 6800M smoke runs both reset and temporal
   frames with zero validation warnings/errors in both RGBA8 and Q2RTX's
   RGBA16F presentation format. `RetireFrame(completedFrameId)` is deliberately
   required after the application's submission fence, retaining multiple
-  queue-ordered imported-view sets safely until GPU completion. The portable
-  presenter and Q2RTX integration
-  remain next. The existing
+  queue-ordered imported-view sets safely until GPU completion. Q2RTX now
+  selects this provider through `flt_frame_generation_backend 1` (default 0
+  retains the 1.1.4 implementation), maps the RGBA16F HUDless color, R32F
+  device depth, and RGBA16F motion input, and retires imports at the frame-slot
+  fence. A validation-enabled 30-second RX 6800M 1280x720 `base1` run recreated
+  its contexts then reached active FIFO paired presentation with no VUID,
+  prepare, dispatch, or interpolation-skip messages. It remains an SDR-only,
+  experimental selection pending broad visual/lifecycle coverage. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
   making the public DLL-export macro portable, and expanding opaque context

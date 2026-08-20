@@ -121,6 +121,9 @@ static uint32_t fsr3_ctx_dw = 0;
 static uint32_t fsr3_ctx_dh = 0;
 static FfxVkPortableFrameGenerationContext *fsr3_frame_generation_context = NULL;
 static bool fsr3_frame_generation_context_ok = false;
+static FfxVkFsr3_3_1_6FrameGenerationContext *fsr3_316_frame_generation_context = NULL;
+static bool fsr3_316_frame_generation_context_ok = false;
+static uint64_t fsr3_316_frame_generation_frame_ids[MAX_FRAMES_IN_FLIGHT];
 static bool fsr3_frame_generation_reset_next = true;
 static uint32_t fsr3_frame_generation_dw = 0;
 static uint32_t fsr3_frame_generation_dh = 0;
@@ -207,6 +210,7 @@ cvar_t *cvar_flt_fsr4_sharpening = NULL;
 cvar_t *cvar_flt_fsr4_auto_exposure = NULL;
 cvar_t *cvar_flt_fsr4_dynamic_resolution = NULL;
 cvar_t *cvar_flt_frame_generation = NULL;
+cvar_t *cvar_flt_frame_generation_backend = NULL;
 cvar_t *cvar_flt_frame_generation_min_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_active = NULL;
 cvar_t *cvar_flt_frame_generation_reason = NULL;
@@ -861,18 +865,27 @@ static VkResult fsr3_create_context(void)
 
 static void fsr3_destroy_frame_generation_context(void)
 {
-    if (fsr3_frame_generation_context) {
+    if (fsr3_frame_generation_context || fsr3_316_frame_generation_context) {
         /* Generated and real presents use separate submissions.  A resize or
          * startup extent transition must retire both before the FI/OF context
          * frees descriptor-referenced image views. */
         _VK(vkDeviceWaitIdle(qvk.device));
-        FfxVkPortableResult result = ffxVkPortableFrameGenerationContextDestroy(
-            fsr3_frame_generation_context);
-        if (result != FFX_VK_PORTABLE_OK)
-            Com_WPrintf("FSR3 FG: context destruction failed (%d)\n", (int)result);
+        if (fsr3_frame_generation_context) {
+            FfxVkPortableResult result = ffxVkPortableFrameGenerationContextDestroy(
+                fsr3_frame_generation_context);
+            if (result != FFX_VK_PORTABLE_OK)
+                Com_WPrintf("FSR3 FG: legacy context destruction failed (%d)\n", (int)result);
+        }
+        if (fsr3_316_frame_generation_context)
+            ffxVkFsr3_3_1_6FrameGenerationContextDestroy(
+                fsr3_316_frame_generation_context);
     }
     fsr3_frame_generation_context = NULL;
     fsr3_frame_generation_context_ok = false;
+    fsr3_316_frame_generation_context = NULL;
+    fsr3_316_frame_generation_context_ok = false;
+    memset(fsr3_316_frame_generation_frame_ids, 0,
+        sizeof(fsr3_316_frame_generation_frame_ids));
     fsr3_frame_generation_dw = fsr3_frame_generation_dh = 0;
     fsr3_frame_generation_reset_next = true;
 }
@@ -886,6 +899,44 @@ static VkResult fsr3_create_frame_generation_context(void)
     fsr3_destroy_frame_generation_context();
     if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
         return VK_ERROR_INITIALIZATION_FAILED;
+
+    if (cvar_flt_frame_generation_backend &&
+        cvar_flt_frame_generation_backend->integer == 1) {
+        FfxVkFsr3_3_1_6FrameGenerationCreateInfo create_316;
+        FfxVkFsr3_3_1_6FrameGenerationResult result_316;
+
+        /* The checked SDK 2.3 Vulkan profile is LDR; Q2RTX's HUDless
+         * presentation image is nevertheless RGBA16F in SDR mode. HDR output
+         * retains the proven 1.1.4 path until the HDR permutation is covered. */
+        if (qvk.surf_is_hdr) {
+            Com_WPrintf("FSR3 FG 3.1.6: HDR presentation is not enabled in the Vulkan profile.\n");
+            return VK_ERROR_FEATURE_NOT_PRESENT;
+        }
+        memset(&create_316, 0, sizeof(create_316));
+        create_316.physicalDevice = qvk.physical_device;
+        create_316.device = qvk.device;
+        create_316.maxRenderWidth = qvk.extent_unscaled.width;
+        create_316.maxRenderHeight = qvk.extent_unscaled.height;
+        create_316.displayWidth = qvk.extent_unscaled.width;
+        create_316.displayHeight = qvk.extent_unscaled.height;
+        create_316.colorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+        result_316 = ffxVkFsr3_3_1_6FrameGenerationContextCreate(
+            &create_316, &fsr3_316_frame_generation_context);
+        if (result_316 != FFX_VK_FSR3_3_1_6_FRAMEGEN_OK) {
+            Com_WPrintf("FSR3 FG 3.1.6: Vulkan context unavailable (%d)\n", (int)result_316);
+            fsr3_316_frame_generation_context = NULL;
+            return result_316 == FFX_VK_FSR3_3_1_6_FRAMEGEN_ERROR_OUT_OF_MEMORY
+                ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_ERROR_FEATURE_NOT_PRESENT;
+        }
+        fsr3_316_frame_generation_context_ok = true;
+        fsr3_frame_generation_reset_next = true;
+        fsr3_frame_generation_dw = qvk.extent_unscaled.width;
+        fsr3_frame_generation_dh = qvk.extent_unscaled.height;
+        Com_Printf("FSR3 FG: SDK 3.1.6 Vulkan Optical Flow/Frame Interpolation ready "
+                   "(max %ux%u).\n", fsr3_frame_generation_dw,
+                   fsr3_frame_generation_dh);
+        return VK_SUCCESS;
+    }
 
     fsr3_fill_device_info(&device_info);
     memset(&create_info, 0, sizeof(create_info));
@@ -1084,6 +1135,11 @@ void vkpt_fsr_init_cvars(void)
      * normal present path until that presenter has acquired two images. */
     cvar_flt_frame_generation = Cvar_Get("flt_frame_generation", "0",
                                          CVAR_ARCHIVE);
+    /* Keep the live-validated 1.1.4 provider as the default. The newer SDK
+     * 2.3 FI/OF path is separately selectable until its presenter path has
+     * equivalent long-duration game coverage. */
+    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "0",
+                                                 CVAR_ARCHIVE);
     /* Analytical interpolation is most convincing at a sustained high input
      * rate. Thirty is a conservative default safety floor; set zero to
      * explicitly disable the gate, or sixty for AMD's recommended target. */
@@ -1355,7 +1411,12 @@ bool vkpt_fsr_frame_generation_is_ready(void)
     if (!((upscaler == VKPT_UPSCALER_FSR3 && fsr3_is_enabled()) ||
           (upscaler == VKPT_UPSCALER_FSR3_315 && fsr3_315_is_enabled())))
         return false;
-    return fsr3_frame_generation_context_ok && fsr3_frame_generation_context &&
+    const bool sdk_316 = cvar_flt_frame_generation_backend &&
+        cvar_flt_frame_generation_backend->integer == 1;
+    const bool provider_ready = sdk_316
+        ? fsr3_316_frame_generation_context_ok && fsr3_316_frame_generation_context
+        : fsr3_frame_generation_context_ok && fsr3_frame_generation_context;
+    return provider_ready &&
            fsr3_frame_generation_dw == qvk.extent_unscaled.width &&
            fsr3_frame_generation_dh == qvk.extent_unscaled.height &&
            qvk.extent_taa_output.width == qvk.extent_unscaled.width &&
@@ -1493,10 +1554,134 @@ bool vkpt_fsr_frame_generation_prepare_present(void)
      * We intentionally keep a disabled context alive until normal pipeline
      * teardown, rather than destroying resources still referenced by another
      * in-flight frame. */
-    if (!fsr3_frame_generation_context_ok &&
+    const bool sdk_316 = cvar_flt_frame_generation_backend &&
+        cvar_flt_frame_generation_backend->integer == 1;
+    const bool selected_context_ok = sdk_316
+        ? fsr3_316_frame_generation_context_ok && fsr3_316_frame_generation_context
+        : fsr3_frame_generation_context_ok && fsr3_frame_generation_context;
+    if (!selected_context_ok &&
         fsr3_create_frame_generation_context() != VK_SUCCESS)
         return false;
     return vkpt_fsr_frame_generation_is_ready();
+}
+
+static FfxVkFsr3_3_1_6FrameGenerationImage fsr3_316_image(
+    unsigned int image_index, VkExtent2D extent, VkImageLayout layout)
+{
+    FfxVkFsr3_3_1_6FrameGenerationImage result;
+
+    memset(&result, 0, sizeof(result));
+    result.image = qvk.images[image_index];
+    result.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    result.width = extent.width;
+    result.height = extent.height;
+    result.layout = layout;
+    result.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    return result;
+}
+
+static FfxVkFsr3_3_1_6FrameGenerationImage fsr3_316_temporal_image(
+    const VkptTemporalImage *image)
+{
+    FfxVkFsr3_3_1_6FrameGenerationImage result;
+
+    memset(&result, 0, sizeof(result));
+    result.image = image->image;
+    result.format = image->format;
+    result.width = image->allocation_extent.width;
+    result.height = image->allocation_extent.height;
+    result.layout = VK_IMAGE_LAYOUT_GENERAL;
+    result.usage = image->usage;
+    return result;
+}
+
+static VkResult fsr3_316_frame_generation_record_after_inputs(
+    VkCommandBuffer cmd_buf, const VkptTemporalFrame *frame)
+{
+    FfxVkFsr3_3_1_6FrameGenerationPrepareInfo prepare;
+    FfxVkFsr3_3_1_6FrameGenerationDispatchInfo dispatch;
+    FfxVkFsr3_3_1_6FrameGenerationResult result;
+
+    if (!fsr3_316_frame_generation_context)
+        return VK_NOT_READY;
+    /* If either SDK call rejects after recording partial work, the normal
+     * fallback still submits this post command buffer. Retire its imported
+     * views at this frame slot's fence rather than leaking/stalling the next
+     * logical frame. */
+    fsr3_316_frame_generation_frame_ids[qvk.current_frame_index] = frame->frame_id;
+    memset(&prepare, 0, sizeof(prepare));
+    prepare.commandBuffer = cmd_buf;
+    prepare.color = fsr3_316_image(VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output,
+        VK_IMAGE_LAYOUT_GENERAL);
+    prepare.depth = fsr3_316_temporal_image(&frame->inputs.device_depth);
+    prepare.motionVectors = fsr3_316_temporal_image(&frame->inputs.motion_vectors);
+    prepare.renderWidth = frame->render_size.width;
+    prepare.renderHeight = frame->render_size.height;
+    prepare.jitterOffsetX = -frame->camera.jitter_render_pixels[0];
+    prepare.jitterOffsetY = -frame->camera.jitter_render_pixels[1];
+    prepare.motionVectorScaleX = frame->inputs.motion_description.to_render_pixels[0];
+    prepare.motionVectorScaleY = frame->inputs.motion_description.to_render_pixels[1];
+    prepare.frameTimeMilliseconds = frame->frame_time_ms > 0.0f
+        ? frame->frame_time_ms : 16.667f;
+    prepare.cameraNear = frame->camera.near_plane;
+    prepare.cameraFar = frame->camera.far_plane;
+    prepare.viewSpaceToMeters = frame->camera.view_space_to_meters;
+    prepare.cameraVerticalFovRadians = frame->camera.vertical_fov_radians;
+    memcpy(prepare.cameraPosition, frame->camera.position, sizeof(prepare.cameraPosition));
+    memcpy(prepare.cameraUp, frame->camera.up, sizeof(prepare.cameraUp));
+    memcpy(prepare.cameraRight, frame->camera.right, sizeof(prepare.cameraRight));
+    memcpy(prepare.cameraForward, frame->camera.forward, sizeof(prepare.cameraForward));
+    prepare.frameId = frame->frame_id;
+    prepare.reset = (fsr3_frame_generation_reset_next || !frame->history_valid)
+        ? VK_TRUE : VK_FALSE;
+    result = ffxVkFsr3_3_1_6FrameGenerationContextRecordPrepare(
+        fsr3_316_frame_generation_context, &prepare);
+    if (result != FFX_VK_FSR3_3_1_6_FRAMEGEN_OK) {
+        fsr3_frame_generation_reset_next = true;
+        Com_WPrintf("FSR3 FG 3.1.6: prepare failed (%d)\n", (int)result);
+        return VK_ERROR_UNKNOWN;
+    }
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.commandBuffer = cmd_buf;
+    dispatch.color = prepare.color;
+    dispatch.output = fsr3_316_image(VKPT_IMG_FSR_RCAS_OUTPUT,
+        qvk.extent_unscaled, VK_IMAGE_LAYOUT_GENERAL);
+    dispatch.displayWidth = frame->display_size.width;
+    dispatch.displayHeight = frame->display_size.height;
+    dispatch.interpolationWidth = frame->display_size.width;
+    dispatch.interpolationHeight = frame->display_size.height;
+    dispatch.frameTimeMilliseconds = prepare.frameTimeMilliseconds;
+    dispatch.cameraNear = prepare.cameraNear;
+    dispatch.cameraFar = prepare.cameraFar;
+    dispatch.viewSpaceToMeters = prepare.viewSpaceToMeters;
+    dispatch.cameraVerticalFovRadians = prepare.cameraVerticalFovRadians;
+    dispatch.minLuminance = 0.0f;
+    dispatch.maxLuminance = 1.0f;
+    dispatch.frameId = prepare.frameId;
+    dispatch.reset = prepare.reset;
+    result = ffxVkFsr3_3_1_6FrameGenerationContextRecordDispatch(
+        fsr3_316_frame_generation_context, &dispatch);
+    if (result != FFX_VK_FSR3_3_1_6_FRAMEGEN_OK) {
+        fsr3_frame_generation_reset_next = true;
+        Com_WPrintf("FSR3 FG 3.1.6: dispatch failed (%d)\n", (int)result);
+        return VK_ERROR_UNKNOWN;
+    }
+    fsr3_frame_generation_reset_next = false;
+    return VK_SUCCESS;
+}
+
+void vkpt_fsr_frame_generation_retire(uint32_t frame_slot)
+{
+    const uint64_t frame_id = frame_slot < MAX_FRAMES_IN_FLIGHT
+        ? fsr3_316_frame_generation_frame_ids[frame_slot] : 0u;
+
+    if (!frame_id || !fsr3_316_frame_generation_context)
+        return;
+    (void)ffxVkFsr3_3_1_6FrameGenerationContextRetireFrame(
+        fsr3_316_frame_generation_context, frame_id);
+    fsr3_316_frame_generation_frame_ids[frame_slot] = 0u;
 }
 
 VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
@@ -1553,6 +1738,10 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         );
     }
+
+    if (cvar_flt_frame_generation_backend &&
+        cvar_flt_frame_generation_backend->integer == 1)
+        return fsr3_316_frame_generation_record_after_inputs(cmd_buf, frame);
 
     source = fsr3_screen_image(VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output,
         FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
