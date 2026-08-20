@@ -55,9 +55,11 @@ Current truth:
   the reusable `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target now provides
   the versioned opaque `create -> prepare -> dispatch -> retire -> destroy`
   lifecycle. Its public-only RX 6800M smoke runs both reset and temporal
-  frames with zero validation warnings/errors; `RetireFrame` is deliberately
-  required after the application's submission fence, retaining imported views
-  safely until GPU completion. The portable presenter and Q2RTX integration
+  frames with zero validation warnings/errors in both RGBA8 and Q2RTX's
+  RGBA16F presentation format. `RetireFrame(completedFrameId)` is deliberately
+  required after the application's submission fence, retaining multiple
+  queue-ordered imported-view sets safely until GPU completion. The portable
+  presenter and Q2RTX integration
   remain next. The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,

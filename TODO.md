@@ -177,9 +177,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` target now exposes a versioned,
   opaque `create -> prepare -> dispatch -> retire -> destroy` C lifecycle;
   its public-only RX 6800M smoke records reset plus temporal frames with zero
-  validation warnings/errors. `RetireFrame` makes the caller's fence boundary
-  explicit so image views cannot be destroyed while the GPU still references
-  them. Portable presenter and Q2RTX integration remain.
+  validation warnings/errors in both RGBA8 and Q2RTX-compatible RGBA16F
+  modes. Frame-ID retirement makes the caller's fence boundary explicit while
+  retaining multiple queue-ordered frames safely. Portable presenter and
+  Q2RTX integration remain.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 27/27.
   Its upscaler host scheduler compiles
