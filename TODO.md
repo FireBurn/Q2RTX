@@ -203,6 +203,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   validation-enabled RX 6800M capture now shows a coherent generated scene
   rather than the former black output:
   `/home/fireburn/Screenshot_FSR316_FG_20260820.png`.
+  A queued `base1 -> base2` transition then completed with no VUID/dispatch
+  error and a coherent post-transition generated capture:
+  `/home/fireburn/Screenshot_FSR316_FG_base2_20260820.png`.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves

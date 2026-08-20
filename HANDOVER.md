@@ -75,7 +75,10 @@ Current truth:
   The 3.1.6 wrapper must pass reciprocal display dimensions as `opticalFlowScale`;
   `{1,1}` produces a collapsed field extent and black generated frames. After
   the correction, a validation-enabled RX 6800M capture shows a coherent
-  generated scene: `/home/fireburn/Screenshot_FSR316_FG_20260820.png`.
+  generated scene: `/home/fireburn/Screenshot_FSR316_FG_20260820.png`. A
+  queued `base1 -> base2` transition likewise completed without validation or
+  dispatch errors and captured a coherent generated post-transition scene:
+  `/home/fireburn/Screenshot_FSR316_FG_base2_20260820.png`.
   The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,
