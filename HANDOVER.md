@@ -79,6 +79,7 @@ Current truth:
   queued `base1 -> base2` transition likewise completed without validation or
   dispatch errors and captured a coherent generated post-transition scene:
   `/home/fireburn/Screenshot_FSR316_FG_base2_20260820.png`.
+  Its direct SDK host-graph fixture was corrected to the same reciprocal scale.
   The existing
   upscaler host source compiles as an
   object-only Linux scaffold after narrowly disabling the unpublished watermark,

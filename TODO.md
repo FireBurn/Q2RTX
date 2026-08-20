@@ -206,6 +206,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   A queued `base1 -> base2` transition then completed with no VUID/dispatch
   error and a coherent post-transition generated capture:
   `/home/fireburn/Screenshot_FSR316_FG_base2_20260820.png`.
+  The direct SDK host-graph fixture now uses the same reciprocal scale, so it
+  cannot preserve the invalid `{1,1}` example.
   Its upscaler host scheduler compiles
   as a separate Linux object scaffold after documented non-Windows DLL-export,
   watermark, and opaque-context-size fixes. An always-on graph test now proves
