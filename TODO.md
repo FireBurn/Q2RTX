@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-08-20 (Europe/London)
+Last updated: 2026-08-25 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -21,6 +21,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Correct backend staging lifetime, reflected 104-byte UBO ABI,
   descriptors, feature/format checks, pass-handle encoding, error propagation,
   job rollback, partial-allocation unwind, and idempotent destruction.
+- [x] Replace FSR4 v07's renderer-assumed descriptor-pool/constant-buffer
+  rotation with explicit `BeginFrame(frameId) -> RetireFrame(completedFrameId)`
+  ownership. Q2RTX connects it to its already-waited per-slot fence; the
+  portable RX 6800M test fills all three unretired slots, rejects unsafe fourth
+  reuse, and proves reuse only after retirement. A live FSR4 Quality run stays
+  active with Vulkan validation clean.
 - [x] Honor FFX float clear values in the Vulkan backend and initialize the
   sampled explicit-exposure fallback to 1.0 rather than zero; a subsequent
   RCAS-on live validation run passed on RX 6800M.
@@ -116,7 +122,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `extern/ffx-vulkan` as `ffx-vulkan::fsr4-v07-vulkan`. Q2RTX now links that
   exact library, its public headers/versioned `ffxFsr4V07…` API avoid AMD SDK
   symbol collisions, and an installed-package consumer contract builds/links
-  without the renderer. The full FSR3 source closure remains an
+  without the renderer. Its explicit per-frame fence-retirement API is part of
+  that installed contract. The full FSR3 source closure remains an
   `add_subdirectory` integration until it has a dependency-complete export.
 - [x] Expose dense scene color, current-to-previous motion, stable primary
   view-Z, camera matrices/jitter, reset reasons, frame ID, and pre-UI boundary.
@@ -374,7 +381,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   hazard, and same-queue order removes the former CPU replay wait. The reusable
   `ffx-vulkan::framegeneration-presenter-policy` target now exports the
   platform-neutral FIFO/image-count/acquired-pair/semaphore-ownership rules;
-  Q2RTX uses it and an installed-package consumer plus 32-test standalone
+  Q2RTX uses it and an installed-package consumer plus 33-test standalone
   suite pass. Full acquire/submit/present callback extraction remains pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run

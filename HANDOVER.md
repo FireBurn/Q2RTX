@@ -938,13 +938,21 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   activation scratch, with no VUID, validation warning, or error. This count
   includes Vulkan allocation alignment and excludes opaque descriptor-pool
   driver overhead; it is not a heuristic estimate.
+- The reusable FSR4 v07 backend no longer recycles descriptor pools and
+  host-visible constant-buffer bytes on a Q2RTX-specific frame cadence.
+  `ffxFsr4VkBeginFrame` reserves one of three partitions and
+  `ffxFsr4VkRetireFrame` releases it only through a host-completed frame ID.
+  Q2RTX calls retirement immediately after its existing per-slot fence wait.
+  The new RX 6800M lifetime test fills all three slots, rejects the unsafe
+  fourth record, retires one completed ID, and then safely reuses it; a live
+  Quality run remained active without VUID, validation warning, or error.
 - The same current build ran the separate Ultra Performance asset graph with
   RCAS 0.50 and SPD auto exposure, then the separate DRS asset graph at a
   fixed 50% controller range (with RCAS/SPD enabled). Both 960x540 RX 6800M
   runs selected the expected model in the live resolver and had no VUID,
   validation warning, or error.
 - A clean standalone `extern/ffx-vulkan` Debug configure/build then passed all
-  32 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
+  33 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
   backend, public 3.1.5 bridge, 3.1.6 FI/OF API variants, generated SPIR-V and
   source hashes, FSR4 v07 asset selection, Vulkan-validation smokes, and the
   reusable generated-frame presenter policy. The
@@ -972,9 +980,9 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 ## Known risks and cautions
 
 - The reusable source-v07 FSR4 backend remains experimental and has fixed
-  limits; it still needs an explicit in-flight retirement API, reflected
-  per-pipeline layouts, and resource-state tracking. Its provider-owned Vulkan
-  allocation accounting is now live and verified at 960x540.
+  limits; it now has explicit in-flight retirement, but still needs reflected
+  per-pipeline layouts and resource-state tracking. Its provider-owned Vulkan
+  allocation accounting is live and verified at 960x540.
 - Conventional device depth is available only for single-device rendering and
   is now inspectable through the temporal-input diagnostic. Device-group input
   gathering remains unimplemented.

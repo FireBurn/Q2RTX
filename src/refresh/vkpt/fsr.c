@@ -86,6 +86,10 @@ static char             fsr4_shader_model[16] = {0};
  * blobs, so a generic "context unavailable" is not actionable. */
 static char             fsr4_unavailable_reason[128] =
     "fallback: FSR4 v07 context unavailable";
+/* The portable FSR4 backend allocates descriptor/constant-buffer storage per
+ * submitted dispatch.  These IDs bind that storage to Q2RTX's existing
+ * per-slot fences instead of relying on an implicit pool rotation. */
+static uint64_t         fsr4_frame_ids[MAX_FRAMES_IN_FLIGHT];
 
 enum {
     VKPT_UPSCALER_Q2RTX = 0,
@@ -326,6 +330,7 @@ static void fsr4_destroy_backend(void)
         fsr4_backend_ok = false;
     }
     memset(&fsr4_backend, 0, sizeof(fsr4_backend));
+    memset(fsr4_frame_ids, 0, sizeof(fsr4_frame_ids));
     fsr4_shader_tier[0] = '\0';
     fsr4_shader_model[0] = '\0';
 }
@@ -2231,6 +2236,18 @@ static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
 }
 #endif
 
+void vkpt_fsr_retire(uint32_t frame_slot)
+{
+#ifdef VKPT_FSR3
+    vkpt_fsr_frame_generation_retire(frame_slot);
+#endif
+    if (frame_slot < MAX_FRAMES_IN_FLIGHT && fsr4_frame_ids[frame_slot] &&
+        fsr4_backend_ok) {
+        (void)ffxFsr4VkRetireFrame(&fsr4_backend, fsr4_frame_ids[frame_slot]);
+        fsr4_frame_ids[frame_slot] = 0u;
+    }
+}
+
 static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
 {
     const VkptTemporalFrame *frame;
@@ -2374,6 +2391,18 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
     d.cameraFovAngleVertical = frame->camera.vertical_fov_radians;
     d.viewSpaceToMetersFactor = frame->camera.view_space_to_meters;
 
+    {
+        const uint64_t frame_id = (uint64_t)qvk.frame_counter + 1u;
+        VkResult begin_result = ffxFsr4VkBeginFrame(&fsr4_backend, frame_id);
+        if (begin_result != VK_SUCCESS) {
+            END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+            fsr4_reset_next = true;
+            Com_WPrintf("FSR4: no retired Vulkan provider frame storage (%s)\n",
+                        qvk_result_to_string(begin_result));
+            return begin_result == VK_NOT_READY ? VK_NOT_READY : begin_result;
+        }
+        fsr4_frame_ids[qvk.current_frame_index] = frame_id;
+    }
     dispatch_result = ffxFsr4V07Dispatch(&fsr4_context, &d.header);
     if (dispatch_result != FFX_API_RETURN_OK) {
         END_PERF_MARKER(cmd_buf, PROFILER_FSR);

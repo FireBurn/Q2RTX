@@ -802,6 +802,9 @@ uint32_t vkpt_fsr_jitter_phase_count(void);
 void vkpt_fsr_update_ubo(QVKUniformBuffer_t *ubo);
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf);
 VkResult vkpt_fsr_final_blit(VkCommandBuffer cmd_buf, bool warp);
+/* Called after Q2RTX's per-slot submission fence signals.  It releases FSR4
+ * provider storage and, when built, FSR3 frame-generation imports. */
+void vkpt_fsr_retire(uint32_t frame_slot);
 /* Analytical FSR3 Frame Generation is recorded after tone mapping.  The
  * presenter owns acquire/submit/present; this function only records OF/FI. */
 bool vkpt_fsr_frame_generation_is_ready(void);

@@ -3692,7 +3692,7 @@ R_BeginFrame_RTX(void)
 	/* The per-slot fence covers the generated and real present submissions.
 	 * Release only the SDK 3.1.6 bridge views associated with this completed
 	 * slot; newer frame IDs may still be queued on the graphics queue. */
-	vkpt_fsr_frame_generation_retire(qvk.current_frame_index);
+	vkpt_fsr_retire(qvk.current_frame_index);
 
 	bool mode_changed = (qvk.draw_width != r_config.width) || (qvk.draw_height != r_config.height);
 	if (!qvk.swap_chain || mode_changed)

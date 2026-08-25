@@ -243,6 +243,13 @@ coexist with AMD's unversioned SDK symbols. Its dependency-complete FSR4
 subset installs as a CMake package; the full FSR3 source closure is consumed
 with `add_subdirectory` as documented in its README.
 
+FSR4 v07 callers must bracket every provider dispatch with
+`ffxFsr4VkBeginFrame(interface, frame_id)` and retire it with
+`ffxFsr4VkRetireFrame(interface, completed_frame_id)` only after their GPU
+fence signals. This is the portable ownership boundary for descriptor sets,
+staged uploads, and host-visible constant-buffer partitions; do not restore a
+renderer-specific automatic pool rotation.
+
 The installed package also exports
 `ffx-vulkan::framegeneration-presenter-policy`. It contains only reusable WSI
 policy (FIFO selection, image-count/pair validation, and image/GPU semaphore
