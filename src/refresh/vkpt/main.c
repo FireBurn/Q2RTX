@@ -3794,7 +3794,7 @@ R_BeginFrame_RTX(void)
 			"fallback: surface did not provide minImageCount+2 swapchain images");
 	else if (!qvk.framegen_present_active && !vkpt_fsr_frame_generation_is_ready())
 		vkpt_fsr_frame_generation_publish_status(false,
-			"fallback: FSR3/frame-generation temporal contract unavailable");
+			"fallback: upscaler/frame-generation temporal contract unavailable");
 	qvk.framegen_generated_frame_ready = false;
 
 #ifdef VKPT_DEVICE_GROUPS

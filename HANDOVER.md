@@ -112,6 +112,21 @@ Current truth:
   presentation, full colour and validation-clean:
   `/tmp/q2rtx-fresh-fg.F4n4pa/quake2rtx/baseq2/screenshots/FSR316_fresh_default.png`.
 
+- The source-v07 FSR4 super-resolution path now also feeds both public
+  analytical FG schedulers through the existing display-resolution HUDless
+  `TAA_OUTPUT` contract. This was previously blocked only by an unnecessary
+  FSR3-only availability gate, despite FSR4 v07 already producing the same
+  contract. On RX 6800M, FSR4-v07 Performance + SDK-3.1.6 FI/OF reached active
+  FIFO presentation at v11/frame 402, then stayed active through frame 2246
+  with the 30-FPS gate (58.8 logical / 111.1 nominal generated FPS), no
+  VUID/error, and a coherent full-colour capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_FSR316_FG_60s.png`.
+  The retained FSR3.1.4 scheduler also reached active FIFO presentation at
+  v11/frame 402 with no VUID/error and a coherent capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_FSR314_FG_smoke.png`.
+  This is source-v07 FSR4 upscaling plus public analytical FSR3 FI/OF, not
+  official FSR Frame Generation 4.0.1/MLFG.
+
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
   would otherwise be paired with the new host descriptor layout and produce a

@@ -1927,11 +1927,13 @@ bool vkpt_fsr_frame_generation_is_ready(void)
 		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
     /* Optical flow and frame interpolation consume the provider-neutral
-     * temporal contract and presentation-domain scene color, not either
-     * upscaler's private history. The public 3.1.5 upscaler therefore has the
-     * same valid analytical-FG input contract as the proven 1.1.4 path. */
+     * temporal contract and presentation-domain scene color, not private
+     * upscaler history. The public 3.1.5 and source-v07 FSR4 providers both
+     * copy their reconstructed display image into TAA_OUTPUT and therefore
+     * have the same analytical-FG input contract as the proven 1.1.4 path. */
     if (!((upscaler == VKPT_UPSCALER_FSR3 && fsr3_is_enabled()) ||
-          (upscaler == VKPT_UPSCALER_FSR3_315 && fsr3_315_is_enabled())))
+          (upscaler == VKPT_UPSCALER_FSR3_315 && fsr3_315_is_enabled()) ||
+          (upscaler == VKPT_UPSCALER_FSR4 && fsr4_is_enabled())))
         return false;
     const bool sdk_316 = cvar_flt_frame_generation_backend &&
         cvar_flt_frame_generation_backend->integer == 1;

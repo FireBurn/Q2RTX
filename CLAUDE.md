@@ -357,8 +357,10 @@ indexing); applications must retain acquire, submit, present, fence, and
 platform-window ownership. Q2RTX must use this policy rather than recreating
 those invariants locally.
 
-Frame generation consumes the HUDless `VKPT_IMG_TAA_OUTPUT` scene. When it is
-active, UI is rendered once to a lazy per-frame-slot RGBA16F texture with
+Frame generation consumes the HUDless `VKPT_IMG_TAA_OUTPUT` scene. FSR3.1.4,
+FSR3.1.5, and the source-v07 FSR4 provider all publish their reconstructed
+display image there, so each may feed the public analytical FI/OF schedulers;
+this must never be labelled AMD ML Frame Generation. When it is active, UI is rendered once to a lazy per-frame-slot RGBA16F texture with
 premultiplied RGB/source alpha and published as
 `VKPT_TEMPORAL_UI_SEPARATE_TEXTURE`; final presentation composites
 `ui.rgb + scene.rgb * (1-ui.a)`. Do not replace this with a second direct UI

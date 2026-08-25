@@ -825,8 +825,8 @@ value. This is independent from FSR4's dynamic-resolution-model selection.
 #### `flt_frame_generation`
 
 Enables the experimental analytical FSR3 Optical Flow and Frame Interpolation
-path. It requires either the native FSR3 3.1.4 upscaler or the experimental
-public-SDK FSR3 3.1.5 path, a single GPU, rectilinear projection,
+path. It requires the native FSR3 3.1.4 upscaler, experimental public-SDK
+FSR3 3.1.5, or source-v07 FSR4 super resolution; a single GPU, rectilinear projection,
 display-resolution `TAA_OUTPUT`, valid device depth/motion inputs, and a
 swapchain with at least `minImageCount + 2` images (five on the tested RX
 6800M/RADV surface). Q2RTX acquires two images, presents

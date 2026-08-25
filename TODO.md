@@ -175,7 +175,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   validation with both masks registered.
 - [x] Keep the dedicated HUDless offscreen scene target and add a separate
   alpha UI target. `TAA_OUTPUT` is the display-resolution,
-  tone-mapped-but-HUDless scene consumed by both FSR3 FI implementations.
+  tone-mapped-but-HUDless scene consumed by both FSR3 FI implementations and
+  by the v07 FSR4-super-resolution + analytical-FG combination. The v07
+  provider copies its reconstructed output there before the shared FI/OF
+  recording stage; this is not AMD's binary ML Frame Generation.
   Active FG now renders the queued UI once to a per-frame-slot linear RGBA16F
   premultiplied-alpha texture and composites it over both generated and real
   scenes. The provider-neutral temporal contract publishes this as
