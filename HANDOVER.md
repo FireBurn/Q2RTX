@@ -146,6 +146,19 @@ Current truth:
   `RR_normal_rough_material_20260825.png`, `RR_diffuse_albedo_20260825.png`,
   and `RR_specular_albedo_20260825.png`.
 
+- Temporal contract v6 adds four dense linear noisy-radiance partitions for a
+  future RR/decoupled-denoiser adapter: direct diffuse, indirect diffuse,
+  direct specular, and indirect specular. Q2RTX's direct-lighting pass now
+  preserves direct specular before the indirect pass accumulates into SPEC;
+  interleave exports the direct high-frequency channel, low-frequency SH
+  coefficient, preserved direct specular, and nonnegative SPEC remainder.
+  This deliberately documents the renderer's semantics rather than relabeling
+  the SH coefficient as a complete official RR signal. A 2026-08-25 RX 6800M
+  `vk_validation=1` FSR3 run reported all four `R16G16B16A16_SFLOAT` images
+  valid at 644x361, temporal contract v6/history valid, and no VUID/error:
+  `baseq2/logs/RR_radiance_contract_20260825.log`. Per-lobe hit distance and
+  dominant visibility remain outstanding, as does any neural provider.
+
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.
   The prior safe-acquire-only code copied an arbitrary fresh image, producing

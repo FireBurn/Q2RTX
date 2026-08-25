@@ -493,8 +493,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Contract v5 now publishes the documented compact material resources from
   checkerboard interleave (oct-normal/linear roughness/category 0 and sqrt
   diffuse/specular albedos), in addition to the dense generic material views.
-  It still lacks the separate noisy radiance, hit-distance, and visibility
-  signals needed by an actual RR adapter.
+  Contract v6 also publishes dense linear direct/indirect diffuse and
+  direct/indirect specular partitions. Direct diffuse is Q2RTX's direct
+  high-frequency channel, indirect diffuse its low-frequency SH coefficient,
+  and direct specular is preserved before indirect accumulation. It still
+  lacks per-lobe hit distance and dominant-visibility signals needed by an
+  actual RR adapter.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes

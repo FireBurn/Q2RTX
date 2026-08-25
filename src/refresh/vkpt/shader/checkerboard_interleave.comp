@@ -263,4 +263,28 @@ void main()
         vec4(sqrt(diffuse_albedo), 1.0));
     imageStore(IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO, opos,
         vec4(sqrt(clamp(specular_albedo, vec3(0.0), vec3(1.0))), 1.0));
+
+    /* Preserve Q2RTX's existing noisy lighting partitions in dense render
+     * coordinates. DIRECT_DIFFUSE is the analytic/direct high-frequency
+     * channel; INDIRECT_DIFFUSE is the current low-frequency SH coefficient;
+     * DIRECT_SPECULAR is captured before indirect-lighting accumulation; the
+     * remaining combined SPEC energy is the indirect specular partition.
+     * These are raw renderer signals, not a claim that every RR signal (notably
+     * hit distances and dominant visibility) is available yet. */
+    vec3 direct_diffuse = unpackRGBE(
+        texelFetch(TEX_PT_COLOR_HF, ipos, 0).x) / STORAGE_SCALE_HF;
+    vec3 indirect_diffuse = texelFetch(TEX_PT_COLOR_LF_SH, ipos, 0).rgb /
+        STORAGE_SCALE_LF;
+    vec3 direct_specular = unpackRGBE(
+        texelFetch(TEX_PT_DIRECT_SPEC, ipos, 0).x) / STORAGE_SCALE_SPEC;
+    vec3 total_specular = unpackRGBE(
+        texelFetch(TEX_PT_COLOR_SPEC, ipos, 0).x) / STORAGE_SCALE_SPEC;
+    imageStore(IMG_TEMPORAL_RR_DIRECT_DIFFUSE, opos,
+        vec4(max(direct_diffuse, vec3(0.0)), 1.0));
+    imageStore(IMG_TEMPORAL_RR_INDIRECT_DIFFUSE, opos,
+        vec4(max(indirect_diffuse, vec3(0.0)), 1.0));
+    imageStore(IMG_TEMPORAL_RR_DIRECT_SPECULAR, opos,
+        vec4(max(direct_specular, vec3(0.0)), 1.0));
+    imageStore(IMG_TEMPORAL_RR_INDIRECT_SPECULAR, opos,
+        vec4(max(total_specular - direct_specular, vec3(0.0)), 1.0));
 }

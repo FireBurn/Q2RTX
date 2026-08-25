@@ -96,8 +96,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	IMG_DO(FSR3_315_DILATED_DEPTH,    48, R32_SFLOAT,          r32f,    IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(FSR3_315_DILATED_MOTION,   49, R16G16_SFLOAT,       rg16f,   IMG_WIDTH,           IMG_HEIGHT     ) \
 	IMG_DO(FSR3_315_PREVIOUS_DEPTH,   50, R32_UINT,            r32ui,   IMG_WIDTH,           IMG_HEIGHT     ) \
+	/* Noisy radiance partition preserved for future decoupled denoisers. */ \
+	IMG_DO(PT_DIRECT_SPEC,            51, R32_UINT,            r32ui,   IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \
+	IMG_DO(TEMPORAL_RR_DIRECT_DIFFUSE,   52, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
+	IMG_DO(TEMPORAL_RR_INDIRECT_DIFFUSE, 53, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
+	IMG_DO(TEMPORAL_RR_DIRECT_SPECULAR,  54, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
+	IMG_DO(TEMPORAL_RR_INDIRECT_SPECULAR,55, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
 
-#define NUM_IMAGES_BASE     51
+#define NUM_IMAGES_BASE     56
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \

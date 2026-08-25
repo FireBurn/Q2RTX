@@ -1140,6 +1140,7 @@ vkpt_pt_trace_lighting(VkCommandBuffer cmd_buf, float num_bounce_rays)
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_LF_COCG]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_HF]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_SPEC]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_DIRECT_SPEC]);
 
 	BUFFER_BARRIER(cmd_buf,
 		.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,

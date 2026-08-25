@@ -1289,6 +1289,14 @@ void vkpt_fsr_print_diagnostics(void)
             &frame->inputs.denoiser_diffuse_albedo);
         fsr_print_temporal_image_diagnostic("RR specular",
             &frame->inputs.denoiser_specular_albedo);
+		fsr_print_temporal_image_diagnostic("RR direct diff",
+			&frame->inputs.rr_direct_diffuse);
+		fsr_print_temporal_image_diagnostic("RR indirect diff",
+			&frame->inputs.rr_indirect_diffuse);
+		fsr_print_temporal_image_diagnostic("RR direct spec",
+			&frame->inputs.rr_direct_specular);
+		fsr_print_temporal_image_diagnostic("RR indirect spec",
+			&frame->inputs.rr_indirect_specular);
         Com_Printf("  RR material encoding: normal=%s albedo=%s types=%u "
                    "(provider-neutral input foundation)\n",
             frame->inputs.denoiser_material_description.normal_encoding ==

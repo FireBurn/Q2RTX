@@ -112,6 +112,14 @@ Q2RTX signal conventions currently exposed by the contract:
   linear roughness, and category 0; the latter two are sqrt encoded. They are
   a provider-neutral input foundation, not evidence that AMD's neural RR
   binary provider is available or active.
+- `TEMPORAL_RR_DIRECT_DIFFUSE`, `TEMPORAL_RR_INDIRECT_DIFFUSE`,
+  `TEMPORAL_RR_DIRECT_SPECULAR`, and `TEMPORAL_RR_INDIRECT_SPECULAR`: dense
+  unfiltered Q2RTX lighting partitions. Direct diffuse is the direct-lighting
+  high-frequency channel; indirect diffuse is Q2RTX's current low-frequency
+  SH coefficient; direct specular is preserved before indirect accumulation;
+  indirect specular is the nonnegative remaining combined SPEC energy. These
+  are useful provider-neutral radiance groundwork, but do not substitute for
+  per-lobe hit distance or dominant visibility inputs.
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.

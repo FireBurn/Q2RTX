@@ -433,12 +433,42 @@ vkpt_temporal_mark_inputs_ready(void)
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
 		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	/* Q2RTX's unfiltered lighting partitions are exported separately so a
+	 * future decoupled denoiser can decide its own temporal/spatial treatment. */
+	set_image(&frame->inputs.rr_direct_diffuse,
+		VKPT_IMG_TEMPORAL_RR_DIRECT_DIFFUSE, VK_FORMAT_R16G16B16A16_SFLOAT,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	set_image(&frame->inputs.rr_indirect_diffuse,
+		VKPT_IMG_TEMPORAL_RR_INDIRECT_DIFFUSE, VK_FORMAT_R16G16B16A16_SFLOAT,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	set_image(&frame->inputs.rr_direct_specular,
+		VKPT_IMG_TEMPORAL_RR_DIRECT_SPECULAR, VK_FORMAT_R16G16B16A16_SFLOAT,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	set_image(&frame->inputs.rr_indirect_specular,
+		VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR, VK_FORMAT_R16G16B16A16_SFLOAT,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	if (qvk.device_count == 1)
 		frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_NORMALS |
 			VKPT_TEMPORAL_INPUT_ALBEDO | VKPT_TEMPORAL_INPUT_ROUGHNESS |
 			VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL |
 			VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO |
-			VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO;
+			VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO |
+			VKPT_TEMPORAL_INPUT_RR_DIRECT_DIFFUSE |
+			VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE |
+			VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR |
+			VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR;
 
 	/* Primary rays write directly to dense screen coordinates.  That is
 	 * correct for Q2RTX's normal single-device path.  Device-group rendering
@@ -683,6 +713,14 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 			&frame->inputs.denoiser_diffuse_albedo, "denoiser diffuse albedo" },
 		{ VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO,
 			&frame->inputs.denoiser_specular_albedo, "denoiser specular albedo" },
+		{ VKPT_TEMPORAL_INPUT_RR_DIRECT_DIFFUSE,
+			&frame->inputs.rr_direct_diffuse, "RR direct diffuse" },
+		{ VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE,
+			&frame->inputs.rr_indirect_diffuse, "RR indirect diffuse" },
+		{ VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR,
+			&frame->inputs.rr_direct_specular, "RR direct specular" },
+		{ VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR,
+			&frame->inputs.rr_indirect_specular, "RR indirect specular" },
 		{ VKPT_TEMPORAL_INPUT_REACTIVE_MASK, &frame->inputs.reactive_mask, "reactive mask" },
 	};
 

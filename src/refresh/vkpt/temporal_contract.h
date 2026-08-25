@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 5u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 6u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -102,7 +102,13 @@ typedef enum VkptTemporalInputFlagBits_e {
 	 * documented packed resources, not availability of AMD's neural provider. */
 	VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL = 1u << 10,
 	VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO = 1u << 11,
-	VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO = 1u << 12
+	VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO = 1u << 12,
+	/* Raw Q2RTX lighting partitions. They are useful RR groundwork but are not
+	 * sufficient to claim a complete neural-denoiser signal set. */
+	VKPT_TEMPORAL_INPUT_RR_DIRECT_DIFFUSE = 1u << 13,
+	VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE = 1u << 14,
+	VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR = 1u << 15,
+	VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR = 1u << 16
 } VkptTemporalInputFlagBits;
 
 typedef enum VkptTemporalNormalEncoding_e {
@@ -256,6 +262,10 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalImage denoiser_normal_roughness_material;
 	VkptTemporalImage denoiser_diffuse_albedo;
 	VkptTemporalImage denoiser_specular_albedo;
+	VkptTemporalImage rr_direct_diffuse;
+	VkptTemporalImage rr_indirect_diffuse;
+	VkptTemporalImage rr_direct_specular;
+	VkptTemporalImage rr_indirect_specular;
 	VkptTemporalImage reactive_mask;
 	VkptTemporalImage transparency_and_composition_mask;
 	VkptTemporalMotionDescription motion_description;
