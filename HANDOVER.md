@@ -930,6 +930,11 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   activation scratch, with no VUID, validation warning, or error. This count
   includes Vulkan allocation alignment and excludes opaque descriptor-pool
   driver overhead; it is not a heuristic estimate.
+- The same current build ran the separate Ultra Performance asset graph with
+  RCAS 0.50 and SPD auto exposure, then the separate DRS asset graph at a
+  fixed 50% controller range (with RCAS/SPD enabled). Both 960x540 RX 6800M
+  runs selected the expected model in the live resolver and had no VUID,
+  validation warning, or error.
 - A temporary RenderDoc 1.40 command-line build succeeded, but its Vulkan
   layer is X11/XCB-only. The locally registered 1.39 layer is also X11/XCB-only.
   Q2RTX's SDL build reports `x11 not available`, while Wayland startup reports
