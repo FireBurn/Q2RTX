@@ -4424,6 +4424,7 @@ R_Init_RTX(bool total)
 	Cmd_AddCommand("reload_textures", (xcommand_t)&vkpt_reload_textures);
 	Cmd_AddCommand("show_pvs", (xcommand_t)&vkpt_show_pvs);
 	Cmd_AddCommand("next_sun", (xcommand_t)&vkpt_next_sun_preset);
+	Cmd_AddCommand("fsr_diagnostics", (xcommand_t)&vkpt_fsr_print_diagnostics);
 
 	vkpt_fog_init();
 	vkpt_cameras_init();
@@ -4457,6 +4458,7 @@ R_Shutdown_RTX(bool total)
 	Cmd_RemoveCommand("reload_textures");
 	Cmd_RemoveCommand("show_pvs");
 	Cmd_RemoveCommand("next_sun");
+	Cmd_RemoveCommand("fsr_diagnostics");
 
 	if (vkpt_refdef.bsp_mesh_world_loaded)
 	{

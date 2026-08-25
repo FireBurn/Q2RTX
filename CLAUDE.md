@@ -30,6 +30,10 @@ other Vulkan applications.
   targets—not `upstream/`, generated-source paths, or Q2RTX paths—and changes
   to that export require the clean `examples/installed-full-stack` consumer
   contract.
+- Use the read-only `fsr_diagnostics` console command for a live provider
+  audit. It must report the resolved provider/reason, temporal input contract,
+  current FSR4 model/permutation/memory, and FSR3/FI state without mutating a
+  context or recording GPU work.
 
 ## Ground truth architecture
 

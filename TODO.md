@@ -544,10 +544,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   branch and tune thresholds.
 - [x] Reset FSR history when temporal settings, including `flt_fsr_enable`,
   change so disable/re-enable cannot reuse stale recurrent state.
-- [ ] Log provider/effect version, backend, model, active permutation, input,
-  and memory use. The resolver already logs the fallback reason, and read-only
-  generated/rendered rolling presentation cadence is published only for
-  successful generated→real pairs through frame-generation FPS cvars.
+- [-] Log provider/effect version, backend, model, active permutation, input,
+  and memory use. `fsr_diagnostics` is now a read-only in-game snapshot of the
+  requested/resolved provider, temporal contract and image metadata, FSR3.1.4/
+  3.1.5/FI backend state, source-v07 model/tier/permutation, and active FSR4
+  allocation accounting. A live RX 6800M Quality capture reported a coherent
+  644x361 -> 960x540 dispatch and 40.01 MiB provider-owned allocation with no
+  VUID/error. FSR3 public allocation accounting is not yet exposed through its
+  reusable ABI, so per-provider memory reporting remains incomplete.
 - [-] Update in-game help, `doc/client.md`, notices, licenses, and screenshots.
   The source menu and client cvar documentation now describe the discrete v07
   model family, independent FSR3/FSR4 RCAS controls, deprecated inert cvars,

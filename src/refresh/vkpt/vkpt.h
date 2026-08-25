@@ -768,6 +768,10 @@ bool vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 	char *reason, size_t reason_size);
 
 void vkpt_fsr_init_cvars(void);
+/* Console command implementation for a truthful snapshot of the selected
+ * temporal provider, its current resource contract, and frame-generation
+ * state.  It is read-only and safe while a frame is in flight. */
+void vkpt_fsr_print_diagnostics(void);
 extern cvar_t *cvar_flt_fsr_enable;
 extern cvar_t *cvar_flt_upscaler;
 extern cvar_t *cvar_flt_fsr_quality;

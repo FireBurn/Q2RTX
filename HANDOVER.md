@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
+  It reports requested/resolved provider and reason, temporal contract/image
+  metadata, FSR3.1.4/3.1.5/FI status, source-v07 FSR4 model/tier/permutation,
+  and provider memory accounting without changing a context or recording work.
+  In the 2026-08-25 RX 6800M Quality run it reported an eligible 644x361 ->
+  960x540 v07 dispatch, all required scene/motion/view-Z inputs, and 40.01 MiB
+  of provider-owned FSR4 allocation (19.91 MiB activation scratch). The log had
+  no VUID/error and the captured output was coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_diagnostics_20260825.png`.
+
 - Console screenshot readback now respects WSI ownership.  It no longer
   transitions `current_swap_chain_image_index` after its normal present;
   `IMG_ReadPixels[_HDR]_RTX` locally acquires an image, initializes it if

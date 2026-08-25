@@ -1188,6 +1188,146 @@ static bool resolve_upscaler(int *active, const char **reason)
     return true;
 }
 
+static const char *fsr_diagnostic_provider_name(int provider)
+{
+    switch (provider) {
+    case VKPT_UPSCALER_FSR3:
+        return "FSR3 3.1.4 native Vulkan";
+    case VKPT_UPSCALER_FSR4:
+        return "FSR4 source-v07 INT8/DOT4 Vulkan";
+    case VKPT_UPSCALER_FSR3_315:
+        return "FSR3 3.1.5 public-SDK Vulkan experiment";
+    default:
+        return "Q2RTX fallback";
+    }
+}
+
+static const char *fsr_diagnostic_motion_space(uint32_t space)
+{
+    switch (space) {
+    case VKPT_TEMPORAL_MOTION_NORMALIZED_UV:
+        return "normalized UV";
+    case VKPT_TEMPORAL_MOTION_RENDER_PIXELS:
+        return "render pixels";
+    case VKPT_TEMPORAL_MOTION_DISPLAY_PIXELS:
+        return "display pixels";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *fsr_diagnostic_motion_direction(uint32_t direction)
+{
+    return direction == VKPT_TEMPORAL_MOTION_CURRENT_TO_PREVIOUS
+        ? "current-to-previous" : "previous-to-current";
+}
+
+static void fsr_print_temporal_image_diagnostic(const char *name,
+    const VkptTemporalImage *image)
+{
+    if (!image || !(image->flags & VKPT_TEMPORAL_RESOURCE_VALID)) {
+        Com_Printf("  input %-12s unavailable\n", name);
+        return;
+    }
+    Com_Printf("  input %-12s %s %ux%u valid=%ux%u layout=%d scale=%g\n",
+        name, qvk_format_to_string(image->format),
+        image->allocation_extent.width, image->allocation_extent.height,
+        image->valid_extent.width, image->valid_extent.height,
+        image->layout, image->value_scale);
+}
+
+void vkpt_fsr_print_diagnostics(void)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    const char *reason = "startup";
+    int active = VKPT_UPSCALER_Q2RTX;
+    const bool resolved = resolve_upscaler(&active, &reason);
+    const int requested = requested_upscaler();
+
+    Com_Printf("FSR diagnostics:\n");
+    Com_Printf("  requested: %s (%d), resolved: %s (%d)\n",
+        fsr_diagnostic_provider_name(requested), requested,
+        fsr_diagnostic_provider_name(active), active);
+    Com_Printf("  status: %s\n", reason);
+    Com_Printf("  temporal contract: v%u stage=%u frame=%llu flags=0x%x "
+               "history=%u reset=0x%x\n",
+        frame ? frame->contract_version : 0u, frame ? frame->stage : 0u,
+        (unsigned long long)(frame ? frame->frame_id : 0u),
+        frame ? frame->flags : 0u, frame ? frame->history_valid : 0u,
+        frame ? frame->reset_reasons : 0u);
+    if (frame) {
+        Com_Printf("  extents: render=%ux%u display=%ux%u, motion=%s %s %s\n",
+            frame->render_size.width, frame->render_size.height,
+            frame->display_size.width, frame->display_size.height,
+            fsr_diagnostic_motion_space(frame->inputs.motion_description.space),
+            fsr_diagnostic_motion_direction(frame->inputs.motion_description.direction),
+            frame->inputs.motion_description.jitter_mode ==
+                    VKPT_TEMPORAL_MOTION_JITTER_FREE
+                ? "jitter-free" : "jittered");
+        fsr_print_temporal_image_diagnostic("scene HDR", &frame->inputs.scene_color);
+        fsr_print_temporal_image_diagnostic("motion", &frame->inputs.motion_vectors);
+        fsr_print_temporal_image_diagnostic("view-Z", &frame->inputs.view_z);
+        fsr_print_temporal_image_diagnostic("device depth", &frame->inputs.device_depth);
+        fsr_print_temporal_image_diagnostic("reactive", &frame->inputs.reactive_mask);
+        fsr_print_temporal_image_diagnostic("composition", &frame->inputs.transparency_and_composition_mask);
+    }
+
+#ifdef VKPT_FSR3
+    Com_Printf("  FSR3 3.1.4: context=%s ABI=%u sharpening=%.2f\n",
+        fsr3_context_ok ? "ready" : "not ready", FFX_VK_PORTABLE_ABI_VERSION,
+        cvar_flt_fsr3_sharpening ? cvar_flt_fsr3_sharpening->value : 0.0f);
+    Com_Printf("  FSR3 3.1.5: context=%s SDK=2.3.0, embedded fixed Vulkan profile\n",
+        fsr3_315_context_ok ? "ready" : "not ready");
+    Com_Printf("  FSR3 FI/OF: requested=%s backend=%s context=%s active=%s "
+               "rendered=%.1f generated=%.1f\n",
+        cvar_flt_frame_generation && cvar_flt_frame_generation->integer ? "on" : "off",
+        cvar_flt_frame_generation_backend &&
+                cvar_flt_frame_generation_backend->integer == 1
+            ? "SDK 3.1.6" : "FSR3 1.1.4",
+        (cvar_flt_frame_generation_backend &&
+         cvar_flt_frame_generation_backend->integer == 1
+            ? fsr3_316_frame_generation_context_ok
+            : fsr3_frame_generation_context_ok) ? "ready" : "not ready",
+        cvar_flt_frame_generation_active && cvar_flt_frame_generation_active->integer
+            ? "yes" : "no",
+        cvar_flt_frame_generation_rendered_fps
+            ? cvar_flt_frame_generation_rendered_fps->value : 0.0f,
+        cvar_flt_frame_generation_generated_fps
+            ? cvar_flt_frame_generation_generated_fps->value : 0.0f);
+#else
+    Com_Printf("  FSR3: not compiled\n");
+#endif
+
+    Com_Printf("  FSR4: backend=%s context=%s provider=source-v07 "
+               "model=%s tier=%s passes=%u\n",
+        fsr4_backend_ok ? "ready" : "not ready",
+        fsr4_context_ok ? "ready" : "not ready",
+        fsr4_shader_model[0] ? fsr4_shader_model : "none",
+        fsr4_shader_tier[0] ? fsr4_shader_tier : "none",
+        FFX_FSR4_VK_PASS_COUNT);
+    Com_Printf("  FSR4 permutation: INT8/DOT4, HDR linear, view-Z positive, "
+               "motion current-to-previous jitter-free, RCAS=%.2f auto-exposure=%s DRS=%s\n",
+        cvar_flt_fsr4_sharpening ? cvar_flt_fsr4_sharpening->value : 0.0f,
+        cvar_flt_fsr4_auto_exposure && cvar_flt_fsr4_auto_exposure->integer
+            ? "on" : "off",
+        fsr4_dynamic_resolution_requested() ? "on" : "off");
+    if (fsr4_backend_ok && fsr4_backend.fpGetEffectGpuMemoryUsage) {
+        FfxApiEffectMemoryUsage memory_usage = {0};
+        FfxErrorCode memory_result = fsr4_backend.fpGetEffectGpuMemoryUsage(
+            &fsr4_backend, 0, &memory_usage);
+        if (memory_result == FFX_OK) {
+            size_t activation_bytes = ffxFsr4GetDot4ScratchSize(
+                qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+            Com_Printf("  FSR4 memory: %.2f MiB provider-owned, %.2f MiB activation scratch\n",
+                (double)memory_usage.totalUsageInBytes / (1024.0 * 1024.0),
+                (double)activation_bytes / (1024.0 * 1024.0));
+        } else {
+            Com_Printf("  FSR4 memory: unavailable (%d)\n", (int)memory_result);
+        }
+    }
+    Com_Printf("  active dispatch: %s\n", resolved ? "eligible" : "fallback");
+}
+
 void vkpt_fsr_init_cvars(void)
 {
     cvar_flt_upscaler     = Cvar_Get("flt_upscaler",     "0",   CVAR_ARCHIVE);
