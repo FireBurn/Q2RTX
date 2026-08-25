@@ -67,6 +67,14 @@ Current truth:
   full-frame coherent capture without VUID/error output:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_state_contract_20260825_validated.png`.
 
+- A post-RR-resource-change visual regression run selected FSR4 source-v07
+  Performance at 480x270 -> 960x540, reached history-valid temporal contract
+  v11/frame 797, and emitted no validation error. The capture is full colour
+  with a coherent HUD/viewmodel and no internal-resolution rectangle:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_v07_colour_after_rr.png`.
+  The on-screen label correctly says `FSR4 v07 INT8/DOT4 Performance`; do not
+  describe it as official FSR 4.1.1.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested
