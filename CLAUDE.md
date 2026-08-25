@@ -256,6 +256,15 @@ fence signals. This is the portable ownership boundary for descriptor sets,
 staged uploads, and host-visible constant-buffer partitions; do not restore a
 renderer-specific automatic pool rotation.
 
+Before every FSR4 dispatch, register each external image with
+`ffxFsr4VkSetExternalImageState`. `FfxApiResource` only transports a view, so
+the separate state record supplies the real image plus current and restored
+Vulkan layout/stage/access. The backend transitions imports to `GENERAL` for
+compute and restores them at unregister. Inputs must declare
+`FFX_API_RESOURCE_STATE_COMPUTE_READ`; output must declare
+`FFX_API_RESOURCE_STATE_UNORDERED_ACCESS`. Do not weaken this back into an
+implicit Q2RTX-only GENERAL-layout assumption.
+
 The FSR4 provider validates every supplied SPIR-V module's descriptor-set,
 binding, and descriptor-type ABI before it creates pipelines. Keep that
 fail-closed check when updating generated assets; the standalone layout test

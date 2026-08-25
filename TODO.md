@@ -37,6 +37,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   superset. Descriptor writes now fail before dispatch if any declared
   non-sampler slot is absent; the RX 6800M live path and all 34 standalone
   tests remain clean.
+- [x] Make FSR4 external-image state ownership explicit. The host registers
+  image/view plus current and restored Vulkan layout/stage/access before each
+  dispatch; the provider transitions to GENERAL, validates FFX read/UAV role,
+  and restores imports at unregister. Q2RTX supplies all four temporal images.
+  The RX 6800M test exercises a real `SHADER_READ_ONLY_OPTIMAL -> GENERAL ->
+  SHADER_READ_ONLY_OPTIMAL` round trip.
 - [x] Honor FFX float clear values in the Vulkan backend and initialize the
   sampled explicit-exposure fallback to 1.0 rather than zero; a subsequent
   RCAS-on live validation run passed on RX 6800M.

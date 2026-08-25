@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The reusable FSR4-v07 provider now owns an explicit external-image state
+  contract instead of silently assuming `GENERAL`. Before dispatch, the host
+  registers each view's `VkImage`, current layout/stage/access, and requested
+  restored state with `ffxFsr4VkSetExternalImageState`; FSR4 enters GENERAL for
+  compute and restores imports at unregister, while rejecting an abstract FFX
+  read/UAV role mismatch. Q2RTX registers color, motion, view-Z, and output.
+  The RX 6800M lifetime test records a real
+  `SHADER_READ_ONLY_OPTIMAL -> GENERAL -> SHADER_READ_ONLY_OPTIMAL` round trip;
+  the timed FSR4 Q2RTX launch completed after the change.
+
 - The source-v07 FSR4 provider now reflects each validated SPIR-V module into
   its own compact, binding-sorted descriptor-set layout. It uses an immutable
   sampler only where declared and rejects a dispatch before recording if a
@@ -999,9 +1009,8 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 ## Known risks and cautions
 
 - The reusable source-v07 FSR4 backend remains experimental and has fixed
-  limits; it now has explicit in-flight retirement and reflected ABI
-  validation, but still needs dynamically generated per-pipeline layouts and
-  resource-state tracking. Its provider-owned Vulkan
+  limits; it now has explicit in-flight retirement, reflected per-pipeline
+  layouts, and explicit imported-image state tracking. Its provider-owned Vulkan
   allocation accounting is live and verified at 960x540.
 - Conventional device depth is available only for single-device rendering and
   is now inspectable through the temporal-input diagnostic. Device-group input

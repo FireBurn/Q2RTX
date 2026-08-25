@@ -2254,6 +2254,7 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
     ffxDispatchDescUpscale d;
     ffxReturnCode_t dispatch_result;
     bool preserve_drs_history;
+    VkResult state_result;
     char temporal_reason[128];
     VkImageSubresourceRange color_range = {
         VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
@@ -2334,25 +2335,71 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
         );
     }
 
+    /* FfxApiResource carries only a VkImageView, so the reusable backend
+     * cannot infer the image/layout that needs transitioning or restoring.
+     * Q2RTX has just established GENERAL+compute-read for these three inputs;
+     * register that explicit contract, and keep output GENERAL for the
+     * following copy-to-TAA path. */
+#define REGISTER_FSR4_IMAGE(image_handle, image_view, current_access, final_access) \
+    do {                                                                        \
+        FfxFsr4VkExternalImageState state = {                                  \
+            .structSize = sizeof(state),                                       \
+            .image = (image_handle),                                           \
+            .view = (image_view),                                              \
+            .layout = VK_IMAGE_LAYOUT_GENERAL,                                 \
+            .stageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,                 \
+            .accessMask = (current_access),                                    \
+            .restoreLayout = VK_IMAGE_LAYOUT_GENERAL,                          \
+            .restoreStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,          \
+            .restoreAccessMask = (final_access),                               \
+        };                                                                      \
+        state_result = ffxFsr4VkSetExternalImageState(&fsr4_backend, &state);  \
+        if (state_result != VK_SUCCESS) {                                      \
+            END_PERF_MARKER(cmd_buf, PROFILER_FSR);                             \
+            fsr4_reset_next = true;                                            \
+            Com_WPrintf("FSR4: external image state rejected (%s)\\n",       \
+                        qvk_result_to_string(state_result));                   \
+            return state_result;                                               \
+        }                                                                       \
+    } while (0)
+    REGISTER_FSR4_IMAGE(frame->inputs.scene_color.image,
+                        frame->inputs.scene_color.view,
+                        VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
+    REGISTER_FSR4_IMAGE(frame->inputs.motion_vectors.image,
+                        frame->inputs.motion_vectors.view,
+                        VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
+    REGISTER_FSR4_IMAGE(frame->inputs.view_z.image,
+                        frame->inputs.view_z.view,
+                        VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
+    REGISTER_FSR4_IMAGE(qvk.images[VKPT_IMG_FSR_EASU_OUTPUT],
+                        qvk.images_views[VKPT_IMG_FSR_EASU_OUTPUT],
+                        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+#undef REGISTER_FSR4_IMAGE
+
     memset(&d, 0, sizeof(d));
     d.header.type = FFX_API_DISPATCH_DESC_TYPE_UPSCALE;
     d.commandList = (FfxCommandList)cmd_buf;
 
-#define FILL_TEMPORAL_TEX(field, temporal_image, ffx_format)                    \
+#define FILL_TEMPORAL_TEX(field, temporal_image, ffx_format, ffx_state)         \
     do {                                                                         \
         d.field.resource = (void *)(temporal_image).view;                        \
         d.field.description.type = FFX_RESOURCE_TYPE_TEXTURE2D;                  \
         d.field.description.format = (ffx_format);                               \
         d.field.description.width = (temporal_image).allocation_extent.width;    \
         d.field.description.height = (temporal_image).allocation_extent.height;  \
+        d.field.state = (ffx_state);                                             \
     } while (0)
 
     FILL_TEMPORAL_TEX(color, frame->inputs.scene_color,
-                      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT);
+                      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+                      FFX_API_RESOURCE_STATE_COMPUTE_READ);
     FILL_TEMPORAL_TEX(motionVectors, frame->inputs.motion_vectors,
-                      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT);
+                      FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT,
+                      FFX_API_RESOURCE_STATE_COMPUTE_READ);
     FILL_TEMPORAL_TEX(depth, frame->inputs.view_z,
-                      FFX_SURFACE_FORMAT_R32_FLOAT);
+                      FFX_SURFACE_FORMAT_R32_FLOAT,
+                      FFX_API_RESOURCE_STATE_COMPUTE_READ);
 #undef FILL_TEMPORAL_TEX
 
     d.output.resource = (void *)qvk.images_views[VKPT_IMG_FSR_EASU_OUTPUT];
@@ -2360,6 +2407,7 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
     d.output.description.format = FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT;
     d.output.description.width = qvk.extent_taa_images.width;
     d.output.description.height = qvk.extent_taa_images.height;
+    d.output.state = FFX_API_RESOURCE_STATE_UNORDERED_ACCESS;
 
     d.renderSize.width = frame->render_size.width;
     d.renderSize.height = frame->render_size.height;
