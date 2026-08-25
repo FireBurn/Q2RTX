@@ -25,6 +25,11 @@ other Vulkan applications.
   non-sampler descriptor bindings, emits the checked embedded C bundle, and
   rejects collisions; do not restore broad 1000/2000/3000 category shifts,
   which faulted RADV during pipeline creation.
+- `ffx-vulkan::effects` is both a vendored and installed C++ integration
+  target. Its installed export must expose only `include/` and versioned
+  targets—not `upstream/`, generated-source paths, or Q2RTX paths—and changes
+  to that export require the clean `examples/installed-full-stack` consumer
+  contract.
 
 ## Ground truth architecture
 

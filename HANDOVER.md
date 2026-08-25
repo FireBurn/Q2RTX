@@ -59,14 +59,13 @@ Current truth:
   `ffx-vulkan::fsr4-v07-vulkan` static library. Its versioned
   `ffxFsr4V07…` API receives a caller-installed `FfxInterface` only during
   context creation, avoiding both Q2RTX globals and AMD SDK symbol collisions.
-  The dependency-complete FSR4 subset installs/exports a CMake package and its
-  downstream consumer contract passed. Full FSR3 remains intended for vendored
-  `add_subdirectory` use because its pinned SDK closure is not yet a
-  dependency-complete installed export. `ffx-vulkan::effects` is the matching
-  convenience integration target for the complete vendored FSR3.1.4/3.1.5/
-  3.1.6 + FSR4-v07 set, and `examples/full-stack` is a separate buildable
-  downstream contract. It deliberately needs a C+C++ host project. This
-  remains experimental v07, never FSR4.1.1/RR/MLFG.
+  `ffx-vulkan::effects` is the matching convenience integration target for the
+  complete FSR3.1.4/3.1.5/3.1.6 + FSR4-v07 set. The target closure is now also
+  installable: its private SDK sources compile into the package, which exports
+  only versioned public targets and `include/`, so a clean C++ consumer has no
+  Q2RTX/source-tree include dependency. `examples/full-stack` and the new
+  `examples/installed-full-stack` both passed on 2026-08-25. This remains
+  experimental v07, never FSR4.1.1/RR/MLFG.
 
 - `ffx-vulkan::framegeneration-presenter-policy` now exports the reusable
   window-system-neutral part of the FSR3 presentation contract: FIFO selection
@@ -941,26 +940,21 @@ acquire/copy/present cycle rather than a stale last-presented-image transition.
 
 ## Immediate next actions
 
-1. Link `extern/ffx-vulkan`'s public C upscaler into Q2RTX, map the temporal
-   scene color/device depth/motion/camera contract, dispatch one two-frame live
-   sequence, and preserve the existing fallback on any capability/error path.
-2. Add a central requested-versus-active resolver for Q2RTX/FSR3/experimental
-   FSR4, then replace the temporary FSR4 toggle with provider/quality controls
-   whose labels expose the actual active implementation and fallback reason.
-3. Run GPU-assisted validation and a RenderDoc frame; prove every FSR4 pass's
-   descriptors, initializer upload, activation ranges, barriers, and bounds.
-4. Expand live FSR4 coverage to resize/tier transitions, reset/map transition,
-   weapon and emissive motion, disocclusion, camera cuts, and long runs. Use
-   the now-present provider-history/reprojected/reconstructed-output and
-   temporal-input diagnostics to prove each case.
-5. Extend the corrected acquire/present lifecycle into an offscreen scene/UI
-   target, safe screenshot readback, and generated-frame presentation scheduler.
-6. Add discrete model-backed quality presets and validate SPD exposure across
-   abrupt lighting changes before treating the experimental control as mature.
-7. Build the portable analytical-FSR3 single-graphics-queue presenter/UI/pacing
-   system and integrate its already-validated compute API into Q2RTX.
-8. Continue measured 4.1.1/RR/ML-FG provider capture research in parallel; do
-   not relabel the current v07 model as 4.1.1.
+1. Obtain a Wayland-capable capture tool (or X11-enabled SDL build) and record
+   the live FSR4 pass graph. RenderDoc's available layer cannot attach to the
+   current Wayland-only SDL build; do not interpret that tooling limit as an
+   FSR4 dispatch failure.
+2. Expand FSR4 visual evidence across camera/weapon/emissive motion,
+   disocclusions, arbitrary resize, camera-cut reset, and long-duration runs.
+   The fresh WSI-safe screenshot path is available for this work.
+3. Validate frame interpolation at sustained >=60 rendered FPS, then exercise
+   camera cuts, alt-tab/loading, low-FPS hysteresis, HDR, and pacing/latency.
+4. Implement temporal input gathering for device-group rendering; the WSI
+   semaphore ownership is fixed, but depth/material temporal input gathering
+   remains single-GPU.
+5. Continue measured official 4.1.1/RR/ML-FG provider research. On this
+   RX 6800M/RADV/vkd3d setup the official API selects analytical FSR3 only;
+   do not relabel source-v07 FSR4 as 4.1.1 or claim RR/MLFG support.
 
 ## Latest diagnostic evidence (2026-08-25)
 

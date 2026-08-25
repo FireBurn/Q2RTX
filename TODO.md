@@ -199,6 +199,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 - [x] Add standalone `extern/ffx-vulkan` ABI, strict validators, capability
   probe, tests, license/provenance, and upstream import manifest.
+- [x] Export the complete FSR3 + source-v07 FSR4 target closure as an installed
+  CMake package. `ffx-vulkan::effects` now brings in the compiled private
+  FSR3.1.4, 3.1.5, and 3.1.6 FI/OF closures alongside FSR4 and presentation
+  policy without exposing source-tree include paths. A clean installed C++
+  consumer links and runs `examples/installed-full-stack`.
 - [x] Confirm RX 6800M prerequisites for FSR3 compute and analytical frame
   interpolation.
 - [x] Vendor the pinned MIT-licensed AMD FSR3 1.1.4 host runtime, pristine
