@@ -127,6 +127,12 @@ Q2RTX signal conventions currently exposed by the contract:
   that lobe was not traced). Later bounces remain associated with that first
   lobe. They are useful provider-neutral radiance groundwork, but do not
   substitute for dominant-visibility inputs.
+- `ffx-vulkan::rayregeneration-contract` validates a reusable Vulkan host's
+  RR-style image, alpha, camera, jitter, and motion metadata before a provider
+  is attached. It does not validate GPU pixels, record commands, or supply a
+  neural provider. Do not use a superficial Q2RTX call to it as evidence that
+  the renderer meets official RR input requirements; the dominant-light bridge
+  remains required.
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.

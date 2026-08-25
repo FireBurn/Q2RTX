@@ -505,7 +505,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   light visibility remains outstanding: the existing sunlight trace currently
   returns only binary visibility and its exact resolved emission is GPU-only,
   so do not publish host-side cvar colour as a false substitute. The official
-  neural provider also remains outstanding.
+  neural provider also remains outstanding. The reusable
+  `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
+  provider-neutral image/alpha/camera metadata ABI (with an installed-package
+  consumer test); it does not certify pixel contents or implement a provider.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes

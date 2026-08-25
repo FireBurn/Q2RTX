@@ -191,6 +191,18 @@ Current truth:
   sampled sun direction/radius. This requires a small explicit GPU-to-host or
   provider-facing metadata bridge; it must not add a duplicate ray trace.
 
+- `extern/ffx-vulkan` now exports the versioned, installable
+  `ffx-vulkan::rayregeneration-contract` static target. Its public C ABI
+  validates provider-neutral RR-style sampled image metadata: signed linear
+  depth, motion, compact material/albedo inputs, camera/motion/jitter/depth
+  metadata, radiance-partition alpha rules, and optional dominant-light data.
+  The contract is intentionally only a pre-provider validator: it cannot
+  inspect GPU pixels, record a dispatch, or make AMD's signed neural RR
+  provider available. Do not wire Q2RTX into it merely to claim coverage until
+  the dominant-light signal and every semantic bridge are complete. Its unit
+  test and both standalone/full-stack installed-consumer contracts pass; see
+  this milestone's commit for exact build evidence.
+
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.
   The prior safe-acquire-only code copied an arbitrary fresh image, producing
