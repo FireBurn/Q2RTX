@@ -35,7 +35,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Derive each v07 Vulkan pipeline's compact descriptor-set layout from its
   validated SPIR-V declarations rather than retaining a generic 44-binding
   superset. Descriptor writes now fail before dispatch if any declared
-  non-sampler slot is absent; the RX 6800M live path and all 34 standalone
+  non-sampler slot is absent; the RX 6800M live path and all 36 standalone
   tests remain clean.
 - [x] Make FSR4 external-image state ownership explicit. The host registers
   image/view plus current and restored Vulkan layout/stage/access before each
@@ -292,7 +292,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and luminance range through both OF and FI; Q2RTX selects scRGB in HDR mode.
   A physical HDR-surface run remains outstanding.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
-  passes 31/31. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
+  passes 36/36. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples
   the normalized vector in RG while Q2RTX preserves derivative metadata in BA.
   A separate scRGB-luminance smoke validates the HDR runtime constants.
@@ -419,7 +419,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   hazard, and same-queue order removes the former CPU replay wait. The reusable
   `ffx-vulkan::framegeneration-presenter-policy` target now exports the
   platform-neutral FIFO/image-count/acquired-pair/semaphore-ownership rules;
-  Q2RTX uses it and an installed-package consumer plus 34-test standalone
+  Q2RTX uses it and an installed-package consumer plus 36-test standalone
   suite pass. Full acquire/submit/present callback extraction remains pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
