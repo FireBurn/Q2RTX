@@ -207,6 +207,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FSR3.1.4, 3.1.5, and 3.1.6 FI/OF closures alongside FSR4 and presentation
   policy without exposing source-tree include paths. A clean installed C++
   consumer links and runs `examples/installed-full-stack`.
+  A distributor can now opt into a complete, validated v07 asset installation
+  with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
+  The package installs only the notice and six model-prefixed, manifest-backed
+  bundles under `share/ffx-vulkan/fsr4-v07`, then exposes that location through
+  `FFX_VK_FSR4_V07_ASSET_DIR`; unrelated neighbouring/extracted blobs are not
+  copied.
 - [x] Confirm RX 6800M prerequisites for FSR3 compute and analytical frame
   interpolation.
 - [x] Vendor the pinned MIT-licensed AMD FSR3 1.1.4 host runtime, pristine

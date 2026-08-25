@@ -151,6 +151,17 @@ Current truth:
   present `fsr4_shaders` directory as proof of a runnable installation. A
   fresh ebuild-equivalent system-dependency CMake configuration passed.
 
+- The standalone reusable `ffx-vulkan` package now offers the corresponding
+  explicit opt-in asset delivery path. A package builder supplies
+  `FFX_VK_PORTABLE_FSR4_V07_ASSET_DIR` and enables
+  `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS`; CMake verifies the notice and all
+  six initializer/pre-weight/manifest sets, installs only those model-prefixed
+  SPIR-V bundles under `share/ffx-vulkan/fsr4-v07`, and exposes the path as
+  `FFX_VK_FSR4_V07_ASSET_DIR` to `find_package` consumers. A standalone
+  reduced-closure build/install verified all six bundles and verified that
+  unrelated generic `fsr4_initializers.bin`/`fsr4_pre_weights.bin` files were
+  not copied.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested

@@ -327,6 +327,14 @@ For a Vulkan application that vendors this directory, prefer the documented
 and 3.1.6 targets, FSR4 v07, and the WSI policy without pretending that FSR4
 v07 is FSR 4.1.1. The host CMake project must enable both C and C++.
 
+`ffx-vulkan` normally ships no source-v07 model data. A distributor that has a
+matching licensed bundle can enable
+`FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` with
+`FFX_VK_PORTABLE_FSR4_V07_ASSET_DIR`; CMake must validate and install only the
+notice plus six model-prefixed SPIR-V/initializer/pre-weight/manifest sets.
+The installed package exposes its opt-in location as
+`FFX_VK_FSR4_V07_ASSET_DIR`; never copy arbitrary neighbouring blobs.
+
 FSR4 v07 callers must bracket every provider dispatch with
 `ffxFsr4VkBeginFrame(interface, frame_id)` and retire it with
 `ffxFsr4VkRetireFrame(interface, completed_frame_id)` only after their GPU
