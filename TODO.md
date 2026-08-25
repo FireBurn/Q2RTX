@@ -101,6 +101,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   reported the selected model active with Vulkan validation clean.
   Native AA and Balanced also received fresh 1280x720 RX 6800M live runs and
   reported their exact model labels with no validation errors.
+  A later live Performance→Quality change while SDK-3.1.6 FI/OF was active
+  exposed a resolver ordering bug: it reported a permanent pending model
+  switch before dispatch could rebuild. The resolver now calls the safe,
+  device-idle recreation before testing availability; the repeat selected the
+  Quality graph at 644x361 -> 960x540 and resumed active FI/OF with no
+  VUID/error and a coherent capture.
 - [x] Add the v07 DRS model to Q2RTX's existing bounded profiler-driven
   controller. It has its own validated graph/assets and never runs a static
   model at an arbitrary ratio; a 50%-bounded live RX 6800M run reported the DRS

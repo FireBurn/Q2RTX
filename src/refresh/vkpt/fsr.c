@@ -1163,6 +1163,24 @@ static bool resolve_upscaler(int *active, const char **reason)
     }
 #endif
 
+    /* A v07 preset owns its whole model graph, persistent images, and
+     * descriptors. Resolve it before reporting availability: otherwise a
+     * quality cvar change is rejected here and the dispatch path that normally
+     * rebuilds the graph is never reached. fsr4_recreate_context waits for the
+     * device before replacing a live backend, making this rare user-triggered
+     * transition safe even while earlier frames are in flight. */
+    if (fsr4_backend_ok && fsr4_context_ok &&
+        (strcmp(fsr4_shader_tier, display_res_tag()) != 0 ||
+         strcmp(fsr4_shader_model, fsr4_requested_model()) != 0)) {
+        VkResult recreate_result = fsr4_recreate_context();
+        if (recreate_result != VK_SUCCESS) {
+            *reason = fsr4_unavailable_reason[0]
+                ? fsr4_unavailable_reason
+                : "fallback: FSR4 v07 model rebuild failed";
+            return false;
+        }
+    }
+
     if (!fsr4_backend_ok || !fsr4_context_ok) {
         *reason = fsr4_unavailable_reason[0]
             ? fsr4_unavailable_reason

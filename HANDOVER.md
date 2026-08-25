@@ -77,6 +77,15 @@ Current truth:
   FSR3.1.4/3.1.5/3.1.6 FI/OF, FSR4-v07, temporal-lifecycle, RR-contract, and
   presenter-policy closure remains installable rather than merely in-tree.
 
+- A live source-v07 FSR4 Performance→Quality change while SDK-3.1.6 FI/OF was
+  active revealed that availability was tested before the graph-rebuild code
+  in dispatch, causing a permanent `quality model switch pending` fallback.
+  The resolver now safely invokes the existing device-idle rebuild first. The
+  corrected RX 6800M run rebuilt to 644x361 -> 960x540 Quality, resumed FI/OF,
+  reached history-valid v11/frame 1585 without VUID/error, and captured a
+  coherent scene:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_quality_switch_fiog.png`.
+
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, the most recent retained temporal reset frame/reason bits,

@@ -50,6 +50,10 @@ other Vulkan applications.
   valid intermediate image. The paired presenter must use the real scene for
   that one slot, including resets caused internally when the rate gate resumes;
   use `ffxVkFrameGenerationShouldPresentGenerated` and retain its policy test.
+- A source-v07 FSR4 model cvar change must rebuild before availability is
+  resolved. Do not leave graph recreation solely in the dispatch path: the
+  resolver otherwise rejects the mismatched old graph forever as a pending
+  model switch. `fsr4_recreate_context` owns the required device-idle hitch.
 - A binary semaphore passed to WSI can remain pending after its render fence.
   On either transition between ordinary and paired generated→real presentation,
   use `ffxVkFrameGenerationTransitionNeedsQuiescence` and wait for the present
