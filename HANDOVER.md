@@ -944,9 +944,10 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   runs selected the expected model in the live resolver and had no VUID,
   validation warning, or error.
 - A clean standalone `extern/ffx-vulkan` Debug configure/build then passed all
-  31 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
+  32 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
   backend, public 3.1.5 bridge, 3.1.6 FI/OF API variants, generated SPIR-V and
-  source hashes, FSR4 v07 asset selection, and Vulkan-validation smokes. The
+  source hashes, FSR4 v07 asset selection, Vulkan-validation smokes, and the
+  reusable generated-frame presenter policy. The
   first attempt correctly exposed a duplicate RenderDoc layer warning left by
   this session's failed capture registration; after removing only that
   session-created user manifest, the same unmodified build was fully clean.
@@ -957,6 +958,16 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   `VID_Init` before FSR4 dispatch. No `.rdc`, proprietary payload, or capture
   artifact was retained or committed. Complete the deferred pass audit with an
   X11-enabled SDL build or a Wayland-capable capture tool.
+- The April `Screenshot_20260417_022508.jpeg` and
+  `Screenshot_20260417_022520.jpeg` artifacts were rechecked. The latter's
+  large translucent old-scene rectangle is the former stale
+  history/reprojection resource-lifetime failure, rather than a normal
+  low-quality-upscale result. Fresh 2026-08-25 Quality, RCAS 0.50, and Native
+  AA captures at `/home/fireburn/Screenshot_FSR4_{current,RCAS_current,native_current}_20260825.png`
+  have coherent HUD/viewmodel and no old-frame rectangle or history trail.
+  The dark corridor is similarly soft in Native AA and Quality, so that view
+  does not evidence a remaining FSR4 temporal corruption or an RCAS failure.
+  These are local diagnostic artifacts and deliberately are not versioned.
 
 ## Known risks and cautions
 
