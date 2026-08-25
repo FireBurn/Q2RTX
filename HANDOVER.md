@@ -75,6 +75,13 @@ Current truth:
   The on-screen label correctly says `FSR4 v07 INT8/DOT4 Performance`; do not
   describe it as official FSR 4.1.1.
 
+- The matching post-RR-resource FSR3 analytical frame-generation run selected
+  native FSR3 1.1.4 plus active FIFO generated->real presentation at 90.9
+  logical FPS (minimum-render gate explicitly disabled for the smoke). It
+  reached temporal contract v11/history-valid frame 401 with no validation
+  error and a full-colour coherent HUD/viewmodel capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR3_FG_colour_after_rr.png`.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested
