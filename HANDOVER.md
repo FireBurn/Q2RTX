@@ -60,7 +60,10 @@ Current truth:
   ordinary reprojectable motion, including a float-safe FOV comparison. The
   standalone test covers each case and the Q2RTX client links the same target.
   A live free-camera/teleport capture is still needed to prove the end-to-end
-  game-input route.
+  game-input route. An attempted XTest mouse-lens jump did not reach the
+  Wayland SDL window (the retained reset remained the ordinary startup/map
+  reset at frame 11, `0xf3`); use a Wayland-native focused-input tool or a
+  controlled engine camera command rather than counting it as a cut test.
 
 - The post-link RX 6800M live regression is clean: the rebuilt Q2RTX client
   selected source-v07 FSR4 DRS plus active SDK-3.1.6 FI/OF, reached temporal
