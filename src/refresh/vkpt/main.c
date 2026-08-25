@@ -698,9 +698,13 @@ create_swapchain(void)
 	 * displays both in order. FIFO is universally available and preserves that
 	 * queueing contract; MAILBOX may replace the generated image and IMMEDIATE
 	 * may tear it. This correctness-first policy intentionally overrides the
-	 * normal low-latency mode while frame generation is requested. */
+	 * normal low-latency mode while frame generation is requested. A temporal
+	 * debug view replaces final presentation and suspends FG, so this must match
+	 * R_BeginFrame_RTX's policy or every debug frame recreates the swapchain. */
 	qvk.surf_framegen_fifo = cvar_flt_frame_generation &&
-		cvar_flt_frame_generation->integer != 0;
+		cvar_flt_frame_generation->integer != 0 &&
+		(!cvar_flt_temporal_debug_view ||
+		 cvar_flt_temporal_debug_view->integer == VKPT_TEMPORAL_DEBUG_OFF);
 
 	qvk.present_mode = ffxVkFrameGenerationSelectPresentMode(
 		qvk.surf_framegen_fifo, qvk.surf_vsync, avail_present_modes,

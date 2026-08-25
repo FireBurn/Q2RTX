@@ -154,6 +154,16 @@ Current truth:
   descriptor set while that set is still pending. The RX 6800M validation run
   above emitted no VUID/error.
 
+- Debug presentation now makes one shared swapchain-policy decision: temporal
+  input inspection disables both generated-frame presentation and its FIFO
+  swapchain request. Previously swapchain creation looked only at the raw FG
+  cvar while `R_BeginFrame_RTX` correctly disabled FG for debug, producing a
+  recreate/destroy/context-create loop every debug frame. A fresh RX 6800M
+  run with both FG and debug requested created contexts only for initial
+  640x480 startup and the intended 960x540 resize, then retained them through
+  frame 35 with history valid and no VUID/error:
+  `baseq2/logs/FSR_debug_context_20260825.log`.
+
 - After adding those presentation branches, a fresh RX 6800M
   `vk_validation=1` FSR3.1.6 generated→real FIFO run (debug view Off) again
   reached active presentation with no VUID/error and a coherent HUDless scene

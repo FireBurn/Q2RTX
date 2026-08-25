@@ -88,7 +88,9 @@ Q2RTX signal conventions currently exposed by the contract:
 - `flt_temporal_debug_view`: a presentation-only semantic inspector for every
   dense temporal input. It must use the input's `valid_extent`, not its
   allocation extent; it does not mutate provider state. It suspends analytical
-  frame generation and removes its FIFO swapchain request while nonzero.
+  frame generation and removes its FIFO swapchain request while nonzero. The
+  swapchain-creation and per-frame policy decisions must use that identical
+  condition; disagreement causes a resize/context-recreation loop.
   Values 10-12 additionally inspect current reconstructed FSR output and the
   FSR4-v07 provider's borrowed history/reprojected surfaces. Values 13-15
   inspect the provider-neutral Ray-Regeneration-compatible material inputs:
