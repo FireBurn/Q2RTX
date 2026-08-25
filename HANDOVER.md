@@ -88,6 +88,13 @@ Current truth:
   coherent, including the HUD and viewmodel:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_colour_after_rr.png`.
 
+- The combined FSR3.1.5 Quality + FSR3.1.4 analytical-FG path also passed a
+  fresh post-RR-resource RX 6800M smoke. It made the expected startup fallback
+  before a temporal contract existed, then reached active FIFO presentation at
+  v11/history-valid frame 402 with no VUID/error. The 960x540 result is full
+  colour and coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_FG_colour_after_rr.png`.
+
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
   would otherwise be paired with the new host descriptor layout and produce a
