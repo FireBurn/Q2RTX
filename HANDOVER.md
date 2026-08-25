@@ -946,13 +946,20 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   The new RX 6800M lifetime test fills all three slots, rejects the unsafe
   fourth record, retires one completed ID, and then safely reuses it; a live
   Quality run remained active without VUID, validation warning, or error.
+- Every FSR4 v07 module now has a dependency-free reflected ABI check before
+  pipeline creation. It fails closed on an unexpected descriptor set, binding,
+  or descriptor type rather than pairing an updated shader bundle with the
+  old layout silently. The portable test covers all 288 generated
+  preset/tier/pass modules and a deliberate pre-pass-as-model-pass mismatch;
+  Q2RTX's menu-size and gameplay-size Quality contexts both passed it on the
+  RX 6800M with no validation output.
 - The same current build ran the separate Ultra Performance asset graph with
   RCAS 0.50 and SPD auto exposure, then the separate DRS asset graph at a
   fixed 50% controller range (with RCAS/SPD enabled). Both 960x540 RX 6800M
   runs selected the expected model in the live resolver and had no VUID,
   validation warning, or error.
 - A clean standalone `extern/ffx-vulkan` Debug configure/build then passed all
-  33 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
+  34 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
   backend, public 3.1.5 bridge, 3.1.6 FI/OF API variants, generated SPIR-V and
   source hashes, FSR4 v07 asset selection, Vulkan-validation smokes, and the
   reusable generated-frame presenter policy. The
@@ -980,8 +987,9 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 ## Known risks and cautions
 
 - The reusable source-v07 FSR4 backend remains experimental and has fixed
-  limits; it now has explicit in-flight retirement, but still needs reflected
-  per-pipeline layouts and resource-state tracking. Its provider-owned Vulkan
+  limits; it now has explicit in-flight retirement and reflected ABI
+  validation, but still needs dynamically generated per-pipeline layouts and
+  resource-state tracking. Its provider-owned Vulkan
   allocation accounting is live and verified at 960x540.
 - Conventional device depth is available only for single-device rendering and
   is now inspectable through the temporal-input diagnostic. Device-group input

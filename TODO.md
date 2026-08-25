@@ -27,6 +27,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   portable RX 6800M test fills all three unretired slots, rejects unsafe fourth
   reuse, and proves reuse only after retirement. A live FSR4 Quality run stays
   active with Vulkan validation clean.
+- [x] Fail closed when a supplied v07 SPIR-V module's reflected descriptor
+  set/binding/type declaration differs from the portable provider ABI. The
+  reusable checker validates all 288 generated modules across six presets and
+  three tensor tiers, plus a deliberate pass mismatch; context creation runs
+  it before pipeline creation.
 - [x] Honor FFX float clear values in the Vulkan backend and initialize the
   sampled explicit-exposure fallback to 1.0 rather than zero; a subsequent
   RCAS-on live validation run passed on RX 6800M.
@@ -381,7 +386,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   hazard, and same-queue order removes the former CPU replay wait. The reusable
   `ffx-vulkan::framegeneration-presenter-policy` target now exports the
   platform-neutral FIFO/image-count/acquired-pair/semaphore-ownership rules;
-  Q2RTX uses it and an installed-package consumer plus 33-test standalone
+  Q2RTX uses it and an installed-package consumer plus 34-test standalone
   suite pass. Full acquire/submit/present callback extraction remains pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run

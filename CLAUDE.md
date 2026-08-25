@@ -250,6 +250,11 @@ fence signals. This is the portable ownership boundary for descriptor sets,
 staged uploads, and host-visible constant-buffer partitions; do not restore a
 renderer-specific automatic pool rotation.
 
+The FSR4 provider validates every supplied SPIR-V module's descriptor-set,
+binding, and descriptor-type ABI before it creates pipelines. Keep that
+fail-closed check when updating generated assets; the standalone layout test
+must cover every model preset and tensor tier.
+
 The installed package also exports
 `ffx-vulkan::framegeneration-presenter-policy`. It contains only reusable WSI
 policy (FIFO selection, image-count/pair validation, and image/GPU semaphore
