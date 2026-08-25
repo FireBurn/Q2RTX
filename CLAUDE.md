@@ -198,9 +198,9 @@ queues unavailable on this machine; build a portable explicit presenter.
   separate descriptors, one UI upload, and queue order rather than a CPU replay
   wait. The reusable backend retains eight dynamic-view generations because FI
   records both Prepare and Dispatch per rendered frame; this fixed the prior
-  in-flight image-view VUID on the two-frame Q2RTX host. Rolling
-  rendered/generated presentation cadence is reported only after successful
-  WSI pairs; explicit WSI pacing and VRR/VSync policy are still required before
+  in-flight image-view VUID on the two-frame Q2RTX host. Q2RTX reports logical
+  rendered cadence and a nominal 2x generated rate only while a WSI pair was
+  active; explicit WSI pacing and VRR/VSync policy are still required before
   performance claims. The application must ensure GPU completion before destroying either
   context.
   It also contains the exact public SDK v2.3.0 FSR3.1.5 source closure under

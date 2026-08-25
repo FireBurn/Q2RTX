@@ -413,10 +413,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   suite pass. Full acquire/submit/present callback extraction remains pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
-  stayed active with no VUIDs. It now marks the presenter active and reports
-  rolling generated/rendered cadence only after an actual interpolated
-  generated→real WSI pair; a two-real-frame fallback cannot inflate the
-  diagnostics. When frame generation is requested, Q2RTX now recreates the
+  stayed active with no VUIDs. It marks the presenter active only after an
+  actual interpolated generated→real WSI pair, while the diagnostic cadence is
+  Q2RTX's completed logical-render rate (and a nominal 2x generated rate only
+  while active), never CPU submission timing for a WSI pair. When frame
+  generation is requested, Q2RTX now recreates the
   swapchain with mandatory FIFO pacing even if `vid_vsync` is off, so Mailbox
   cannot replace or Immediate tear a generated→real pair; the active status
   makes that policy explicit. A fresh `vid_vsync=0`, 1280x720 FSR3.1.5+FG

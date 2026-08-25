@@ -373,9 +373,10 @@ Current truth:
   clean on the RX 6800M.
 - Analytical Frame Generation compute is implemented and live-validated in the
   reusable Vulkan module. Q2RTX now has an experimental active two-acquire,
-  generated-then-real single-queue presentation path. Read-only rolling
-  rendered/generated presentation cadence is published only after successful
-  interpolated-generated→real pairs and resets on fallback. Frame-generation
+  generated-then-real single-queue presentation path. Presenter activity is
+  published only after an interpolated-generated→real pair; diagnostics instead
+  report logical rendered cadence and nominal 2x rate while active, avoiding
+  false claims from CPU WSI submission timing. Frame-generation
   requests now recreate the swapchain in FIFO mode—even with `vid_vsync 0`—so
   Mailbox/Immediate cannot discard or tear the pair; the active status exposes
   `FIFO pacing`. This is correctness-first WSI policy, not a finished
