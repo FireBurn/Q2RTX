@@ -404,8 +404,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   dispatch-failure, or fallback log entry. An in-process 1280x720 -> 960x540
   -> 1280x720 resize recreated the context at each extent with no validation
   or fallback message. The Quality preset's 67% input scale also produced a
-  coherent active 3.1.5 frame; camera-cut and broader image-quality coverage
-  remain.
+  coherent active 3.1.5 frame. A controlled 960x540 FSR3.1.5 + SDK-3.1.6
+  FI/OF camera-cut smoke recorded reset `0x800`, returned to a history-valid
+  v11/frame-1193 generated presentation without VUID/error, and captured a
+  coherent scene at
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  Weapon/emissive, physical-input, and broader image-quality coverage remain.
 - [x] Expose shared FSR3/FSR4 Native AA, Quality, Balanced, Performance, and
   Ultra Performance discrete render-ratio presets. FSR4 v07 selects a matching
   separately compiled model, rather than one graph at arbitrary scale.
@@ -490,7 +494,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   960x540 -> 800x600 -> 960x540 windowed transition rebuilt FSR4 Quality and
   resumed FI/OF after both resets with no VUID/error. Remaining work is a
   genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
-  cuts, alt-tab/loading, and broader lifecycle coverage.
+  cuts, alt-tab/loading, and broader lifecycle coverage. The same controlled
+  cut also passed with public FSR3.1.5 plus SDK-3.1.6 FI/OF, reaching
+  history-valid frame 1193 without VUID/error and a coherent capture at
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
 
 ## P3 — FSR 4.1.1 binary-provider research
 

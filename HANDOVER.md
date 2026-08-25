@@ -49,6 +49,11 @@ Current truth:
   provider-reset path that has valid engine camera history; it resumed active
   FI/OF at contract-v11/frame-910 with no VUID/error and a coherent capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_rate_recovery.png`.
+  The same controlled reset was repeated with public FSR3.1.5 upscaling plus
+  SDK-3.1.6 FI/OF: it retained reset `0x800`, returned to history-valid
+  contract-v11/frame-1193, reported active FIFO generation with no VUID/error,
+  and captured a coherent scene:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
 
 - The verified `pushmenu main` → `popmenu` lifecycle exposed a second real
   bug: resuming paired presentation could re-signal a binary render-finished
