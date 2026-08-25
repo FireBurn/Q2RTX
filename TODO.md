@@ -160,7 +160,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   only borrowed sampled image views after a successful FSR4 dispatch. A
   validation-enabled RX 6800M history capture is coherent and full-frame:
   `/home/fireburn/Screenshot_FSR4_v07_history_20260820.png`.
-- [ ] Support/gather temporal inputs for device-group rendering.
+- [-] Support/gather temporal inputs for device-group rendering. The generated
+  present now correctly indexes its render-finished semaphore by swapchain
+  image and GPU, but device-group depth/material input gathering itself remains
+  unimplemented.
 
 ## P2 — reusable native Vulkan FSR3
 

@@ -3977,7 +3977,12 @@ R_EndFrame_RTX(void)
 			Com_WPrintf("FSR3 FG: alpha UI target unavailable; using direct UI replay.\n");
 		}
 		VkCommandBuffer generated_cmd = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
-		VkSemaphore generated_signal = qvk.swap_chain_render_finished[generated_index];
+		/* render-finished semaphores are owned by swapchain image *and* GPU.
+		 * The generated present is submitted only on GPU 0, but indexing by just
+		 * the image aliases another GPU's semaphore on a device-group build and
+		 * permits an illegal re-signal while its presentation is still pending. */
+		VkSemaphore generated_signal = qvk.swap_chain_render_finished[
+			(size_t)generated_index * (size_t)qvk.device_count];
 		VkSemaphore generated_wait = qvk.semaphores[qvk.current_frame_index][0].image_available;
 		VkPipelineStageFlags generated_wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		uint32_t device_index = 0;

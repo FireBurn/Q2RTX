@@ -64,13 +64,21 @@ Current truth:
   reached active presentation with no VUID/error and a coherent HUDless scene
   plus replayed UI: `/home/fireburn/Screenshot_FSR3_FG_post_debug_20260820.png`.
 
+- The generated-present signal now uses the same `(swapchain image *
+  device_count + GPU)` ownership index as the real present. Previously the
+  generated path indexed by image alone: harmless on the RX 6800M single-GPU
+  run, but an illegal cross-GPU semaphore alias on device-group builds. The
+  corrected path passed a 45-second RX 6800M FSR3.1.6 FIFO run at 960x540,
+  reached active presentation, and logged no VUID, validation warning, or
+  error. Device-group temporal input gathering remains separately unsupported.
+
 - Presentation audit: `VKPT_IMG_TAA_OUTPUT` is already the dedicated
   display-resolution, tone-mapped-but-HUDless offscreen scene for both FI
   backends. The current presenter composes the same uploaded stretch-pic queue
-  once over each generated and real swapchain image, which is safe for Q2RTX's
-  direct UI. The remaining architectural gap is a reusable alpha UI texture
-  and compositor for non-replayable UI, external presentation, and safe
-  capture—not a missing HUDless scene target.
+  once into a reusable alpha texture and composites it over each generated and
+  real swapchain image. The remaining architectural work is extending that
+  contract to externally presented/non-Q2 UI and safe screenshot readback—not
+  creating another HUDless scene target.
 
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
