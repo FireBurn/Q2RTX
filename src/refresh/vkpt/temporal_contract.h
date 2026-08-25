@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 9u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 10u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -220,6 +220,10 @@ typedef struct VkptTemporalCamera_s {
 	 * frame interpolation needs these at high precision for camera-motion
 	 * classification; they are intentionally not inferred by a provider. */
 	float position[3];
+	/* Current world-space position minus the prior presented frame's position.
+	 * It is zero on the first/discontinuous frame, which is separately marked
+	 * by reset_reasons.  Providers must not infer this from view matrices. */
+	float position_delta[3];
 	float up[3];
 	float right[3];
 	float forward[3];
@@ -298,9 +302,9 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalImage rr_indirect_diffuse;
 	VkptTemporalImage rr_direct_specular;
 	VkptTemporalImage rr_indirect_specular;
-	/* Primary direct-sun blocker distance. This is diagnostic groundwork only:
-	 * it is not a complete RR dominant-light signal until exact sun emission is
-	 * exported alongside the sampled direction/radius. */
+	/* Primary direct-sun blocker distance. When the corresponding available bit
+	 * is set, exact resolved emission and sampled direction/radius are in
+	 * dominant_light_description. */
 	VkptTemporalImage rr_dominant_light_visibility;
 	VkptTemporalImage reactive_mask;
 	VkptTemporalImage transparency_and_composition_mask;

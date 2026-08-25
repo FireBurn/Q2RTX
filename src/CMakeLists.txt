@@ -587,6 +587,7 @@ IF (TARGET client)
             # latter is selected only by its explicit experimental cvar.
             TARGET_LINK_LIBRARIES(client
                 ffx-vulkan::portable
+                ffx-vulkan::rayregeneration-contract
                 ffx-vulkan::fsr4-v07-vulkan
                 ffx-vulkan::fsr3-vk-backend-3.1.5
                 ffx-vulkan::fsr3-vk-framegeneration-3.1.6)

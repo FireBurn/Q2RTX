@@ -504,11 +504,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Direct alpha remains the documented non-negative undefined value. The
   primary direct-sun trace now also preserves its real blocker distance in a
   dense `R16_SFLOAT` image (FP16_MAX exposed, negative untraced), without a
-  duplicate ray trace. Contract v9 pairs it with direction/radius and the
+  duplicate ray trace. Contract v10 pairs it with direction/radius and the
   exact resolved `sun_color_ubo` emission via the existing fence-retired
   primary-ray readback ring; it suppresses availability while that ring is
-  stale after a sky update. The official neural provider remains outstanding.
-  The reusable
+  stale after a sky update. The bridge exports real camera-position delta and
+  maps all complete inputs into the reusable validator; a live RX 6800M run
+  returned `issues=0x0` with dominant light included. The official neural
+  provider remains outstanding. The reusable
   `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package
   consumer test); it does not certify pixel contents or implement a provider.

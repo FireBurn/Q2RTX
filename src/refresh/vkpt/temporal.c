@@ -298,6 +298,14 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	frame->camera.position[0] = frame->camera.view_inverse[12];
 	frame->camera.position[1] = frame->camera.view_inverse[13];
 	frame->camera.position[2] = frame->camera.view_inverse[14];
+	if (temporal_state.have_previous_camera) {
+		frame->camera.position_delta[0] = frame->camera.position[0] -
+			temporal_state.previous_camera.position[0];
+		frame->camera.position_delta[1] = frame->camera.position[1] -
+			temporal_state.previous_camera.position[1];
+		frame->camera.position_delta[2] = frame->camera.position[2] -
+			temporal_state.previous_camera.position[2];
+	}
 
 	if (render_world && temporal_state.have_previous_camera &&
 		camera_cut_detected(&frame->camera, &temporal_state.previous_camera)) {
@@ -862,6 +870,12 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 			VKPT_TEMPORAL_MOTION_CURRENT_TO_PREVIOUS ||
 		!(frame->inputs.motion_description.to_render_pixels[0] > 0.0f) ||
 		!(frame->inputs.motion_description.to_render_pixels[1] > 0.0f) ||
+		!isfinite(frame->camera.position[0]) ||
+		!isfinite(frame->camera.position[1]) ||
+		!isfinite(frame->camera.position[2]) ||
+		!isfinite(frame->camera.position_delta[0]) ||
+		!isfinite(frame->camera.position_delta[1]) ||
+		!isfinite(frame->camera.position_delta[2]) ||
 		!(frame->camera.vertical_fov_radians > 0.0f) ||
 		!(frame->camera.view_space_to_meters > 0.0f))
 		return temporal_validation_fail(reason, reason_size,

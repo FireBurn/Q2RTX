@@ -179,7 +179,7 @@ Current truth:
   `baseq2/screenshots/RR_indirect_diffuse_hit_distance_20260825.png`.
   Diagnostics are in `baseq2/logs/RR_hit_distance_debug_20260825.log`.
 
-- Temporal contract v9 completes Q2RTX's provider-neutral dominant-light
+- Temporal contract v10 completes Q2RTX's provider-neutral dominant-light
   data bridge without tracing a second ray. The direct pass writes its actual
   primary sun blocker distance to `R16_SFLOAT` (FP16_MAX exposed; negative
   untraced), and the host now obtains the exact `sun_color_ubo.sun_color`
@@ -196,7 +196,13 @@ Current truth:
   `baseq2/screenshots/RR_dominant_sun_blocker_20260825.png`; log:
   `baseq2/logs/RR_dominant_sun_metadata_20260825.log`. This establishes the
   Q2RTX-side signal contract only, not availability of AMD's neural RR
-  provider.
+  provider. It now also publishes actual camera-position delta (rather than
+  asking a consumer to infer it from matrices) and maps the complete input set
+  into the installable `ffx-vulkan::rayregeneration-contract`. A fresh RX
+  6800M `vk_validation=1` FSR3 run reached v10/history-valid frame 113; the
+  reusable preflight returned `valid (issues=0x0; dominant light included)`
+  with no validation error. Evidence:
+  `baseq2/logs/RR_reusable_preflight_20260825.log`.
 
 - `extern/ffx-vulkan` now exports the versioned, installable
   `ffx-vulkan::rayregeneration-contract` static target. Its public C ABI

@@ -99,11 +99,13 @@ Q2RTX signal conventions currently exposed by the contract:
   indirect diffuse/specular radiance partitions. Values 20-21 visualize their
   first-lobe hit distances from alpha (black means untraced); view 22 shows
   the primary direct-sun blocker distance (black untraced, white FP16-max
-  exposed). Contract v9 pairs that image with the exact resolved GPU sun
+  exposed). Contract v10 pairs that image with the exact resolved GPU sun
   emission, surface-to-light direction, and angular radius only after the
   primary-ray readback ring has fence-retired the matching physical-sky
-  update. It remains provider-neutral groundwork, not proof that a neural RR
-  provider is active. Those two FSR4
+  update. It also exports actual camera-position delta and maps the complete
+  Q2RTX input set into `ffx-vulkan::rayregeneration-contract` for a live
+  provider-neutral preflight. It remains provider-neutral groundwork, not
+  proof that a neural RR provider is active. Those two FSR4
   private surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
   as general renderer resources or record writes to them.

@@ -27,6 +27,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #ifdef VKPT_FSR3
 #include "ffx_vk_portable.h"
 #include "ffx_vk_fsr3_3_1_5_bridge.h"
+#include "ffx_vk_rayregeneration_contract.h"
 #endif
 #include <math.h>
 
@@ -145,6 +146,8 @@ static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_motion;
 static FfxVkFsr3_3_1_5Resource fsr3_315_previous_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_output;
+static FfxVkPortableResult fsr3_validate_rayregeneration_inputs(
+    const VkptTemporalFrame *frame, uint64_t *issues);
 #endif
 
 static uint32_t align_up_8(uint32_t value)
@@ -1330,6 +1333,20 @@ void vkpt_fsr_print_diagnostics(void)
                     VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT
                 ? "sqrt" : "linear",
             frame->inputs.denoiser_material_description.material_type_count);
+#ifdef VKPT_FSR3
+		{
+			uint64_t rr_issues = 0;
+			const FfxVkPortableResult rr_result =
+				fsr3_validate_rayregeneration_inputs(frame, &rr_issues);
+			Com_Printf("  RR reusable Vulkan preflight: %s (issues=0x%llx%s)\n",
+				rr_result == FFX_VK_PORTABLE_OK ? "valid" : "rejected",
+				(unsigned long long)rr_issues,
+				(frame->inputs.available_inputs &
+					VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY)
+					? "; dominant light included" :
+					"; dominant light awaits matching sky readback");
+		}
+#endif
     }
 
 #ifdef VKPT_FSR3
@@ -1732,6 +1749,108 @@ static FfxVkPortableImage fsr3_temporal_image(
     result.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     result.state = state;
     return result;
+}
+
+/* Convert the Q2RTX temporal ABI to the standalone provider-neutral RR ABI.
+ * This intentionally only validates metadata: no neural provider is selected,
+ * and a future provider remains responsible for recording the read barriers
+ * that make these GENERAL-layout producer images COMPUTE_READ. */
+static FfxVkPortableResult
+fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
+    uint64_t *issues)
+{
+    const uint32_t required_inputs =
+        VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+        VKPT_TEMPORAL_INPUT_VIEW_Z |
+        VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL |
+        VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO |
+        VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO |
+        VKPT_TEMPORAL_INPUT_RR_DIRECT_DIFFUSE |
+        VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR |
+        VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE |
+        VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR;
+    FfxVkRayRegenerationInputs inputs;
+
+    if (!issues)
+        return FFX_VK_PORTABLE_ERROR_INVALID_POINTER;
+    *issues = 0;
+    if (!frame || frame->stage < VKPT_TEMPORAL_STAGE_INPUTS_READY ||
+        frame->stage > VKPT_TEMPORAL_STAGE_PRESENTED ||
+        (frame->inputs.available_inputs & required_inputs) != required_inputs) {
+        *issues = FFX_VK_RR_VALIDATION_REQUIRED_SIGNAL;
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+    }
+
+    memset(&inputs, 0, sizeof(inputs));
+    inputs.structSize = sizeof(inputs);
+    inputs.contractVersion = FFX_VK_RAYREGENERATION_CONTRACT_VERSION;
+    inputs.signalFlags = FFX_VK_RR_SIGNAL_DIRECT_DIFFUSE |
+        FFX_VK_RR_SIGNAL_DIRECT_SPECULAR |
+        FFX_VK_RR_SIGNAL_INDIRECT_DIFFUSE |
+        FFX_VK_RR_SIGNAL_INDIRECT_SPECULAR;
+    inputs.renderSize.width = frame->render_size.width;
+    inputs.renderSize.height = frame->render_size.height;
+    inputs.linearDepth = fsr3_temporal_image(&frame->inputs.view_z,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.motionVectors = fsr3_temporal_image(&frame->inputs.motion_vectors,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.normalsRoughnessMaterial = fsr3_temporal_image(
+        &frame->inputs.denoiser_normal_roughness_material,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.diffuseAlbedo = fsr3_temporal_image(
+        &frame->inputs.denoiser_diffuse_albedo,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.specularAlbedo = fsr3_temporal_image(
+        &frame->inputs.denoiser_specular_albedo,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.motionVectorScale.x =
+        frame->inputs.motion_description.to_render_pixels[0];
+    inputs.motionVectorScale.y =
+        frame->inputs.motion_description.to_render_pixels[1];
+    inputs.jitterOffset.x = frame->camera.jitter_render_pixels[0];
+    inputs.jitterOffset.y = frame->camera.jitter_render_pixels[1];
+    inputs.cameraPositionDelta.x = frame->camera.position_delta[0];
+    inputs.cameraPositionDelta.y = frame->camera.position_delta[1];
+    inputs.cameraPositionDelta.z = frame->camera.position_delta[2];
+    memcpy(inputs.view, frame->camera.view, sizeof(inputs.view));
+    memcpy(inputs.projection, frame->camera.projection_matrix,
+        sizeof(inputs.projection));
+    inputs.linearDepthMin = 0.0f;
+    inputs.linearDepthMax = frame->inputs.view_z_description.sky_value;
+    inputs.directDiffuse = fsr3_temporal_image(&frame->inputs.rr_direct_diffuse,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.directSpecular = fsr3_temporal_image(&frame->inputs.rr_direct_specular,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.indirectDiffuse = fsr3_temporal_image(
+        &frame->inputs.rr_indirect_diffuse,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.indirectSpecular = fsr3_temporal_image(
+        &frame->inputs.rr_indirect_specular,
+        FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+    inputs.directAlphaSemantic = FFX_VK_RR_ALPHA_NONNEGATIVE_UNDEFINED;
+    inputs.indirectAlphaSemantic = FFX_VK_RR_ALPHA_FIRST_LOBE_HIT_DISTANCE;
+    inputs.noHitDistance = frame->inputs.radiance_description.no_hit_distance;
+
+    if (frame->inputs.available_inputs &
+        VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY) {
+        const VkptTemporalDominantLightDescription *dominant =
+            &frame->inputs.dominant_light_description;
+        inputs.signalFlags |= FFX_VK_RR_SIGNAL_DOMINANT_LIGHT_VISIBILITY;
+        inputs.dominantLightVisibility = fsr3_temporal_image(
+            &frame->inputs.rr_dominant_light_visibility,
+            FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+        inputs.dominantLightDirection.x =
+            dominant->surface_to_light_direction[0];
+        inputs.dominantLightDirection.y =
+            dominant->surface_to_light_direction[1];
+        inputs.dominantLightDirection.z =
+            dominant->surface_to_light_direction[2];
+        inputs.dominantLightEmission.x = dominant->emission[0];
+        inputs.dominantLightEmission.y = dominant->emission[1];
+        inputs.dominantLightEmission.z = dominant->emission[2];
+        inputs.dominantLightAngularRadius = dominant->angular_radius_radians;
+    }
+    return ffxVkRayRegenerationValidateInputs(&inputs, issues);
 }
 
 static FfxVkPortableImage fsr3_output_image(void)
