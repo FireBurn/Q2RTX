@@ -70,6 +70,13 @@ Current truth:
   1579 with no VUID/error and a coherent `base2` capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_map_transition.png`.
 
+- The updated reusable `ffx-vulkan::effects` package was reinstalled into a
+  fresh temporary prefix after the reset-slot and mode-transition policy API
+  changes. An independent `examples/installed-full-stack` CMake consumer then
+  configured, linked, and ran using only that prefix; it proves the public
+  FSR3.1.4/3.1.5/3.1.6 FI/OF, FSR4-v07, temporal-lifecycle, RR-contract, and
+  presenter-policy closure remains installable rather than merely in-tree.
+
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, the most recent retained temporal reset frame/reason bits,
