@@ -127,6 +127,12 @@ Current truth:
   This is source-v07 FSR4 upscaling plus public analytical FSR3 FI/OF, not
   official FSR Frame Generation 4.0.1/MLFG.
 
+- The dynamic-size FSR4-v07 model also composes with SDK-3.1.6 analytical FG.
+  A RX 6800M `vk_validation=1` run selected `model=drs`, kept FSR4 DRS on,
+  reached active FIFO presentation at v11/history-valid frame 797, and emitted
+  no VUID/error. Its 960x540 capture is full colour and coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_DRS_FSR316_FG_smoke.png`.
+
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
   would otherwise be paired with the new host descriptor layout and produce a
