@@ -795,6 +795,20 @@ void vkpt_fsr_init_cvars(void);
  * temporal provider, its current resource contract, and frame-generation
  * state.  It is read-only and safe while a frame is in flight. */
 void vkpt_fsr_print_diagnostics(void);
+
+/* Read-only snapshot of the renderer-owned dynamic-resolution controller.
+ * Temporal providers use this only for diagnostics; it does not update the
+ * controller or alter the current render extent. */
+typedef struct VkptDrsDiagnostics {
+    bool enabled;
+    int current_scale;
+    int effective_scale;
+    int target_fps;
+    int min_scale;
+    int max_scale;
+} VkptDrsDiagnostics;
+void vkpt_drs_get_diagnostics(VkptDrsDiagnostics *diagnostics);
+
 extern cvar_t *cvar_flt_fsr_enable;
 extern cvar_t *cvar_flt_upscaler;
 extern cvar_t *cvar_flt_fsr_quality;

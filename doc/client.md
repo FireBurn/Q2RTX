@@ -790,7 +790,9 @@ resets temporal history when it changes. During normal adaptive render-size
 transitions, the dedicated DRS model preserves its display-sized recurrent
 history; camera cuts, settings, projection, display-size, and presentation
 gaps still reset it. Static FSR4 models are never dispatched at a DRS ratio.
-The DRS model is experimental and is not FSR 4.1.1.
+The read-only `fsr_diagnostics` command reports the controller's current and
+effective scale, target, and bounds whenever this model is selected. The DRS
+model is experimental and is not FSR 4.1.1.
 
 #### `flt_fsr3_sharpening`
 

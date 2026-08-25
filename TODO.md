@@ -611,8 +611,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Log provider/effect version, backend, model, active permutation, input,
   and memory use. `fsr_diagnostics` is now a read-only in-game snapshot of the
   requested/resolved provider, temporal contract and image metadata, FSR3.1.4/
-  3.1.5/FI backend state, source-v07 model/tier/permutation, and active FSR4
-  allocation accounting. Both reusable FSR3 upscaler APIs now expose
+  3.1.5/FI backend state, source-v07 model/tier/permutation, current/effective
+  bounded DRS scale, and active FSR4 allocation accounting. Both reusable FSR3
+  upscaler APIs now expose
   SDK-reported effect-owned allocation totals; the SDK-3.1.5 bridge counts its
   exact Vulkan allocation sizes and reports zero aliasable bytes because it
   does not alias heaps. The 2026-08-25 RX 6800M Quality capture reported a

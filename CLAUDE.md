@@ -32,8 +32,9 @@ other Vulkan applications.
   contract.
 - Use the read-only `fsr_diagnostics` console command for a live provider
   audit. It must report the resolved provider/reason, temporal input contract,
-  current FSR4 model/permutation/memory, all FSR3/FI effect memory, and state
-  without mutating a context or recording GPU work.
+  current FSR4 model/permutation/memory, current/effective bounded DRS scale
+  when the DRS model is selected, all FSR3/FI effect memory, and state without
+  mutating a context or recording GPU work.
 - Frame-generation FPS telemetry must use completed logical-render cadence,
   never CPU duration between generated/real `vkQueuePresentKHR` submissions.
   A rate-gated fallback learns FI cost and requires that headroom on recovery;

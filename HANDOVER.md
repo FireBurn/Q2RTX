@@ -132,6 +132,13 @@ Current truth:
   reached active FIFO presentation at v11/history-valid frame 797, and emitted
   no VUID/error. Its 960x540 capture is full colour and coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_DRS_FSR316_FG_smoke.png`.
+  `fsr_diagnostics` now exposes the renderer's read-only current/effective DRS
+  controller scale plus target and bounds. A forced 240->30-FPS controller
+  transition proved the full lifecycle under active FI/OF: it reached
+  480x270/50% at frame 401, then recovered to 960x540/100% at frame 1034;
+  both states had a history-valid v11 contract and no VUID/error. The recovered
+  full-colour capture is:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_DRS_FG_transition_telemetry.png`.
 
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache

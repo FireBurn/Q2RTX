@@ -3681,6 +3681,19 @@ static void drs_process(void)
 	drs_effective_scale = drs_current_scale;
 }
 
+void vkpt_drs_get_diagnostics(VkptDrsDiagnostics *diagnostics)
+{
+	if (!diagnostics)
+		return;
+	memset(diagnostics, 0, sizeof(*diagnostics));
+	diagnostics->enabled = cvar_drs_enable && cvar_drs_enable->integer != 0;
+	diagnostics->current_scale = drs_current_scale;
+	diagnostics->effective_scale = drs_effective_scale;
+	diagnostics->target_fps = cvar_drs_target ? cvar_drs_target->integer : 0;
+	diagnostics->min_scale = cvar_drs_minscale ? cvar_drs_minscale->integer : 0;
+	diagnostics->max_scale = cvar_drs_maxscale ? cvar_drs_maxscale->integer : 0;
+}
+
 void
 R_BeginFrame_RTX(void)
 {

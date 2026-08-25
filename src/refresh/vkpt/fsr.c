@@ -1446,6 +1446,15 @@ void vkpt_fsr_print_diagnostics(void)
         cvar_flt_fsr4_auto_exposure && cvar_flt_fsr4_auto_exposure->integer
             ? "on" : "off",
         fsr4_dynamic_resolution_requested() ? "on" : "off");
+    if (fsr4_dynamic_resolution_requested()) {
+        VkptDrsDiagnostics drs;
+        vkpt_drs_get_diagnostics(&drs);
+        Com_Printf("  FSR4 DRS controller: enabled=%s current=%d%% effective=%d%% "
+                   "target=%d FPS bounds=%d..%d%%\n",
+            drs.enabled ? "on" : "off", drs.current_scale,
+            drs.effective_scale, drs.target_fps, drs.min_scale,
+            drs.max_scale);
+    }
     if (fsr4_backend_ok && fsr4_backend.fpGetEffectGpuMemoryUsage) {
         FfxApiEffectMemoryUsage memory_usage = {0};
         FfxErrorCode memory_result = fsr4_backend.fpGetEffectGpuMemoryUsage(
