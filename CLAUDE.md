@@ -96,6 +96,12 @@ image transitions must use HOST -> ALL_COMMANDS before the copy and
 ALL_COMMANDS -> HOST afterwards: a generic ALL_COMMANDS -> ALL_COMMANDS
 barrier is invalid when either access mask is `HOST_READ`.
 
+Generated/real WSI acquisition goes through
+`ffxVkFrameGenerationAcquirePair`. If its second acquire cannot form a pair,
+the first image remains acquired and must be rendered/presented as the normal
+one-image fallback; do not acquire a third image or reuse the un-signalled
+second semaphore.
+
 Q2RTX signal conventions currently exposed by the contract:
 
 - `FLAT_COLOR`: dense render-resolution RGBA16F linear HDR, stored at 128x

@@ -69,6 +69,17 @@ Current truth:
   validation clean and visually coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_framegen_menu_resume.png`.
 
+- The reusable presenter policy now exports the actual two-image-acquisition
+  outcome contract, not just arithmetic/policy helpers. Its host callback
+  supports core or device-group acquire calls, returns a valid generated/real
+  pair only for two distinct successful images, and preserves the first image
+  for normal presentation if the second acquisition fails. The standalone
+  policy test covers success, suboptimal, second-acquire fallback,
+  first-acquire failure, and duplicate-image rejection. Q2RTX's adapter uses
+  it; a fresh RX 6800M FSR3.1.5 + SDK-3.1.6 FI/OF camera-cut smoke passed with
+  no VUID/error and a coherent capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+
 - A real `gamemap base2` scene replacement (not a full server restart) kept
   source-v07 FSR4 plus SDK-3.1.6 FI/OF enabled. It retained the expected
   scene/menu reset `0x840`, then reached an eligible/history-valid v11 frame

@@ -3705,6 +3705,30 @@ void vkpt_drs_get_diagnostics(VkptDrsDiagnostics *diagnostics)
 	diagnostics->max_scale = cvar_drs_maxscale ? cvar_drs_maxscale->integer : 0;
 }
 
+/* Adapter for the reusable presenter policy. It keeps Q2RTX's device-group
+ * acquire path private while making the two-image result contract reusable by
+ * any Vulkan WSI host. */
+static VkResult
+acquire_framegen_swapchain_image(void *user_data, VkSemaphore image_available,
+	uint32_t *image_index)
+{
+	(void)user_data;
+#ifdef VKPT_DEVICE_GROUPS
+	VkAcquireNextImageInfoKHR acquire_info = {
+		.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR,
+		.swapchain = qvk.swap_chain,
+		.timeout = ~((uint64_t)0),
+		.semaphore = image_available,
+		.fence = VK_NULL_HANDLE,
+		.deviceMask = (1 << qvk.device_count) - 1,
+	};
+	return vkAcquireNextImage2KHR(qvk.device, &acquire_info, image_index);
+#else
+	return vkAcquireNextImageKHR(qvk.device, qvk.swap_chain, ~((uint64_t)0),
+		image_available, VK_NULL_HANDLE, image_index);
+#endif
+}
+
 void
 R_BeginFrame_RTX(void)
 {
@@ -3830,65 +3854,45 @@ R_BeginFrame_RTX(void)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"fallback: upscaler/frame-generation temporal contract unavailable");
 	qvk.framegen_generated_frame_ready = false;
-
-#ifdef VKPT_DEVICE_GROUPS
-	VkAcquireNextImageInfoKHR acquire_info = {
-		.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR,
-		.swapchain = qvk.swap_chain,
-		.timeout = (~((uint64_t) 0)),
-		.semaphore = qvk.semaphores[qvk.current_frame_index][0].image_available,
-		.fence = VK_NULL_HANDLE,
-		.deviceMask = (1 << qvk.device_count) - 1,
-	};
-
-	VkResult res_swapchain = vkAcquireNextImage2KHR(qvk.device, &acquire_info, &qvk.current_swap_chain_image_index);
-#else
-	VkResult res_swapchain = vkAcquireNextImageKHR(qvk.device, qvk.swap_chain, ~((uint64_t) 0),
-		qvk.semaphores[qvk.current_frame_index][0].image_available, VK_NULL_HANDLE, &qvk.current_swap_chain_image_index);
-#endif
-	if(res_swapchain == VK_ERROR_OUT_OF_DATE_KHR || res_swapchain == VK_SUBOPTIMAL_KHR) {
-		recreate_swapchain();
-		goto retry;
-	}
-	else if(res_swapchain != VK_SUCCESS) {
-		Com_EPrintf("Error %d in vkAcquireNextImageKHR\n", res_swapchain);
-	}
 	if (qvk.framegen_present_active) {
-		/* The first acquisition above becomes the generated-frame target. Acquire
-		 * the real-frame target with a distinct binary semaphore, then restore
-		 * current_swap_chain_image_index to the real image for the existing
-		 * renderer/framebuffers. */
-		qvk.framegen_generated_swap_chain_image_index = qvk.current_swap_chain_image_index;
-#ifdef VKPT_DEVICE_GROUPS
-		/* The FG swapchain requested minImageCount+2, so this is the deliberate
-		 * second acquired image of the display pair.  A zero-timeout probe made
-		 * FIFO/Mailbox discard generation whenever WSI had not returned a spare at
-		 * that exact instant.  Waiting here is safe: presentation can release one
-		 * of the reserved images independently of this frame's GPU submissions. */
-		acquire_info.timeout = ~((uint64_t)0);
-		acquire_info.semaphore = qvk.framegen_image_available[qvk.current_frame_index];
-		res_swapchain = vkAcquireNextImage2KHR(qvk.device, &acquire_info,
-			&qvk.current_swap_chain_image_index);
-#else
-		res_swapchain = vkAcquireNextImageKHR(qvk.device, qvk.swap_chain,
-			~((uint64_t)0), qvk.framegen_image_available[qvk.current_frame_index],
-			VK_NULL_HANDLE, &qvk.current_swap_chain_image_index);
-#endif
+		/* The shared callback helper preserves the first acquired image for a
+		 * one-image fallback if WSI cannot immediately reserve the real target. */
+		FfxVkFrameGenerationAcquiredPair pair;
+		VkResult res_swapchain = ffxVkFrameGenerationAcquirePair(
+			acquire_framegen_swapchain_image, NULL,
+			qvk.semaphores[qvk.current_frame_index][0].image_available,
+			qvk.framegen_image_available[qvk.current_frame_index],
+			qvk.num_swap_chain_images, &pair);
 		if (res_swapchain == VK_ERROR_OUT_OF_DATE_KHR || res_swapchain == VK_SUBOPTIMAL_KHR) {
 			recreate_swapchain();
 			goto retry;
 		}
-		if (res_swapchain != VK_SUCCESS ||
-			!ffxVkFrameGenerationValidateAcquiredPair(
-				qvk.framegen_generated_swap_chain_image_index,
-				qvk.current_swap_chain_image_index,
-				qvk.num_swap_chain_images)) {
+		if (res_swapchain != VK_SUCCESS || !pair.paired) {
 			if (res_swapchain != VK_NOT_READY)
 				Com_WPrintf("FSR3 FG: second swapchain acquisition failed; using real-frame fallback.\n");
-			qvk.current_swap_chain_image_index = qvk.framegen_generated_swap_chain_image_index;
+			if (!pair.generatedImageAcquired) {
+				Com_EPrintf("Error %d in vkAcquireNextImageKHR\n", res_swapchain);
+				return;
+			}
+			qvk.current_swap_chain_image_index = pair.generatedImageIndex;
 			qvk.framegen_present_active = false;
 			vkpt_fsr_frame_generation_publish_status(false,
 				"fallback: no second swapchain image available");
+		} else {
+			qvk.framegen_generated_swap_chain_image_index = pair.generatedImageIndex;
+			qvk.current_swap_chain_image_index = pair.realImageIndex;
+		}
+	} else {
+		VkResult res_swapchain = acquire_framegen_swapchain_image(NULL,
+			qvk.semaphores[qvk.current_frame_index][0].image_available,
+			&qvk.current_swap_chain_image_index);
+		if (res_swapchain == VK_ERROR_OUT_OF_DATE_KHR || res_swapchain == VK_SUBOPTIMAL_KHR) {
+			recreate_swapchain();
+			goto retry;
+		}
+		if (res_swapchain != VK_SUCCESS) {
+			Com_EPrintf("Error %d in vkAcquireNextImageKHR\n", res_swapchain);
+			return;
 		}
 	}
 

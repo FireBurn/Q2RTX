@@ -437,7 +437,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `ffx-vulkan::framegeneration-presenter-policy` target now exports the
   platform-neutral FIFO/image-count/acquired-pair/semaphore-ownership rules;
   Q2RTX uses it and an installed-package consumer plus 36-test standalone
-  suite pass. Full acquire/submit/present callback extraction remains pending.
+  suite pass. It now also exports callback-based two-image acquisition: a
+  failed second acquire leaves the first image explicitly available for the
+  correct one-image fallback, and Q2RTX's core/device-group adapter uses that
+  exact path. Generic render-submit/present callback extraction remains
+  pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
   stayed active with no VUIDs. It marks the presenter active only after an
