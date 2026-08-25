@@ -1141,6 +1141,8 @@ vkpt_pt_trace_lighting(VkCommandBuffer cmd_buf, float num_bounce_rays)
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_HF]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_SPEC]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_DIRECT_SPEC]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_DIFFUSE_DISTANCE]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_SPECULAR_DISTANCE]);
 
 	BUFFER_BARRIER(cmd_buf,
 		.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
@@ -1180,6 +1182,8 @@ vkpt_pt_trace_lighting(VkCommandBuffer cmd_buf, float num_bounce_rays)
 				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_LF_COCG]);
 				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_HF]);
 				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_SPEC]);
+				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_DIFFUSE_DISTANCE]);
+				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_SPECULAR_DISTANCE]);
 				BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_BOUNCE_THROUGHPUT]);
 
 				END_PERF_MARKER(cmd_buf, PROFILER_INDIRECT_LIGHTING_0 + bounce_ray);

@@ -84,6 +84,13 @@ void main()
     case 19u: /* RR raw indirect specular. */
         color = tonemap_debug(sample_value.rgb);
         break;
+    case 20u: /* RR indirect diffuse first-lobe hit distance. */
+    case 21u: /* RR indirect specular first-lobe hit distance. */
+        /* Negative alpha denotes an untraced lobe. Map the finite 10,000-unit
+         * sky miss and shorter physical hits into a readable grayscale. */
+        color = sample_value.a < 0.0 ? vec3(0.0) : vec3(
+            log2(sample_value.a + 1.0) / log2(10001.0));
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;

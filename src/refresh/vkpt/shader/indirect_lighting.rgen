@@ -40,7 +40,8 @@ indirect_lighting(
 	bool half_res, 
 	out vec3 bounce_direction,
 	out vec3 bounce_contrib,
-	out bool is_specular_ray)
+	out bool is_specular_ray,
+	out float bounce_hit_distance)
 {
     rng_seed = texelFetch(TEX_ASVGF_RNG_SEED_A, ipos, 0).r;
 	
@@ -58,6 +59,7 @@ indirect_lighting(
 		bounce_direction = vec3(0);
 		bounce_contrib = vec3(0);
 		is_specular_ray = false;
+		bounce_hit_distance = -1.0;
 		return;
 	}
 
@@ -233,6 +235,12 @@ indirect_lighting(
 	trace_geometry_ray(bounce_ray, true, bounce_cull_mask);
 
 	bounce_contrib = vec3(0);
+	/* RR's indirect signal alpha describes the first ray segment after the
+	 * current surface.  An environment miss is still a valid finite path, so
+	 * retain Q2RTX's explicit 10,000-unit trace limit rather than fabricating
+	 * an intersection distance. */
+	bounce_hit_distance = found_intersection(ray_payload_geometry)
+		? ray_payload_geometry.hit_distance : bounce_ray.t_max;
 
 	if(is_specular_ray)
 	{
@@ -488,13 +496,27 @@ main()
 	vec3 bounce_direction;
 	vec3 bounce_contrib;
 	bool is_specular_ray;
+	float bounce_hit_distance;
 
-	indirect_lighting(ipos, half_res, bounce_direction, bounce_contrib, is_specular_ray);
+	indirect_lighting(ipos, half_res, bounce_direction, bounce_contrib,
+		is_specular_ray, bounce_hit_distance);
 
 	if(any(isinf(bounce_contrib)) || any(isnan(bounce_contrib)) || any(isinf(bounce_direction)) || any(isnan(bounce_direction)) )
 		return;
 
 	bounce_contrib = clamp_output(bounce_contrib);
+
+	/* The initial BSDF choice separates the indirect diffuse and specular
+	 * signals.  Later bounces remain part of that same lobe, so their provider
+	 * input uses the first segment's physically traced distance. */
+	if (spec_bounce_index == 0u) {
+		if (is_specular_ray)
+			imageStore(IMG_PT_INDIRECT_SPECULAR_DISTANCE, ipos,
+				vec4(bounce_hit_distance));
+		else
+			imageStore(IMG_PT_INDIRECT_DIFFUSE_DISTANCE, ipos,
+				vec4(bounce_hit_distance));
+	}
 
 	if(all(equal(bounce_contrib, vec3(0))))
 		return;

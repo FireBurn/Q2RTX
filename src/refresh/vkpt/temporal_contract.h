@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 6u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 7u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -122,6 +122,15 @@ typedef enum VkptTemporalAlbedoEncoding_e {
 	 * select its non-gamma flag only after explicitly converting these inputs. */
 	VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT = 1
 } VkptTemporalAlbedoEncoding;
+
+/* Alpha semantics for the dense RR radiance partitions.  Direct radiance
+ * follows the FSR RR contract's non-negative-but-otherwise-undefined alpha.
+ * Indirect radiance carries the first segment length of its selected BSDF
+ * lobe; a negative value means that lobe was not traced this frame. */
+typedef enum VkptTemporalRadianceAlphaSemantic_e {
+	VKPT_TEMPORAL_RADIANCE_ALPHA_NONNEGATIVE_UNDEFINED = 0,
+	VKPT_TEMPORAL_RADIANCE_ALPHA_FIRST_LOBE_HIT_DISTANCE = 1
+} VkptTemporalRadianceAlphaSemantic;
 
 typedef enum VkptTemporalProjection_e {
 	VKPT_TEMPORAL_PROJECTION_RECTILINEAR = 0,
@@ -247,6 +256,16 @@ typedef struct VkptTemporalDenoiserMaterialDescription_s {
 	uint32_t material_type_count;
 } VkptTemporalDenoiserMaterialDescription;
 
+typedef struct VkptTemporalRadianceDescription_s {
+	uint32_t struct_size;
+	uint32_t direct_alpha_semantic;
+	uint32_t indirect_alpha_semantic;
+	/* Q2RTX's finite ray length used for an environment/sky miss. */
+	float no_hit_distance;
+	/* The stored indirect distance is from the first indirect ray segment. */
+	uint32_t indirect_distance_bounce_index;
+} VkptTemporalRadianceDescription;
+
 typedef struct VkptTemporalInputs_s {
 	uint32_t struct_size;
 	uint32_t available_inputs;
@@ -272,6 +291,7 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalDepthDescription view_z_description;
 	VkptTemporalDepthDescription device_depth_description;
 	VkptTemporalDenoiserMaterialDescription denoiser_material_description;
+	VkptTemporalRadianceDescription radiance_description;
 } VkptTemporalInputs;
 
 typedef struct VkptTemporalUiDescription_s {

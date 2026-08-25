@@ -164,6 +164,21 @@ Current truth:
   denoiser: `baseq2/screenshots/RR_direct_diffuse_20260825.png`. This exposes
   the renderer's raw partitions; it is not a claim of official RR support.
 
+- Temporal contract v7 completes the directly available RR radiance-alpha
+  data without inventing a signal: the alpha of each indirect partition is the
+  physically traced first lobe segment distance. A sky/environment miss uses
+  Q2RTX's explicit finite `10000` trace distance; a lobe not traced this frame
+  is negative. Direct alpha remains non-negative but otherwise undefined, per
+  AMD's current contract. This first-segment association remains correct for
+  Q2RTX's later-bounce energy accumulation. Dominant-light visibility is the
+  remaining signal-level gap; official RR itself remains DX12/RX9000-only.
+  The menu's views 20/21 present the two alpha channels as log-scaled
+  grayscale for inspection. A 960x540 RX 6800M `vk_validation=1` v7 run
+  reached history-valid frame 23 with no VUID/error and a populated diffuse
+  distance capture:
+  `baseq2/screenshots/RR_indirect_diffuse_hit_distance_20260825.png`.
+  Diagnostics are in `baseq2/logs/RR_hit_distance_debug_20260825.log`.
+
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.
   The prior safe-acquire-only code copied an arbitrary fresh image, producing

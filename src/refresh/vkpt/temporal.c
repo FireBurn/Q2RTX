@@ -165,6 +165,8 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 		sizeof(frame->inputs.device_depth_description);
 	frame->inputs.denoiser_material_description.struct_size =
 		sizeof(frame->inputs.denoiser_material_description);
+	frame->inputs.radiance_description.struct_size =
+		sizeof(frame->inputs.radiance_description);
 	frame->ui.struct_size = sizeof(frame->ui);
 	initialize_image(&frame->inputs.scene_color);
 	initialize_image(&frame->inputs.motion_vectors);
@@ -176,6 +178,10 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 	initialize_image(&frame->inputs.denoiser_normal_roughness_material);
 	initialize_image(&frame->inputs.denoiser_diffuse_albedo);
 	initialize_image(&frame->inputs.denoiser_specular_albedo);
+	initialize_image(&frame->inputs.rr_direct_diffuse);
+	initialize_image(&frame->inputs.rr_indirect_diffuse);
+	initialize_image(&frame->inputs.rr_direct_specular);
+	initialize_image(&frame->inputs.rr_indirect_specular);
 	initialize_image(&frame->inputs.reactive_mask);
 	initialize_image(&frame->inputs.transparency_and_composition_mask);
 	initialize_image(&frame->ui.scene_target);
@@ -327,6 +333,12 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	frame->inputs.denoiser_material_description.albedo_encoding =
 		VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT;
 	frame->inputs.denoiser_material_description.material_type_count = 4;
+	frame->inputs.radiance_description.direct_alpha_semantic =
+		VKPT_TEMPORAL_RADIANCE_ALPHA_NONNEGATIVE_UNDEFINED;
+	frame->inputs.radiance_description.indirect_alpha_semantic =
+		VKPT_TEMPORAL_RADIANCE_ALPHA_FIRST_LOBE_HIT_DISTANCE;
+	frame->inputs.radiance_description.no_hit_distance = PRIMARY_RAY_T_MAX;
+	frame->inputs.radiance_description.indirect_distance_bounce_index = 0;
 
 	frame->ui.mode = VKPT_TEMPORAL_UI_DIRECT_AFTER_SCENE;
 
@@ -439,25 +451,29 @@ vkpt_temporal_mark_inputs_ready(void)
 		VKPT_IMG_TEMPORAL_RR_DIRECT_DIFFUSE, VK_FORMAT_R16G16B16A16_SFLOAT,
 		qvk.extent_screen_images, qvk.extent_render,
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
-		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	set_image(&frame->inputs.rr_indirect_diffuse,
 		VKPT_IMG_TEMPORAL_RR_INDIRECT_DIFFUSE, VK_FORMAT_R16G16B16A16_SFLOAT,
 		qvk.extent_screen_images, qvk.extent_render,
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
-		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	set_image(&frame->inputs.rr_direct_specular,
 		VKPT_IMG_TEMPORAL_RR_DIRECT_SPECULAR, VK_FORMAT_R16G16B16A16_SFLOAT,
 		qvk.extent_screen_images, qvk.extent_render,
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
-		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	set_image(&frame->inputs.rr_indirect_specular,
 		VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR, VK_FORMAT_R16G16B16A16_SFLOAT,
 		qvk.extent_screen_images, qvk.extent_render,
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
-		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	if (qvk.device_count == 1)
 		frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_NORMALS |
@@ -617,7 +633,7 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
 	if (cvar_flt_temporal_debug_view->integer >
-		VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR)
+		VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE)
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view %d",
 			cvar_flt_temporal_debug_view->integer);
@@ -685,6 +701,14 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		selected_image = VKPT_IMG_TEMPORAL_RR_DIRECT_SPECULAR;
 		break;
 	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR:
+		image = &frame->inputs.rr_indirect_specular;
+		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_DIFFUSE_HIT_DISTANCE:
+		image = &frame->inputs.rr_indirect_diffuse;
+		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_DIFFUSE;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE:
 		image = &frame->inputs.rr_indirect_specular;
 		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR;
 		break;
@@ -759,11 +783,19 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 		sizeof(frame->inputs.motion_description) ||
 		frame->inputs.denoiser_material_description.struct_size !=
 			sizeof(frame->inputs.denoiser_material_description) ||
+		frame->inputs.radiance_description.struct_size !=
+			sizeof(frame->inputs.radiance_description) ||
 		frame->inputs.denoiser_material_description.normal_encoding !=
 			VKPT_TEMPORAL_NORMAL_ENCODING_OCTAHEDRAL_UV ||
 		frame->inputs.denoiser_material_description.albedo_encoding !=
 			VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT ||
 		frame->inputs.denoiser_material_description.material_type_count != 4 ||
+		frame->inputs.radiance_description.direct_alpha_semantic !=
+			VKPT_TEMPORAL_RADIANCE_ALPHA_NONNEGATIVE_UNDEFINED ||
+		frame->inputs.radiance_description.indirect_alpha_semantic !=
+			VKPT_TEMPORAL_RADIANCE_ALPHA_FIRST_LOBE_HIT_DISTANCE ||
+		!(frame->inputs.radiance_description.no_hit_distance > 0.0f) ||
+		frame->inputs.radiance_description.indirect_distance_bounce_index != 0 ||
 		frame->inputs.motion_description.direction !=
 			VKPT_TEMPORAL_MOTION_CURRENT_TO_PREVIOUS ||
 		!(frame->inputs.motion_description.to_render_pixels[0] > 0.0f) ||

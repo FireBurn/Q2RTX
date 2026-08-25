@@ -241,6 +241,8 @@ vkpt_asvgf_filter(VkCommandBuffer cmd_buf, bool enable_lf)
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_LF_COCG]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_HF]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_COLOR_SPEC]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_DIFFUSE_DISTANCE]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_SPECULAR_DISTANCE]);
 
 	BEGIN_PERF_MARKER(cmd_buf, PROFILER_ASVGF_RECONSTRUCT_GRADIENT);
 

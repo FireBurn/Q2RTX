@@ -1297,6 +1297,10 @@ void vkpt_fsr_print_diagnostics(void)
 			&frame->inputs.rr_direct_specular);
 		fsr_print_temporal_image_diagnostic("RR indirect spec",
 			&frame->inputs.rr_indirect_specular);
+		Com_Printf("  RR radiance alpha: direct=non-negative undefined; "
+			"indirect=first-lobe hit distance (negative=untraced, sky=%.0f, bounce=%u)\n",
+			frame->inputs.radiance_description.no_hit_distance,
+			frame->inputs.radiance_description.indirect_distance_bounce_index);
         Com_Printf("  RR material encoding: normal=%s albedo=%s types=%u "
                    "(provider-neutral input foundation)\n",
             frame->inputs.denoiser_material_description.normal_encoding ==

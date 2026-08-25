@@ -96,8 +96,9 @@ Q2RTX signal conventions currently exposed by the contract:
   inspect the provider-neutral Ray-Regeneration-compatible material inputs:
   octahedral-normal/linear-roughness/category, sqrt diffuse albedo, and sqrt
   specular albedo respectively. Values 16-19 inspect Q2RTX's raw direct and
-  indirect diffuse/specular radiance partitions. Those two FSR4 private
-  surfaces must be
+  indirect diffuse/specular radiance partitions. Values 20-21 visualize their
+  first-lobe hit distances from alpha (black means untraced). Those two FSR4
+  private surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
   as general renderer resources or record writes to them.
 - `TEMPORAL_REACTIVE_MASK` and `TEMPORAL_COMPOSITION_MASK`: dense R8 UNORM
@@ -120,8 +121,12 @@ Q2RTX signal conventions currently exposed by the contract:
   high-frequency channel; indirect diffuse is Q2RTX's current low-frequency
   SH coefficient; direct specular is preserved before indirect accumulation;
   indirect specular is the nonnegative remaining combined SPEC energy. These
-  are useful provider-neutral radiance groundwork, but do not substitute for
-  per-lobe hit distance or dominant visibility inputs.
+  use the FSR RR-compatible alpha contract: direct alpha is non-negative and
+  otherwise undefined, while indirect alpha is the physically traced first
+  lobe segment distance (`10000` for Q2RTX's finite sky miss, negative when
+  that lobe was not traced). Later bounces remain associated with that first
+  lobe. They are useful provider-neutral radiance groundwork, but do not
+  substitute for dominant-visibility inputs.
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.

@@ -222,7 +222,8 @@ begin temporal_diagnostics
 		"Reactive mask" 5 "Composition mask" 6 "Normals" 7 "Albedo" 8 "Roughness" 9 \
 		"FSR output" 10 "FSR4 history" 11 "FSR4 reprojected" 12 \
 		"RR normal/rough/material" 13 "RR diffuse albedo" 14 "RR specular albedo" 15 \
-		"RR direct diffuse" 16 "RR indirect diffuse" 17 "RR direct specular" 18 "RR indirect specular" 19
+		"RR direct diffuse" 16 "RR indirect diffuse" 17 "RR direct specular" 18 "RR indirect specular" 19 \
+		"RR indirect diffuse distance" 20 "RR indirect specular distance" 21
     static --width 52 --status "active temporal-upscaler provider or the exact fallback reason" \
         "upscaler" flt_upscaler_reason
     static --width 52 --status "active analytical-frame-generation state or the exact suspension/fallback reason" \

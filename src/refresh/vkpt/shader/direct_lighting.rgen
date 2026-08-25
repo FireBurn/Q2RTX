@@ -168,4 +168,8 @@ main()
 	 * combined SPEC channel. A future decoupled denoiser needs this partition,
 	 * not just Q2RTX's final demodulated specular total. */
 	imageStore(IMG_PT_DIRECT_SPEC, ipos, uvec4(packRGBE(specular)));
+	/* The first indirect bounce fills exactly one of these lobe distances.
+	 * A negative value says that lobe has no valid ray this frame. */
+	imageStore(IMG_PT_INDIRECT_DIFFUSE_DISTANCE, ipos, vec4(-1.0));
+	imageStore(IMG_PT_INDIRECT_SPECULAR_DISTANCE, ipos, vec4(-1.0));
 }

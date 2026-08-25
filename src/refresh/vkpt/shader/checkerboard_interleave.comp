@@ -269,8 +269,9 @@ void main()
      * channel; INDIRECT_DIFFUSE is the current low-frequency SH coefficient;
      * DIRECT_SPECULAR is captured before indirect-lighting accumulation; the
      * remaining combined SPEC energy is the indirect specular partition.
-     * These are raw renderer signals, not a claim that every RR signal (notably
-     * hit distances and dominant visibility) is available yet. */
+     * These are raw renderer signals, not a claim that every RR signal is
+     * available. Indirect-lobe first-segment hit distances are retained in
+     * alpha; dominant-light visibility remains unavailable. */
     vec3 direct_diffuse = unpackRGBE(
         texelFetch(TEX_PT_COLOR_HF, ipos, 0).x) / STORAGE_SCALE_HF;
     vec3 indirect_diffuse = texelFetch(TEX_PT_COLOR_LF_SH, ipos, 0).rgb /
@@ -279,12 +280,17 @@ void main()
         texelFetch(TEX_PT_DIRECT_SPEC, ipos, 0).x) / STORAGE_SCALE_SPEC;
     vec3 total_specular = unpackRGBE(
         texelFetch(TEX_PT_COLOR_SPEC, ipos, 0).x) / STORAGE_SCALE_SPEC;
+    float indirect_diffuse_distance = texelFetch(
+        TEX_PT_INDIRECT_DIFFUSE_DISTANCE, ipos, 0).r;
+    float indirect_specular_distance = texelFetch(
+        TEX_PT_INDIRECT_SPECULAR_DISTANCE, ipos, 0).r;
     imageStore(IMG_TEMPORAL_RR_DIRECT_DIFFUSE, opos,
         vec4(max(direct_diffuse, vec3(0.0)), 1.0));
     imageStore(IMG_TEMPORAL_RR_INDIRECT_DIFFUSE, opos,
-        vec4(max(indirect_diffuse, vec3(0.0)), 1.0));
+        vec4(max(indirect_diffuse, vec3(0.0)), indirect_diffuse_distance));
     imageStore(IMG_TEMPORAL_RR_DIRECT_SPECULAR, opos,
         vec4(max(direct_specular, vec3(0.0)), 1.0));
     imageStore(IMG_TEMPORAL_RR_INDIRECT_SPECULAR, opos,
-        vec4(max(total_specular - direct_specular, vec3(0.0)), 1.0));
+        vec4(max(total_specular - direct_specular, vec3(0.0)),
+            indirect_specular_distance));
 }
