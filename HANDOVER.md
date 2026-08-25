@@ -95,6 +95,13 @@ Current truth:
   colour and coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_FG_colour_after_rr.png`.
 
+- The newer public FSR3.1.6 FI/OF backend passed the same current-layout
+  smoke with FSR3.1.5 Quality. It made the expected initialization fallback,
+  then reached active FIFO presentation at v11/history-valid frame 401
+  (83.3 logical FPS, gate disabled), with no VUID/error. Its 960x540 capture
+  is full colour and coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_colour_after_rr.png`.
+
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
   would otherwise be paired with the new host descriptor layout and produce a
