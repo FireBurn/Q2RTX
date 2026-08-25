@@ -4174,7 +4174,6 @@ R_EndFrame_RTX(void)
 			cvar_flt_frame_generation_backend->integer == 1
 				? "FSR3 3.1.6 FI/OF frame generation active (FIFO pacing)"
 				: "FSR3 1.1.4 frame generation active (FIFO pacing)");
-		vkpt_fsr_frame_generation_note_present_pair();
 	} else if (qvk.framegen_present_active && qvk.framegen_generated_frame_ready) {
 		vkpt_fsr_frame_generation_publish_status(false,
 			"fallback: generated or real present was rejected");

@@ -34,6 +34,11 @@ other Vulkan applications.
   audit. It must report the resolved provider/reason, temporal input contract,
   current FSR4 model/permutation/memory, all FSR3/FI effect memory, and state
   without mutating a context or recording GPU work.
+- Frame-generation FPS telemetry must use completed logical-render cadence,
+  never CPU duration between generated/real `vkQueuePresentKHR` submissions.
+  A rate-gated fallback learns FI cost and requires that headroom on recovery;
+  do not replace it with a simple threshold +2 loop, which oscillates when
+  disabling FI itself raises the frame rate.
 
 ## Ground truth architecture
 

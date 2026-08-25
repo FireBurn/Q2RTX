@@ -435,21 +435,20 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   publishes an inactive/zero-cadence status, resets history, and resumes a
   clean active presenter on return. Camera-cut, alt-tab/loading, low-FPS, and
   pacing coverage remain.
-- [ ] Validate frame interpolation at >=60 rendered FPS, including camera
+- [-] Validate frame interpolation at >=60 rendered FPS, including camera
   cuts, alt-tab, loading, and low-FPS hysteresis.
   The presenter's HDR mode now matches its post-tone-map HUDless source, and
   all temporal/acquire/present fallbacks explicitly reset FI/OF history before
   generation resumes. `flt_frame_generation_min_rendered_fps` defaults to 30,
-  pauses after four low completed frames, and resumes after eight frames at
-  threshold +2 FPS (0 is an explicit test override). Both open and forced-240
-  FPS fallback branches were live-validated at 1280x720 without VUIDs. A
-  2026-08-25 960x540 SDK-3.1.6 run with a requested 60-FPS threshold did reach
-  active generated→real presentation (84.2 rendered / 168.4 generated) with a
-  coherent screenshot and no VUID/error, but then repeatedly fell back and
-  recovered. The gate currently samples a timing value perturbed by the FIFO
-  two-present path, creating a feedback loop near the threshold. Measure an
-  ungenerated logical-render cadence before declaring high-rate/hysteresis
-  validation complete. Latency/pacing and broad lifecycle coverage remain.
+  pauses after four low logical frames, then requires eight high frames above
+  an adaptive re-enable floor (threshold +2 FPS plus measured FI cost; 0 is an
+  explicit test override). The telemetry no longer treats CPU submission of a
+  WSI pair as completed presentation rate. A 2026-08-25 960x540 SDK-3.1.6 run
+  stayed active at a 30-FPS floor (76.9 logical FPS), while the same scene at a
+  60-FPS floor settled in safe fallback after one probe rather than oscillating
+  (166.7 logical FPS versus a learned 181.6-FPS re-enable floor). Both runs
+  used validation with coherent screenshots and no VUID. Validate a genuinely
+  sustained >=60-FPS scene plus latency/pacing and broad lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research
 

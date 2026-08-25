@@ -814,7 +814,6 @@ void vkpt_fsr_retire(uint32_t frame_slot);
 bool vkpt_fsr_frame_generation_is_ready(void);
 bool vkpt_fsr_frame_generation_prepare_present(void);
 void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason);
-void vkpt_fsr_frame_generation_note_present_pair(void);
 VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf);
 /* Called after Q2RTX's per-slot submission fence signals, so the SDK 2.3
  * frame generator may safely free its retained imported-image views. */

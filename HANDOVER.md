@@ -10,16 +10,20 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
-- SDK-3.1.6 FI/OF did reach real generated→real WSI presentation on RX 6800M
-  at the requested 60-FPS gate (the diagnostic observed 84.2 rendered and
-  168.4 generated FPS) with a coherent 960x540 capture and no VUID/error:
-  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_60fps_20260825.png`.
-  Do not call the threshold policy validated: immediately afterwards it
-  repeatedly alternated active and `rendered input below 60 FPS` fallback.
-  The gate samples a timing value affected by FIFO's generated+real WSI pair,
-  creating feedback near the threshold. Replace it with an ungenerated
-  logical-render cadence measurement before closing the high-rate/hysteresis
-  TODO.
+- SDK-3.1.6 FI/OF reaches real generated→real WSI presentation on RX 6800M
+  with Vulkan validation and coherent 960x540 captures. The rate telemetry
+  and gate now use Q2RTX's completed logical-render cadence—not CPU submission
+  time for a generated/real WSI pair, which had misleadingly reported 84.2
+  rendered / 168.4 generated FPS. The `flt_frame_generation_rendered_fps`
+  cvar is logical input FPS; `generated_fps` is its nominal 2x rate only while
+  a generated pair was active. At a 30-FPS floor, SDK-3.1.6 remained active
+  (76.9 logical FPS) with no VUID/error:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_30fps_active_gate_20260825.png`.
+  At a 60-FPS floor this scene falls below the floor with FI enabled. The
+  adaptive recovery gate observed its enabled cost, briefly probed once, then
+  remained safely in real-frame fallback (logical 166.7 FPS, re-enable floor
+  181.6 FPS) rather than continuously oscillating; capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_60fps_steady_gate_20260825.png`.
 
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
@@ -388,12 +392,14 @@ Current truth:
   1280x720 RX 6800M generated→real run was active with Vulkan validation and
   no VUID/error output.
 - `flt_frame_generation_min_rendered_fps` defaults to 30 FPS and makes the
-  experimental presenter pause after four below-threshold completed frames;
-  eight samples at least 2 FPS above the threshold resume it. `0` explicitly
-  disables the gate for R&D and 60 reflects AMD's recommendation. Both the
-  open-gate and deliberately impossible 240-FPS fallback branches were live
-  validated at 1280x720 without a VUID; the local archived test setting was
-  restored to the 30-FPS default.
+  experimental presenter pause after four below-threshold logical frames.
+  Eight frames above an adaptive re-enable floor resume it; that floor starts
+  at threshold +2 FPS and incorporates the last measured FI cost, preventing
+  a borderline scene from repeatedly enabling FI only to fall under the same
+  threshold. `0` explicitly disables the gate for R&D and 60 reflects AMD's
+  recommendation. Both the open-gate and deliberately impossible 240-FPS
+  fallback branches were live validated at 1280x720 without a VUID; the local
+  archived test setting was restored to the 30-FPS default.
 - DXIL extraction/capture tooling is complete and tested; no extracted payload
   is checked into the repository.
 - The source-only official SDK 2.3 DX12 probe now cross-compiles under MinGW

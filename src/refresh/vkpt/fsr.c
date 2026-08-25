@@ -221,11 +221,21 @@ cvar_t *cvar_flt_frame_generation_reason = NULL;
 cvar_t *cvar_flt_frame_generation_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
 cvar_t *cvar_flt_temporal_debug_view = NULL;
-static unsigned fsr3_fg_last_present_msec;
-static float fsr3_fg_filtered_rendered_fps;
 static unsigned fsr3_fg_low_rate_frames;
 static unsigned fsr3_fg_recovery_frames;
 static bool fsr3_fg_rate_blocked;
+/* The presenter can ask more than once while handling one temporal frame.
+ * Hysteresis is defined in completed logical frames, never WSI operations. */
+static uint64_t fsr3_fg_last_rate_frame_id;
+static bool fsr3_fg_rate_frame_seen;
+/* A threshold can feed back on itself: disabling FI makes an otherwise
+ * borderline scene render more quickly. Keep a small per-enable cost model so
+ * the gate only retries when the ungenerated logical rate has enough headroom
+ * to remain above the requested floor after interpolation is enabled. */
+static float fsr3_fg_enable_baseline_fps;
+static float fsr3_fg_active_input_fps;
+static float fsr3_fg_recovery_required_fps;
+static float fsr3_fg_recovery_input_fps;
 cvar_t *cvar_flt_upscaler_active = NULL;
 cvar_t *cvar_flt_upscaler_reason = NULL;
 cvar_t *cvar_flt_fsr_sharpness = NULL;
@@ -1316,6 +1326,19 @@ void vkpt_fsr_print_diagnostics(void)
             ? cvar_flt_frame_generation_rendered_fps->value : 0.0f,
         cvar_flt_frame_generation_generated_fps
             ? cvar_flt_frame_generation_generated_fps->value : 0.0f);
+    {
+        const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+        const float minimum_fps = cvar_flt_frame_generation_min_rendered_fps
+            ? Q_clipf(cvar_flt_frame_generation_min_rendered_fps->value, 0.0f, 240.0f)
+            : 0.0f;
+        const float input_fps = frame && frame->frame_time_ms > 0.0f
+            ? 1000.0f / frame->frame_time_ms : 0.0f;
+        Com_Printf("  FSR3 FI/OF gate: logical=%.1f FPS threshold=%.1f "
+                   "re-enable=%.1f blocked=%s low=%u recovery=%u\n",
+            input_fps, minimum_fps, fsr3_fg_recovery_required_fps,
+            fsr3_fg_rate_blocked ? "yes" : "no",
+            fsr3_fg_low_rate_frames, fsr3_fg_recovery_frames);
+    }
     if (fsr3_316_frame_generation_context_ok && fsr3_316_frame_generation_context) {
         FfxVkFsr3_3_1_6FrameGenerationMemoryUsage usage = {0};
         FfxVkFsr3_3_1_6FrameGenerationResult result =
@@ -1433,6 +1456,11 @@ void vkpt_fsr_request_reset(void)
     fsr3_fg_low_rate_frames = 0;
     fsr3_fg_recovery_frames = 0;
     fsr3_fg_rate_blocked = false;
+    fsr3_fg_rate_frame_seen = false;
+    fsr3_fg_enable_baseline_fps = 0.0f;
+    fsr3_fg_active_input_fps = 0.0f;
+    fsr3_fg_recovery_required_fps = 0.0f;
+    fsr3_fg_recovery_input_fps = 0.0f;
 #endif
 }
 
@@ -1732,6 +1760,26 @@ bool vkpt_fsr_frame_generation_is_ready(void)
            qvk.extent_taa_output.height == qvk.extent_unscaled.height;
 }
 
+static void fsr3_frame_generation_publish_logical_rate(float input_fps,
+    bool active)
+{
+    char rendered_text[32];
+    char generated_text[32];
+
+    /* These status cvars describe the cadence of logical rendered frames, not
+     * CPU submission of a generated/real WSI pair. vkQueuePresentKHR may only
+     * enqueue both images, so timing it can report an impossible rate. */
+    Q_snprintf(rendered_text, sizeof(rendered_text), "%.1f", input_fps);
+    Q_snprintf(generated_text, sizeof(generated_text), "%.1f",
+        active ? input_fps * 2.0f : 0.0f);
+    if (cvar_flt_frame_generation_rendered_fps)
+        Cvar_SetByVar(cvar_flt_frame_generation_rendered_fps, rendered_text,
+            FROM_CODE);
+    if (cvar_flt_frame_generation_generated_fps)
+        Cvar_SetByVar(cvar_flt_frame_generation_generated_fps, generated_text,
+            FROM_CODE);
+}
+
 static bool fsr3_frame_generation_rate_is_eligible(void)
 {
     const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
@@ -1739,11 +1787,17 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
         ? Q_clipf(cvar_flt_frame_generation_min_rendered_fps->value, 0.0f, 240.0f)
         : 0.0f;
     float input_fps;
+    bool was_active;
 
     if (minimum_fps <= 0.0f) {
         fsr3_fg_low_rate_frames = 0;
         fsr3_fg_recovery_frames = 0;
         fsr3_fg_rate_blocked = false;
+        fsr3_fg_rate_frame_seen = false;
+        fsr3_fg_enable_baseline_fps = 0.0f;
+        fsr3_fg_active_input_fps = 0.0f;
+        fsr3_fg_recovery_required_fps = 0.0f;
+        fsr3_fg_recovery_input_fps = 0.0f;
         return true;
     }
     /* There is no completed frame-rate sample on first use. Let the normal
@@ -1751,23 +1805,64 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
     if (!frame || frame->frame_time_ms <= 0.0f || frame->frame_time_ms > 1000.0f)
         return !fsr3_fg_rate_blocked;
 
+    /* Generated/real presentation may re-enter this eligibility test. Count
+     * only the first check for a temporal frame so the documented four-low /
+     * eight-recovery hysteresis is not shortened by WSI work. */
+    if (fsr3_fg_rate_frame_seen && fsr3_fg_last_rate_frame_id == frame->frame_id)
+        return !fsr3_fg_rate_blocked;
+    fsr3_fg_last_rate_frame_id = frame->frame_id;
+    fsr3_fg_rate_frame_seen = true;
+
     input_fps = 1000.0f / frame->frame_time_ms;
+    was_active = cvar_flt_frame_generation_active &&
+        cvar_flt_frame_generation_active->integer != 0;
+    fsr3_frame_generation_publish_logical_rate(input_fps, was_active);
     if (!fsr3_fg_rate_blocked) {
+        if (was_active) {
+            fsr3_fg_active_input_fps = fsr3_fg_active_input_fps > 0.0f
+                ? fsr3_fg_active_input_fps * 0.75f + input_fps * 0.25f
+                : input_fps;
+        } else {
+            /* This is the last known no-FI rate immediately before a new
+             * activation attempt. It calibrates the cost model below. */
+            fsr3_fg_enable_baseline_fps = input_fps;
+            fsr3_fg_active_input_fps = 0.0f;
+        }
         if (input_fps < minimum_fps) {
             fsr3_fg_recovery_frames = 0;
-            if (++fsr3_fg_low_rate_frames >= 4u)
+            if (++fsr3_fg_low_rate_frames >= 4u) {
                 fsr3_fg_rate_blocked = true;
+                fsr3_fg_recovery_input_fps = 0.0f;
+                fsr3_fg_recovery_required_fps = minimum_fps + 2.0f;
+                if (fsr3_fg_enable_baseline_fps > 0.0f &&
+                    fsr3_fg_active_input_fps > 0.0f) {
+                    const float active_fraction = fsr3_fg_active_input_fps /
+                        fsr3_fg_enable_baseline_fps;
+                    if (active_fraction > 0.1f && active_fraction < 1.0f)
+                        fsr3_fg_recovery_required_fps = Q_clipf(
+                            minimum_fps / active_fraction + 2.0f,
+                            minimum_fps + 2.0f, 240.0f);
+                }
+            }
         } else {
             fsr3_fg_low_rate_frames = 0;
         }
-    } else if (input_fps >= minimum_fps + 2.0f) {
-        fsr3_fg_low_rate_frames = 0;
-        if (++fsr3_fg_recovery_frames >= 8u) {
-            fsr3_fg_recovery_frames = 0;
-            fsr3_fg_rate_blocked = false;
-        }
     } else {
-        fsr3_fg_recovery_frames = 0;
+        fsr3_fg_recovery_input_fps = fsr3_fg_recovery_input_fps > 0.0f
+            ? fsr3_fg_recovery_input_fps * 0.75f + input_fps * 0.25f
+            : input_fps;
+        if (input_fps >= fsr3_fg_recovery_required_fps) {
+            fsr3_fg_low_rate_frames = 0;
+            if (++fsr3_fg_recovery_frames >= 8u) {
+                fsr3_fg_recovery_frames = 0;
+                fsr3_fg_rate_blocked = false;
+                fsr3_fg_enable_baseline_fps = fsr3_fg_recovery_input_fps;
+                fsr3_fg_active_input_fps = 0.0f;
+                fsr3_fg_recovery_required_fps = 0.0f;
+            }
+        } else {
+            fsr3_fg_recovery_frames = 0;
+        }
     }
     return !fsr3_fg_rate_blocked;
 }
@@ -1778,20 +1873,13 @@ void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason)
     static char last_reason[128];
     char active_text[8];
 
-    /* Publishing a fallback must not leave the last active presentation rate
-     * in the diagnostics. The private estimator state is reset here on every
-     * transition away from an active generated→real presenter. */
+    /* A present/acquire/temporal fallback creates a discontinuity in the
+     * generated cadence. Do not reuse optical-flow or interpolation history
+     * when the two-image presenter becomes available again. Logical-rate
+     * diagnostics deliberately remain intact: they explain a rate-gate
+     * fallback and are not a completed-WSI timing estimate. */
     if (!active) {
-        /* A present/acquire/temporal fallback creates a discontinuity in the
-         * generated cadence. Do not reuse optical-flow or interpolation
-         * history when the two-image presenter becomes available again. */
         fsr3_frame_generation_reset_next = true;
-        fsr3_fg_last_present_msec = 0;
-        fsr3_fg_filtered_rendered_fps = 0.0f;
-        if (cvar_flt_frame_generation_rendered_fps)
-            Cvar_SetByVar(cvar_flt_frame_generation_rendered_fps, "0", FROM_CODE);
-        if (cvar_flt_frame_generation_generated_fps)
-            Cvar_SetByVar(cvar_flt_frame_generation_generated_fps, "0", FROM_CODE);
     }
 
     if (!cvar_flt_frame_generation_active || !cvar_flt_frame_generation_reason)
@@ -1805,45 +1893,6 @@ void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason)
     Com_Printf("Frame generation: %s\n", reason ? reason : "unspecified");
     last_active = active ? 1 : 0;
     Q_strlcpy(last_reason, reason ? reason : "unspecified", sizeof(last_reason));
-}
-
-void vkpt_fsr_frame_generation_note_present_pair(void)
-{
-    /* This is deliberately presentation cadence, not a GPU timestamp or the
-     * game tick rate. A sample is recorded only after both generated and real
-     * images were accepted by the WSI path, therefore generated FPS is exactly
-     * twice the rendered-frame cadence for this 1:1 interpolator. */
-    unsigned now;
-    unsigned elapsed;
-    float instant_fps;
-    char rendered_text[32];
-    char generated_text[32];
-
-    if (!cvar_flt_frame_generation_rendered_fps ||
-        !cvar_flt_frame_generation_generated_fps)
-        return;
-
-    now = Sys_Milliseconds();
-    if (fsr3_fg_last_present_msec == 0) {
-        fsr3_fg_last_present_msec = now;
-        return;
-    }
-    elapsed = now - fsr3_fg_last_present_msec;
-    fsr3_fg_last_present_msec = now;
-    if (!elapsed || elapsed > 1000u) {
-        fsr3_fg_filtered_rendered_fps = 0.0f;
-        return;
-    }
-
-    instant_fps = 1000.0f / (float)elapsed;
-    fsr3_fg_filtered_rendered_fps = fsr3_fg_filtered_rendered_fps > 0.0f
-        ? fsr3_fg_filtered_rendered_fps * 0.85f + instant_fps * 0.15f
-        : instant_fps;
-    Q_snprintf(rendered_text, sizeof(rendered_text), "%.1f", fsr3_fg_filtered_rendered_fps);
-    Q_snprintf(generated_text, sizeof(generated_text), "%.1f",
-               fsr3_fg_filtered_rendered_fps * 2.0f);
-    Cvar_SetByVar(cvar_flt_frame_generation_rendered_fps, rendered_text, FROM_CODE);
-    Cvar_SetByVar(cvar_flt_frame_generation_generated_fps, generated_text, FROM_CODE);
 }
 
 bool vkpt_fsr_frame_generation_prepare_present(void)
