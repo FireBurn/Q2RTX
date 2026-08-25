@@ -227,7 +227,7 @@ Current truth:
   validates provider-neutral RR-style sampled image metadata: signed linear
   depth, motion, compact material/albedo inputs, camera/motion/jitter/depth
   metadata, radiance-partition alpha rules, optional dominant-light data, and
-  the two optional scalar AO/specular-occlusion signals. Contract v3 validates
+  the two optional scalar AO/specular-occlusion signals. Contract v4 validates
   those additions while retaining the real-provider rule that one primary
   radiance or dominant-light signal is required; it rejects unknown flag bits.
   Q2RTX maps its four radiance partitions plus dominant light and does not yet
@@ -249,6 +249,14 @@ Current truth:
   FSR3 run reached v11/history-valid frame 149 with `issues=0x0` and no
   validation error. This proves the input bridge/barriers, not a neural RR
   dispatch.
+
+- The reusable RR contract now also has a provider-dispatch hand-off: populate
+  `FfxVkRayRegenerationOutputs`, then call `ffxVkRayRegenerationValidateOutputs`
+  after input validation. It checks active output formats, full render extent,
+  storage state/usage, legal in-place aliases, and checkerboard subset/origin
+  rules. This is deliberately validation only; it does not imply a provider
+  records neural work. Its standalone test exercises valid output bindings,
+  wrong output format, and checkerboard origin rejection.
 
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.

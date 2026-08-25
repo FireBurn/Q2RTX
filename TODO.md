@@ -520,7 +520,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   of the four radiance partitions or dominant light remains required by a real
   provider. Q2RTX currently exports the four radiance partitions plus dominant
   light, not separate AO/specular occlusion. It does not certify pixel contents
-  or implement a provider. Contract v3 corrects the provider-facing motion
+  or implement a provider. Contract v4 adds concrete per-signal output and
+  checkerboard validation, including output storage state/format and legal
+  in-place aliases, so a provider has an explicit dispatch boundary. Contract
+  v3 corrected the provider-facing motion
   conventions: a three-component UV/depth scale and previous-minus-current
   camera delta. Q2RTX contract v11 exports dense primary-surface
   `TEMPORAL_RR_MOTION` (PreviousUV-CurrentUV plus previous-minus-current
