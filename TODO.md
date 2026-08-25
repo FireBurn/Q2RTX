@@ -475,7 +475,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   presenter suppresses only the reset dispatch's undefined generated slot,
   presenting the real image twice before FI/OF resumes. A live forced
   240-FPS gate fallback→0-FPS-threshold recovery confirms the same guard when
-  the provider alone requests reset (`v11/frame 910`, no VUID/error). Validate
+  the provider alone requests reset (`v11/frame 910`, no VUID/error).
   A verified `pushmenu main` → `popmenu` lifecycle then exposed a binary WSI
   semaphore re-signal on resume; the reusable presenter policy now quiesces
   exactly once on either ordinary↔paired transition. The repeat resumed cleanly
@@ -483,9 +483,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FSR3.1.4 FI backend passed the same menu resume at v11/frame 1984, and
   public FSR3.1.5 + SDK-3.1.6 FI/OF passed at v11/frame 1982. A live `gamemap
   base2` scene transition retained FSR4-v07 + SDK-3.1.6 FI/OF through reset
-  `0x840`, reaching active/eligible v11/frame 1579 with no VUID/error. Validate
-  a genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
-  cuts, alt-tab/loading, and broad lifecycle coverage.
+  `0x840`, reaching active/eligible v11/frame 1579 with no VUID/error. A live
+  960x540 -> 800x600 -> 960x540 windowed transition rebuilt FSR4 Quality and
+  resumed FI/OF after both resets with no VUID/error. Remaining work is a
+  genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
+  cuts, alt-tab/loading, and broader lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research
 

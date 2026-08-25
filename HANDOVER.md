@@ -70,6 +70,13 @@ Current truth:
   1579 with no VUID/error and a coherent `base2` capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_map_transition.png`.
 
+- A live windowed `vid_geometry` transition from 960x540 to 800x600 and back
+  rebuilt the FSR4 Quality context at 536x402 -> 800x600 and again at
+  644x361 -> 960x540. SDK-3.1.6 FI/OF performed its expected fallback/reseed
+  and resumed after each transition, with no VUID/error. The 800x600 capture is
+  coherent and the script restored the original geometry before exit:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_resize_fiog.png`.
+
 - The updated reusable `ffx-vulkan::effects` package was reinstalled into a
   fresh temporary prefix after the reset-slot and mode-transition policy API
   changes. An independent `examples/installed-full-stack` CMake consumer then
