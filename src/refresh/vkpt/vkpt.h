@@ -671,7 +671,11 @@ typedef enum VkptTemporalDebugView_e {
 	 * provider-neutral input inspection only, not an RR availability claim. */
 	VKPT_TEMPORAL_DEBUG_DENOISER_NORMAL_ROUGHNESS_MATERIAL,
 	VKPT_TEMPORAL_DEBUG_DENOISER_DIFFUSE_ALBEDO,
-	VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO
+	VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO,
+	VKPT_TEMPORAL_DEBUG_RR_DIRECT_DIFFUSE,
+	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_DIFFUSE,
+	VKPT_TEMPORAL_DEBUG_RR_DIRECT_SPECULAR,
+	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR
 } VkptTemporalDebugView;
 VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);

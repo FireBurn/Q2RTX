@@ -617,7 +617,7 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
 	if (cvar_flt_temporal_debug_view->integer >
-		VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO)
+		VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR)
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view %d",
 			cvar_flt_temporal_debug_view->integer);
@@ -671,6 +671,22 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 	case VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO:
 		image = &frame->inputs.denoiser_specular_albedo;
 		selected_image = VKPT_IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_DIRECT_DIFFUSE:
+		image = &frame->inputs.rr_direct_diffuse;
+		selected_image = VKPT_IMG_TEMPORAL_RR_DIRECT_DIFFUSE;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_DIFFUSE:
+		image = &frame->inputs.rr_indirect_diffuse;
+		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_DIFFUSE;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_DIRECT_SPECULAR:
+		image = &frame->inputs.rr_direct_specular;
+		selected_image = VKPT_IMG_TEMPORAL_RR_DIRECT_SPECULAR;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR:
+		image = &frame->inputs.rr_indirect_specular;
+		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR;
 		break;
 	default:
 		return temporal_validation_fail(reason, reason_size,

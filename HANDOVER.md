@@ -158,6 +158,11 @@ Current truth:
   valid at 644x361, temporal contract v6/history valid, and no VUID/error:
   `baseq2/logs/RR_radiance_contract_20260825.log`. Per-lobe hit distance and
   dominant visibility remain outstanding, as does any neural provider.
+  Values 16-19 in `flt_temporal_debug_view` now render those four channels
+  directly for visual inspection. The validation-enabled direct-diffuse
+  capture is visibly populated and deliberately noisy, as expected before a
+  denoiser: `baseq2/screenshots/RR_direct_diffuse_20260825.png`. This exposes
+  the renderer's raw partitions; it is not a claim of official RR support.
 
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.

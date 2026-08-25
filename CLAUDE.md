@@ -95,7 +95,9 @@ Q2RTX signal conventions currently exposed by the contract:
   FSR4-v07 provider's borrowed history/reprojected surfaces. Values 13-15
   inspect the provider-neutral Ray-Regeneration-compatible material inputs:
   octahedral-normal/linear-roughness/category, sqrt diffuse albedo, and sqrt
-  specular albedo respectively. Those two FSR4 private surfaces must be
+  specular albedo respectively. Values 16-19 inspect Q2RTX's raw direct and
+  indirect diffuse/specular radiance partitions. Those two FSR4 private
+  surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
   as general renderer resources or record writes to them.
 - `TEMPORAL_REACTIVE_MASK` and `TEMPORAL_COMPOSITION_MASK`: dense R8 UNORM

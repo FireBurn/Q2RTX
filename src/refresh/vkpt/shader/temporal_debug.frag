@@ -78,6 +78,12 @@ void main()
     case 15u: /* RR: sqrt-encoded specular albedo. */
         color = sample_value.rgb * sample_value.rgb;
         break;
+    case 16u: /* RR raw direct diffuse. */
+    case 17u: /* RR raw indirect diffuse SH coefficient. */
+    case 18u: /* RR raw direct specular. */
+    case 19u: /* RR raw indirect specular. */
+        color = tonemap_debug(sample_value.rgb);
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;
