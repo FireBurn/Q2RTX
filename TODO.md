@@ -32,6 +32,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   reusable checker validates all 288 generated modules across six presets and
   three tensor tiers, plus a deliberate pass mismatch; context creation runs
   it before pipeline creation.
+- [x] Derive each v07 Vulkan pipeline's compact descriptor-set layout from its
+  validated SPIR-V declarations rather than retaining a generic 44-binding
+  superset. Descriptor writes now fail before dispatch if any declared
+  non-sampler slot is absent; the RX 6800M live path and all 34 standalone
+  tests remain clean.
 - [x] Honor FFX float clear values in the Vulkan backend and initialize the
   sampled explicit-exposure fallback to 1.0 rather than zero; a subsequent
   RCAS-on live validation run passed on RX 6800M.

@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The source-v07 FSR4 provider now reflects each validated SPIR-V module into
+  its own compact, binding-sorted descriptor-set layout. It uses an immutable
+  sampler only where declared and rejects a dispatch before recording if a
+  declared non-sampler descriptor lacks a write. This replaces the former
+  permissive generic 44-binding layout. The Q2RTX client build, all 34
+  standalone tests, and a fresh installed-package consumer build passed on
+  2026-08-25; the timed RX 6800M Quality launch also completed without a
+  reported validation error.
+
 - Analytical frame generation now has a reusable separate alpha-UI path.
   `VKPT_IMG_TAA_OUTPUT` remains the HUDless display-resolution scene; when FG
   is active, Q2RTX renders the queued UI once into a lazily allocated per-frame

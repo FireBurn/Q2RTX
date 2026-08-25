@@ -253,7 +253,9 @@ renderer-specific automatic pool rotation.
 The FSR4 provider validates every supplied SPIR-V module's descriptor-set,
 binding, and descriptor-type ABI before it creates pipelines. Keep that
 fail-closed check when updating generated assets; the standalone layout test
-must cover every model preset and tensor tier.
+must cover every model preset and tensor tier. Pipeline descriptor layouts are
+then reflected per module (not a generic 44-binding superset), with immutable
+samplers and a required write for every declared non-sampler binding.
 
 The installed package also exports
 `ffx-vulkan::framegeneration-presenter-policy`. It contains only reusable WSI
