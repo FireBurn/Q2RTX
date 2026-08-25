@@ -60,6 +60,9 @@ Current truth:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_menu_resume_verified.png`.
   The native FSR3.1.4 FI path passed the same transition at frame 1984:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR314_framegen_menu_resume.png`.
+  Public FSR3.1.5 plus SDK-3.1.6 FI/OF likewise resumed at v11/frame 1982,
+  validation clean and visually coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_framegen_menu_resume.png`.
 
 - A real `gamemap base2` scene replacement (not a full server restart) kept
   source-v07 FSR4 plus SDK-3.1.6 FI/OF enabled. It retained the expected
