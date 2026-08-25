@@ -516,10 +516,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package
   consumer test); contract v2 models all seven independently selectable RR
-  signals, including AO-only and specular-occlusion-only dispatches, rather
-  than incorrectly requiring a radiance signal. Q2RTX currently exports the
-  four radiance partitions plus dominant light, not separate AO/specular
-  occlusion. It does not certify pixel contents or implement a provider.
+  signals. AO and specular occlusion are valid optional additions, while one
+  of the four radiance partitions or dominant light remains required by a real
+  provider. Q2RTX currently exports the four radiance partitions plus dominant
+  light, not separate AO/specular occlusion. It does not certify pixel contents
+  or implement a provider.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes

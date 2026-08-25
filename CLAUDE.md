@@ -141,13 +141,13 @@ Q2RTX signal conventions currently exposed by the contract:
   RR-style image, alpha, camera, jitter, and motion metadata before a provider
   is attached. Contract v2 represents all seven independently selectable
   signal inputs: four radiance partitions, dominant-light visibility, ambient
-  occlusion, and specular occlusion. The latter two are R8_UNORM [0,1] signals
-  and are valid by themselves; do not fabricate a radiance image to satisfy a
-  validator. Q2RTX currently exports the first five, not separate AO/specular
-  occlusion. The validator does not inspect GPU pixels, record commands, or
-  supply a neural provider. Do not use a superficial Q2RTX call to it as
-  evidence that the renderer meets official RR input requirements; the
-  dominant-light bridge remains required.
+  occlusion, and specular occlusion. The latter two are R8_UNORM [0,1] optional
+  additions; one primary radiance or dominant-light signal remains required.
+  Q2RTX currently exports the first five, not separate AO/specular occlusion.
+  The validator does not inspect GPU pixels, record commands, or supply a
+  neural provider. Do not use a superficial Q2RTX call to it as evidence that
+  the renderer meets official RR input requirements; the dominant-light bridge
+  remains required.
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.
