@@ -509,7 +509,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   primary-ray readback ring; it suppresses availability while that ring is
   stale after a sky update. The bridge exports real camera-position delta and
   maps all complete inputs into the reusable validator; a live RX 6800M run
-  returned `issues=0x0` with dominant light included. The official neural
+  returned `issues=0x0` with dominant light included. It also explicitly
+  converts Q2RTX's surface-to-sun shadow vector to the provider's
+  light-to-target direction. The official neural
   provider remains outstanding. The reusable
   `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package

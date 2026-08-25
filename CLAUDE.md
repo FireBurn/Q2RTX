@@ -104,7 +104,9 @@ Q2RTX signal conventions currently exposed by the contract:
   primary-ray readback ring has fence-retired the matching physical-sky
   update. It also exports actual camera-position delta and maps the complete
   Q2RTX input set into `ffx-vulkan::rayregeneration-contract` for a live
-  provider-neutral preflight. It remains provider-neutral groundwork, not
+  provider-neutral preflight. Q2RTX stores its direct-shadow direction from
+  surface to sun; the bridge negates it for the provider's light-to-target
+  convention. It remains provider-neutral groundwork, not
   proof that a neural RR provider is active. Those two FSR4
   private surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles

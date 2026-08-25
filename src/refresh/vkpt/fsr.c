@@ -1320,6 +1320,10 @@ void vkpt_fsr_print_diagnostics(void)
 				dominant->surface_to_light_direction[2],
 				dominant->emission[0], dominant->emission[1],
 				dominant->emission[2], dominant->angular_radius_radians);
+			Com_Printf("  RR provider mapping: light-to-surface=(%.4f %.4f %.4f)\n",
+				-dominant->surface_to_light_direction[0],
+				-dominant->surface_to_light_direction[1],
+				-dominant->surface_to_light_direction[2]);
 		} else {
 			Com_Printf("  RR dominant metadata: unavailable until a matching "
 				"physical-sky resolve readback is fence-retired\n");
@@ -1839,12 +1843,15 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
         inputs.dominantLightVisibility = fsr3_temporal_image(
             &frame->inputs.rr_dominant_light_visibility,
             FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+        /* Q2RTX's direct shadow ray points from the surface to the sun. AMD
+         * RR's provider ABI deliberately uses the opposite, light-to-target
+         * direction, so perform the explicit convention conversion here. */
         inputs.dominantLightDirection.x =
-            dominant->surface_to_light_direction[0];
+            -dominant->surface_to_light_direction[0];
         inputs.dominantLightDirection.y =
-            dominant->surface_to_light_direction[1];
+            -dominant->surface_to_light_direction[1];
         inputs.dominantLightDirection.z =
-            dominant->surface_to_light_direction[2];
+            -dominant->surface_to_light_direction[2];
         inputs.dominantLightEmission.x = dominant->emission[0];
         inputs.dominantLightEmission.y = dominant->emission[1];
         inputs.dominantLightEmission.z = dominant->emission[2];

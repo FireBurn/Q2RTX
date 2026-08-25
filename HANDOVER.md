@@ -216,6 +216,11 @@ Current truth:
   reusable preflight returned `valid (issues=0x0; dominant light included)`
   with no validation error. Evidence:
   `baseq2/logs/RR_reusable_preflight_20260825.log`.
+  Q2RTX's shadow ray points surface-to-sun; the reusable provider boundary
+  explicitly negates that to the AMD RR light-to-target direction convention.
+  A fresh corrected-direction validation run logged
+  `light-to-surface=(-0.8754 0.2346 -0.4226)` and retained the clean preflight:
+  `baseq2/logs/RR_provider_direction_20260825.log`.
 
 - `extern/ffx-vulkan` now exports the versioned, installable
   `ffx-vulkan::rayregeneration-contract` static target. Its public C ABI
