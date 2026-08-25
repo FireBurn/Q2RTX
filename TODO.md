@@ -135,6 +135,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   without the renderer. Its explicit per-frame fence-retirement API is part of
   that installed contract. The full FSR3 source closure remains an
   `add_subdirectory` integration until it has a dependency-complete export.
+  `ffx-vulkan::effects` and `examples/full-stack` now provide the tested
+  vendored FSR3.1.4/3.1.5/3.1.6 + FSR4-v07 starting point for another Vulkan
+  renderer; the example builds and runs without Q2RTX.
 - [x] Expose dense scene color, current-to-previous motion, stable primary
   view-Z, camera matrices/jitter, reset reasons, frame ID, and pre-UI boundary.
 - [x] Preserve primary view-Z before reflection passes overwrite denoiser depth.

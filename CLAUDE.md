@@ -243,6 +243,12 @@ coexist with AMD's unversioned SDK symbols. Its dependency-complete FSR4
 subset installs as a CMake package; the full FSR3 source closure is consumed
 with `add_subdirectory` as documented in its README.
 
+For a Vulkan application that vendors this directory, prefer the documented
+`ffx-vulkan::effects` convenience target or start from
+`examples/full-stack`. It links the compatible versioned FSR3 1.1.4, 3.1.5,
+and 3.1.6 targets, FSR4 v07, and the WSI policy without pretending that FSR4
+v07 is FSR 4.1.1. The host CMake project must enable both C and C++.
+
 FSR4 v07 callers must bracket every provider dispatch with
 `ffxFsr4VkBeginFrame(interface, frame_id)` and retire it with
 `ffxFsr4VkRetireFrame(interface, completed_frame_id)` only after their GPU

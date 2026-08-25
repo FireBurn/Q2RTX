@@ -42,8 +42,11 @@ Current truth:
   The dependency-complete FSR4 subset installs/exports a CMake package and its
   downstream consumer contract passed. Full FSR3 remains intended for vendored
   `add_subdirectory` use because its pinned SDK closure is not yet a
-  dependency-complete installed export. This remains experimental v07, never
-  FSR4.1.1/RR/MLFG.
+  dependency-complete installed export. `ffx-vulkan::effects` is the matching
+  convenience integration target for the complete vendored FSR3.1.4/3.1.5/
+  3.1.6 + FSR4-v07 set, and `examples/full-stack` is a separate buildable
+  downstream contract. It deliberately needs a C+C++ host project. This
+  remains experimental v07, never FSR4.1.1/RR/MLFG.
 
 - `ffx-vulkan::framegeneration-presenter-policy` now exports the reusable
   window-system-neutral part of the FSR3 presentation contract: FIFO selection
