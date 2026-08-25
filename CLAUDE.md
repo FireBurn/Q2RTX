@@ -206,7 +206,10 @@ and exact upstream revision are retained in
 its manifest. `fsr4_v07_assets` verifies every tracked pair against its
 manifest's size and SHA-256. `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS` may package
 this complete set, but it remains the older source-v07 model rather than FSR
-4.1.1.
+4.1.1. When Linux packaging enables that option, CMake must require the notice,
+all six initializer/pre-weight pairs, and their manifests at configure time;
+never make a runnable FSR4 selection depend on an optional, unchecked loose
+directory.
 
 The backend must fail closed: mandatory pipeline creation, descriptor
 allocation/writes, resource registration, scheduling, and execution errors are

@@ -773,11 +773,32 @@ IF(CONFIG_LINUX_PACKAGING_SUPPORT)
 
     # The complete source-v07 FSR4 graph and its model initializer/weight pairs
     # are versioned together. Downstream packages may still opt out explicitly,
-    # but the default delivers a runnable experimental FSR4 selection.
-    IF(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS AND
-       EXISTS "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+    # but an enabled install must never silently ship a partial, unusable model
+    # set. The per-model manifests perform hash validation at runtime; these
+    # configure-time checks make the required payload obvious to package builds.
+    IF(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS)
+        SET(FSR4_V07_ASSET_DIR "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders")
+        IF(NOT EXISTS "${FSR4_V07_ASSET_DIR}/LICENSE-FSR4-v07.txt")
+            MESSAGE(FATAL_ERROR
+                "CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS requires "
+                "${FSR4_V07_ASSET_DIR}/LICENSE-FSR4-v07.txt")
+        ENDIF()
+
+        FOREACH(FSR4_V07_MODEL native quality balanced performance ultraperf drs)
+            SET(FSR4_V07_PREFIX
+                "${FSR4_V07_ASSET_DIR}/fsr4_model_v07_i8_${FSR4_V07_MODEL}")
+            FOREACH(FSR4_V07_REQUIRED_SUFFIX
+                    initializers.bin pre_weights.bin shader_manifest.json)
+                IF(NOT EXISTS "${FSR4_V07_PREFIX}_${FSR4_V07_REQUIRED_SUFFIX}")
+                    MESSAGE(FATAL_ERROR
+                        "CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS requires "
+                        "${FSR4_V07_PREFIX}_${FSR4_V07_REQUIRED_SUFFIX}")
+                ENDIF()
+            ENDFOREACH()
+        ENDFOREACH()
+
         INSTALL(DIRECTORY
-            "${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders"
+            "${FSR4_V07_ASSET_DIR}"
             DESTINATION share/quake2rtx/baseq2
             COMPONENT shareware)
     ENDIF()

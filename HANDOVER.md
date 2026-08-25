@@ -122,6 +122,14 @@ Current truth:
   `Q2RTX_SKIP_SHADER_CACHE_MIGRATION=1`. The Gentoo ebuild verifies that this
   launcher migration is installed.
 
+- Source-tree Linux packaging now fails closed for the complete FSR4-v07 asset
+  set, matching the ebuild's checks. With
+  `CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS=ON`, CMake requires the retained MIT
+  notice plus each of the six model-specific initializer, pre-weight, and
+  manifest files before generating install rules; it no longer treats a merely
+  present `fsr4_shaders` directory as proof of a runnable installation. A
+  fresh ebuild-equivalent system-dependency CMake configuration passed.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested

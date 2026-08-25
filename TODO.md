@@ -546,11 +546,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   system Vulkan/SDL/OpenAL/curl/zlib dependencies, external 7-Zip and shader
   tools, release media/shareware import, `/usr/bin` launcher/server,
   `/usr/share/quake2rtx` data, and current menu/config archive updates.  A
-  package-style staged install passed.  The release's all-rights-reserved media
-  is correctly `bindist`/`mirror` restricted.  The v07 FSR4 SPIR-V graph is
-  tracked, but its required initializer/weight blobs are deliberately ignored
-  local artifacts; the ebuild detects this and excludes the unusable partial
-  directory. The runtime now publishes the specific missing v07 asset through
+  package-style staged install passed. The release's all-rights-reserved media
+  is correctly `bindist`/`mirror` restricted. The complete v07 FSR4 SPIR-V
+  graph, six model initializer/pre-weight pairs, manifests, and MIT notice are
+  tracked; both the ebuild and CMake's Linux-packaging configuration reject a
+  missing model payload before an incomplete install can be created. The
+  runtime still publishes a specific missing v07 asset through
   `flt_upscaler_reason` instead of an ambiguous context failure. FSR3 and
   analytical FSR3 frame generation remain built in.
 
