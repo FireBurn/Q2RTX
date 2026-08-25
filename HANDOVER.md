@@ -132,6 +132,28 @@ Current truth:
   pre-tone-map debug images and therefore should not be brightness-compared to
   final presentation captures.
 
+- Temporal contract v5 adds three compact, provider-neutral Ray
+  Regeneration-compatible material inputs: `R8G8B8A8_UNORM` oct-normal / linear
+  roughness / category 0, sqrt diffuse albedo, and sqrt specular albedo.
+  `checkerboard_interleave` produces them with the documented BRDF
+  approximation and publishes explicit compute visibility barriers. A live
+  RX 6800M `fsr_diagnostics` invocation reports all three as valid 644x361
+  inputs with octahedral/sqrt/four-category metadata. This is only an RR input
+  foundation; it does not make the official neural RR binary available. The
+  selector views were live captured with `vk_validation=1` on RX 6800M:
+  packed normal/roughness/material, diffuse albedo, and specular albedo are
+  coherent in `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/` as
+  `RR_normal_rough_material_20260825.png`, `RR_diffuse_albedo_20260825.png`,
+  and `RR_specular_albedo_20260825.png`.
+
+- Console screenshot readback now deterministically renders a requested
+  temporal debug view into its freshly acquired WSI image before copying it.
+  The prior safe-acquire-only code copied an arbitrary fresh image, producing
+  black debug captures. The capture uses a third per-frame final-blit
+  descriptor slot, so it never updates either normal or generated-present
+  descriptor set while that set is still pending. The RX 6800M validation run
+  above emitted no VUID/error.
+
 - After adding those presentation branches, a fresh RX 6800M
   `vk_validation=1` FSR3.1.6 generated→real FIFO run (debug view Off) again
   reached active presentation with no VUID/error and a coherent HUDless scene

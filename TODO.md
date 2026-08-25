@@ -490,10 +490,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [-] Add RR-compatible normals/roughness/material, diffuse/specular albedo,
   separate noisy direct/indirect diffuse/specular signals, hit distances,
   view-Z delta, and camera basis inputs while retaining ASVGF fallback.
-  Contract v3 now publishes live-validated dense geometric normals, primary
-  albedo, and roughness from checkerboard interleave; RR still needs its exact
-  oct-normal/material convention and the separate noisy radiance/hit-distance
-  signals.
+  Contract v5 now publishes the documented compact material resources from
+  checkerboard interleave (oct-normal/linear roughness/category 0 and sqrt
+  diffuse/specular albedos), in addition to the dense generic material views.
+  It still lacks the separate noisy radiance, hit-distance, and visibility
+  signals needed by an actual RR adapter.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes

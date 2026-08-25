@@ -666,11 +666,20 @@ typedef enum VkptTemporalDebugView_e {
 	 * the remaining views are FSR4 v07 private temporal surfaces. */
 	VKPT_TEMPORAL_DEBUG_FSR_RECONSTRUCTED,
 	VKPT_TEMPORAL_DEBUG_FSR4_HISTORY,
-	VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED
+	VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED,
+	/* Compact FSR Ray Regeneration-compatible material resources. These are
+	 * provider-neutral input inspection only, not an RR availability claim. */
+	VKPT_TEMPORAL_DEBUG_DENOISER_NORMAL_ROUGHNESS_MATERIAL,
+	VKPT_TEMPORAL_DEBUG_DENOISER_DIFFUSE_ALBEDO,
+	VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO
 } VkptTemporalDebugView;
 VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);
 VkResult vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf,
+	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view);
+/* Uses a capture-only descriptor set and cannot update the normal or
+ * generated-present descriptor set while it may still be in flight. */
+VkResult vkpt_temporal_debug_blit_for_screenshot(VkCommandBuffer cmd_buf,
 	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view);
 VkResult vkpt_draw_clear_stretch_pics(void);
 

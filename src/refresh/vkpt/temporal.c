@@ -163,6 +163,8 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 		sizeof(frame->inputs.view_z_description);
 	frame->inputs.device_depth_description.struct_size =
 		sizeof(frame->inputs.device_depth_description);
+	frame->inputs.denoiser_material_description.struct_size =
+		sizeof(frame->inputs.denoiser_material_description);
 	frame->ui.struct_size = sizeof(frame->ui);
 	initialize_image(&frame->inputs.scene_color);
 	initialize_image(&frame->inputs.motion_vectors);
@@ -171,6 +173,9 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 	initialize_image(&frame->inputs.normals);
 	initialize_image(&frame->inputs.albedo);
 	initialize_image(&frame->inputs.roughness);
+	initialize_image(&frame->inputs.denoiser_normal_roughness_material);
+	initialize_image(&frame->inputs.denoiser_diffuse_albedo);
+	initialize_image(&frame->inputs.denoiser_specular_albedo);
 	initialize_image(&frame->inputs.reactive_mask);
 	initialize_image(&frame->inputs.transparency_and_composition_mask);
 	initialize_image(&frame->ui.scene_target);
@@ -317,6 +322,11 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	frame->inputs.view_z_description.primary_surface_only = 1;
 	frame->inputs.device_depth_description.convention =
 		VKPT_TEMPORAL_DEPTH_UNAVAILABLE;
+	frame->inputs.denoiser_material_description.normal_encoding =
+		VKPT_TEMPORAL_NORMAL_ENCODING_OCTAHEDRAL_UV;
+	frame->inputs.denoiser_material_description.albedo_encoding =
+		VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT;
+	frame->inputs.denoiser_material_description.material_type_count = 4;
 
 	frame->ui.mode = VKPT_TEMPORAL_UI_DIRECT_AFTER_SCENE;
 
@@ -400,9 +410,35 @@ vkpt_temporal_mark_inputs_ready(void)
 		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_LINEAR |
 		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	/* These compact inputs follow the public RR material contract exactly:
+	 * oct normal / roughness / material category and sqrt encoded albedos.
+	 * They are a reusable input substrate only; no neural denoiser is selected
+	 * or implied by publishing them. */
+	set_image(&frame->inputs.denoiser_normal_roughness_material,
+		VKPT_IMG_TEMPORAL_DENOISER_NORMAL_ROUGHNESS_MATERIAL,
+		VK_FORMAT_R8G8B8A8_UNORM, qvk.extent_screen_images,
+		qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	set_image(&frame->inputs.denoiser_diffuse_albedo,
+		VKPT_IMG_TEMPORAL_DENOISER_DIFFUSE_ALBEDO, VK_FORMAT_R8G8B8A8_UNORM,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	set_image(&frame->inputs.denoiser_specular_albedo,
+		VKPT_IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO, VK_FORMAT_R8G8B8A8_UNORM,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	if (qvk.device_count == 1)
 		frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_NORMALS |
-			VKPT_TEMPORAL_INPUT_ALBEDO | VKPT_TEMPORAL_INPUT_ROUGHNESS;
+			VKPT_TEMPORAL_INPUT_ALBEDO | VKPT_TEMPORAL_INPUT_ROUGHNESS |
+			VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL |
+			VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO |
+			VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO;
 
 	/* Primary rays write directly to dense screen coordinates.  That is
 	 * correct for Q2RTX's normal single-device path.  Device-group rendering
@@ -550,7 +586,8 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 	if (!image_index || !extent || !view || !cvar_flt_temporal_debug_view ||
 		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
-	if (cvar_flt_temporal_debug_view->integer > VKPT_TEMPORAL_DEBUG_ROUGHNESS)
+	if (cvar_flt_temporal_debug_view->integer >
+		VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO)
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view %d",
 			cvar_flt_temporal_debug_view->integer);
@@ -593,6 +630,18 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		image = &frame->inputs.roughness;
 		selected_image = VKPT_IMG_TEMPORAL_ROUGHNESS;
 		break;
+	case VKPT_TEMPORAL_DEBUG_DENOISER_NORMAL_ROUGHNESS_MATERIAL:
+		image = &frame->inputs.denoiser_normal_roughness_material;
+		selected_image = VKPT_IMG_TEMPORAL_DENOISER_NORMAL_ROUGHNESS_MATERIAL;
+		break;
+	case VKPT_TEMPORAL_DEBUG_DENOISER_DIFFUSE_ALBEDO:
+		image = &frame->inputs.denoiser_diffuse_albedo;
+		selected_image = VKPT_IMG_TEMPORAL_DENOISER_DIFFUSE_ALBEDO;
+		break;
+	case VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO:
+		image = &frame->inputs.denoiser_specular_albedo;
+		selected_image = VKPT_IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO;
+		break;
 	default:
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view");
@@ -627,6 +676,13 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 		{ VKPT_TEMPORAL_INPUT_NORMALS, &frame->inputs.normals, "normals" },
 		{ VKPT_TEMPORAL_INPUT_ALBEDO, &frame->inputs.albedo, "albedo" },
 		{ VKPT_TEMPORAL_INPUT_ROUGHNESS, &frame->inputs.roughness, "roughness" },
+		{ VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL,
+			&frame->inputs.denoiser_normal_roughness_material,
+			"denoiser normal/roughness/material" },
+		{ VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO,
+			&frame->inputs.denoiser_diffuse_albedo, "denoiser diffuse albedo" },
+		{ VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO,
+			&frame->inputs.denoiser_specular_albedo, "denoiser specular albedo" },
 		{ VKPT_TEMPORAL_INPUT_REACTIVE_MASK, &frame->inputs.reactive_mask, "reactive mask" },
 	};
 
@@ -647,6 +703,13 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 			"temporal frame extents/stage are invalid");
 	if (frame->inputs.motion_description.struct_size !=
 		sizeof(frame->inputs.motion_description) ||
+		frame->inputs.denoiser_material_description.struct_size !=
+			sizeof(frame->inputs.denoiser_material_description) ||
+		frame->inputs.denoiser_material_description.normal_encoding !=
+			VKPT_TEMPORAL_NORMAL_ENCODING_OCTAHEDRAL_UV ||
+		frame->inputs.denoiser_material_description.albedo_encoding !=
+			VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT ||
+		frame->inputs.denoiser_material_description.material_type_count != 4 ||
 		frame->inputs.motion_description.direction !=
 			VKPT_TEMPORAL_MOTION_CURRENT_TO_PREVIOUS ||
 		!(frame->inputs.motion_description.to_render_pixels[0] > 0.0f) ||

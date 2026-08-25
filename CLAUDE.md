@@ -90,17 +90,26 @@ Q2RTX signal conventions currently exposed by the contract:
   allocation extent; it does not mutate provider state. It suspends analytical
   frame generation and removes its FIFO swapchain request while nonzero.
   Values 10-12 additionally inspect current reconstructed FSR output and the
-  FSR4-v07 provider's borrowed history/reprojected surfaces. Those two private
-  surfaces must be obtained only through `ffxFsr4GetDebugResource`; do not
-  expose their handles as general renderer resources or record writes to them.
+  FSR4-v07 provider's borrowed history/reprojected surfaces. Values 13-15
+  inspect the provider-neutral Ray-Regeneration-compatible material inputs:
+  octahedral-normal/linear-roughness/category, sqrt diffuse albedo, and sqrt
+  specular albedo respectively. Those two FSR4 private surfaces must be
+  obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
+  as general renderer resources or record writes to them.
 - `TEMPORAL_REACTIVE_MASK` and `TEMPORAL_COMPOSITION_MASK`: dense R8 UNORM
   FSR3 history-control inputs authored by primary-ray material classification.
   Transparent/water/glass/warped/screen paths receive both masks; view-model
   pixels receive the reactive mask. Sky and ordinary opaque geometry are zero.
 - `TEMPORAL_NORMALS`, `TEMPORAL_ALBEDO`, and `TEMPORAL_ROUGHNESS`: dense
   provider-neutral primary-material inputs exported at checkerboard interleave.
-  Normals are geometric linear XYZ in `[-1, 1]`; they are deliberately not yet
-  advertised as a complete Ray Regeneration signal set.
+  Normals are geometric linear XYZ in `[-1, 1]`.
+- `TEMPORAL_DENOISER_NORMAL_ROUGHNESS_MATERIAL`,
+  `TEMPORAL_DENOISER_DIFFUSE_ALBEDO`, and
+  `TEMPORAL_DENOISER_SPECULAR_ALBEDO`: compact Ray-Regeneration-compatible
+  material inputs exported at the same point. The first is oct-normal,
+  linear roughness, and category 0; the latter two are sqrt encoded. They are
+  a provider-neutral input foundation, not evidence that AMD's neural RR
+  binary provider is available or active.
 - Camera metadata includes a positive vertical FOV derived from `abs(P[5])`
   (Q2RTX flips Vulkan Y) and `view_space_to_meters = 0.0254` for the engine's
   one-inch-per-world-unit convention.

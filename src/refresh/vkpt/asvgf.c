@@ -457,6 +457,19 @@ vkpt_interleave(VkCommandBuffer cmd_buf)
 
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_FLAT_COLOR]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_FLAT_MOTION]);
+	/* checkerboard_interleave also produces the dense primary-material inputs
+	 * consumed by temporal diagnostics and future denoising providers.  These
+	 * are submitted in this command buffer, then sampled by the FSR/debug
+	 * submission, so each write needs an explicit compute visibility barrier. */
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_TEMPORAL_NORMALS]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_TEMPORAL_ALBEDO]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_TEMPORAL_ROUGHNESS]);
+	BARRIER_COMPUTE(cmd_buf,
+		qvk.images[VKPT_IMG_TEMPORAL_DENOISER_NORMAL_ROUGHNESS_MATERIAL]);
+	BARRIER_COMPUTE(cmd_buf,
+		qvk.images[VKPT_IMG_TEMPORAL_DENOISER_DIFFUSE_ALBEDO]);
+	BARRIER_COMPUTE(cmd_buf,
+		qvk.images[VKPT_IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO]);
 
 	return VK_SUCCESS;
 }

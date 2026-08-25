@@ -71,6 +71,13 @@ void main()
     case 12u: /* FSR4 pre/post bridge: reprojected display-resolution HDR. */
         color = tonemap_debug(sample_value.rgb / 128.0);
         break;
+    case 13u: /* RR: oct normal in RG, linear roughness B, material type A. */
+        color = vec3(sample_value.rg, sample_value.b);
+        break;
+    case 14u: /* RR: sqrt-encoded diffuse albedo. */
+    case 15u: /* RR: sqrt-encoded specular albedo. */
+        color = sample_value.rgb * sample_value.rgb;
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;

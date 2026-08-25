@@ -3983,18 +3983,15 @@ R_EndFrame_RTX(void)
 		vkpt_tone_mapping_draw_debug();
 	if (frame_ready && cvar_flt_temporal_debug_view &&
 		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) {
-		if (cvar_flt_temporal_debug_view->integer <=
-			VKPT_TEMPORAL_DEBUG_ROUGHNESS) {
-			temporal_debug_active = vkpt_temporal_debug_select(
-				&temporal_debug_image, &temporal_debug_extent,
-				&temporal_debug_view, NULL, 0);
-			if (temporal_debug_active)
-				temporal_debug_image_view = qvk.images_views[temporal_debug_image];
-		} else {
+		temporal_debug_active = vkpt_temporal_debug_select(
+			&temporal_debug_image, &temporal_debug_extent,
+			&temporal_debug_view, NULL, 0);
+		if (temporal_debug_active)
+			temporal_debug_image_view = qvk.images_views[temporal_debug_image];
+		else
 			temporal_debug_active = vkpt_fsr_debug_select(
 				&temporal_debug_image_view, &temporal_debug_extent,
 				&temporal_debug_view, NULL, 0);
-		}
 	}
 
 	if (qvk.framegen_present_active) {
@@ -4524,6 +4521,40 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 
 	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
 	ensure_acquired_swapchain_image_initialized(cmd_buf, swap_chain_image_index);
+
+	/* A console screenshot cannot transition the image just presented by
+	 * R_EndFrame_RTX: WSI owns it until a later acquire.  The old safe-acquire
+	 * path consequently copied an arbitrary newly acquired image, which made
+	 * temporal-debug screenshots black whenever that image had not previously
+	 * been rendered.  For a debug request, reproduce the selected diagnostic
+	 * blit into this locally acquired image before copying it. This preserves
+	 * WSI ownership while making the capture deterministic. */
+	/* R_EndFrame_RTX clears frame_ready after presenting, but the temporal
+	 * contract still owns the completed frame's diagnostic resources until the
+	 * next render begins. Let the selector validate that persisted contract. */
+	if (cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) {
+		bool debug_active;
+		unsigned int debug_image = VKPT_IMG_CLEAR;
+		VkImageView debug_image_view = VK_NULL_HANDLE;
+		VkExtent2D debug_extent = { 0, 0 };
+		VkptTemporalDebugView debug_view = VKPT_TEMPORAL_DEBUG_OFF;
+		uint32_t rendered_image_index = qvk.current_swap_chain_image_index;
+
+		debug_active = vkpt_temporal_debug_select(&debug_image, &debug_extent,
+			&debug_view, NULL, 0);
+		if (debug_active)
+			debug_image_view = qvk.images_views[debug_image];
+		else
+			debug_active = vkpt_fsr_debug_select(&debug_image_view, &debug_extent,
+				&debug_view, NULL, 0);
+		if (debug_active) {
+			qvk.current_swap_chain_image_index = swap_chain_image_index;
+			vkpt_temporal_debug_blit_for_screenshot(cmd_buf, debug_image_view,
+				debug_extent, debug_view);
+			qvk.current_swap_chain_image_index = rendered_image_index;
+		}
+	}
 
 	VkImage swap_chain_image = qvk.swap_chain_images[swap_chain_image_index];
 

@@ -1280,6 +1280,24 @@ void vkpt_fsr_print_diagnostics(void)
         fsr_print_temporal_image_diagnostic("device depth", &frame->inputs.device_depth);
         fsr_print_temporal_image_diagnostic("reactive", &frame->inputs.reactive_mask);
         fsr_print_temporal_image_diagnostic("composition", &frame->inputs.transparency_and_composition_mask);
+        fsr_print_temporal_image_diagnostic("normals", &frame->inputs.normals);
+        fsr_print_temporal_image_diagnostic("albedo", &frame->inputs.albedo);
+        fsr_print_temporal_image_diagnostic("roughness", &frame->inputs.roughness);
+        fsr_print_temporal_image_diagnostic("RR norm/rgh/mat",
+            &frame->inputs.denoiser_normal_roughness_material);
+        fsr_print_temporal_image_diagnostic("RR diffuse",
+            &frame->inputs.denoiser_diffuse_albedo);
+        fsr_print_temporal_image_diagnostic("RR specular",
+            &frame->inputs.denoiser_specular_albedo);
+        Com_Printf("  RR material encoding: normal=%s albedo=%s types=%u "
+                   "(provider-neutral input foundation)\n",
+            frame->inputs.denoiser_material_description.normal_encoding ==
+                    VKPT_TEMPORAL_NORMAL_ENCODING_OCTAHEDRAL_UV
+                ? "octahedral UV" : "linear XYZ",
+            frame->inputs.denoiser_material_description.albedo_encoding ==
+                    VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT
+                ? "sqrt" : "linear",
+            frame->inputs.denoiser_material_description.material_type_count);
     }
 
 #ifdef VKPT_FSR3

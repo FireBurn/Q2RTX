@@ -129,6 +129,43 @@ ivec2 get_output_position()
     return ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
 }
 
+vec2 encode_octahedral_normal(vec3 normal)
+{
+    normal /= max(abs(normal.x) + abs(normal.y) + abs(normal.z), 1e-6);
+    if (normal.z < 0.0)
+        normal.xy = (1.0 - abs(normal.yx)) * sign(normal.xy);
+    return normal.xy * 0.5 + 0.5;
+}
+
+/* This is AMD's documented lightweight BRDF approximation for RR's specular
+ * albedo feature. Keeping it here makes the packed provider-neutral input
+ * useful to a future RR adapter without requiring an external BRDF LUT. */
+vec3 approximate_specular_albedo(vec3 f0, float roughness, float no_v)
+{
+    vec4 x = vec4(1.0, no_v, no_v * no_v, no_v * no_v * no_v);
+    float alpha = roughness * roughness;
+    vec4 y = vec4(1.0, alpha, alpha * alpha, alpha * alpha * alpha);
+    vec2 m1x = vec2(
+        dot(vec2(0.99044, -1.28514), x.xy),
+        dot(vec2(1.29678, -0.755907), x.xy));
+    vec3 m2x = vec3(
+        dot(vec3(1.0, 2.92338, 59.4188), x.xyw),
+        dot(vec3(20.3225, -27.0302, 222.592), x.xyw),
+        dot(vec3(121.563, 626.13, 316.627), x.xyw));
+    vec2 m3x = vec2(
+        dot(vec2(0.0365463, 3.32707), x.xy),
+        dot(vec2(9.0632, -9.04756), x.xy));
+    vec3 m4x = vec3(
+        dot(vec3(1.0, 3.59685, -1.36772), x.xzw),
+        dot(vec3(9.04401, -16.3174, 9.22949), x.xzw),
+        dot(vec3(20.2123, -20.2123, 33.0), x.xzw));
+    float bias = dot(m1x, y.xy) / max(dot(m2x, y.xyw), 1e-6);
+    float scale = dot(m3x, y.xy) / max(dot(m4x, y.xyw), 1e-6);
+
+    bias *= clamp(f0.g * 50.0, 0.0, 1.0);
+    return max(f0 * max(0.0, scale) + vec3(max(0.0, bias)), vec3(0.0));
+}
+
 void main()
 {
     int other_side_offset;
@@ -195,8 +232,35 @@ void main()
     vec3 geo_normal = packed_geo_normal != 0u
         ? decode_normal(packed_geo_normal) : vec3(0.0);
     vec4 base_color = imageLoad(IMG_PT_BASE_COLOR_A, ipos);
-    float roughness = imageLoad(IMG_PT_METALLIC_A, ipos).y;
+    vec2 metallic_roughness = imageLoad(IMG_PT_METALLIC_A, ipos).xy;
+    float metallic = metallic_roughness.x;
+    float roughness = metallic_roughness.y;
     imageStore(IMG_TEMPORAL_NORMALS, opos, vec4(geo_normal, 1.0));
     imageStore(IMG_TEMPORAL_ALBEDO, opos, base_color);
     imageStore(IMG_TEMPORAL_ROUGHNESS, opos, vec4(roughness));
+
+    /* RR uses a compact oct-normal/roughness/material resource plus separate
+     * sqrt-encoded diffuse and specular albedo. Start all surfaces at the
+     * documented material category 0; a future provider can add categories
+     * only where a visually justified rejection boundary is known. */
+    vec3 normal_for_features = dot(geo_normal, geo_normal) > 1e-6
+        ? normalize(geo_normal) : vec3(0.0, 0.0, 1.0);
+    vec3 base = clamp(base_color.rgb, vec3(0.0), vec3(1.0));
+    vec3 diffuse_albedo = base * (1.0 - clamp(metallic, 0.0, 1.0));
+    vec3 view_direction = imageLoad(IMG_PT_VIEW_DIRECTION, ipos).xyz;
+    float view_direction_length = length(view_direction);
+    float no_v = view_direction_length > 1e-6
+        ? clamp(abs(dot(normal_for_features,
+            view_direction / view_direction_length)), 0.0, 1.0)
+        : 1.0;
+    vec3 f0 = mix(vec3(0.04), base, clamp(metallic, 0.0, 1.0));
+    vec3 specular_albedo = approximate_specular_albedo(f0,
+        clamp(roughness, 0.0, 1.0), no_v);
+    imageStore(IMG_TEMPORAL_DENOISER_NORMAL_ROUGHNESS_MATERIAL, opos,
+        vec4(encode_octahedral_normal(normal_for_features),
+            clamp(roughness, 0.0, 1.0), 0.0));
+    imageStore(IMG_TEMPORAL_DENOISER_DIFFUSE_ALBEDO, opos,
+        vec4(sqrt(diffuse_albedo), 1.0));
+    imageStore(IMG_TEMPORAL_DENOISER_SPECULAR_ALBEDO, opos,
+        vec4(sqrt(clamp(specular_albedo, vec3(0.0), vec3(1.0))), 1.0));
 }

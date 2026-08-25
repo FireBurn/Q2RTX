@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 4u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 5u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -97,8 +97,25 @@ typedef enum VkptTemporalInputFlagBits_e {
 	VKPT_TEMPORAL_INPUT_ROUGHNESS      = 1u << 6,
 	VKPT_TEMPORAL_INPUT_REACTIVE_MASK  = 1u << 7,
 	VKPT_TEMPORAL_INPUT_UI             = 1u << 8,
-	VKPT_TEMPORAL_INPUT_TRANSPARENCY_AND_COMPOSITION_MASK = 1u << 9
+	VKPT_TEMPORAL_INPUT_TRANSPARENCY_AND_COMPOSITION_MASK = 1u << 9,
+	/* FSR Ray Regeneration-compatible material features.  These describe the
+	 * documented packed resources, not availability of AMD's neural provider. */
+	VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL = 1u << 10,
+	VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO = 1u << 11,
+	VKPT_TEMPORAL_INPUT_DENOISER_SPECULAR_ALBEDO = 1u << 12
 } VkptTemporalInputFlagBits;
+
+typedef enum VkptTemporalNormalEncoding_e {
+	VKPT_TEMPORAL_NORMAL_ENCODING_LINEAR_XYZ = 0,
+	VKPT_TEMPORAL_NORMAL_ENCODING_OCTAHEDRAL_UV = 1
+} VkptTemporalNormalEncoding;
+
+typedef enum VkptTemporalAlbedoEncoding_e {
+	VKPT_TEMPORAL_ALBEDO_ENCODING_LINEAR = 0,
+	/* FSR Ray Regeneration's default dispatch encoding.  A future provider can
+	 * select its non-gamma flag only after explicitly converting these inputs. */
+	VKPT_TEMPORAL_ALBEDO_ENCODING_SQRT = 1
+} VkptTemporalAlbedoEncoding;
 
 typedef enum VkptTemporalProjection_e {
 	VKPT_TEMPORAL_PROJECTION_RECTILINEAR = 0,
@@ -212,6 +229,18 @@ typedef struct VkptTemporalDepthDescription_s {
 	uint32_t primary_surface_only;
 } VkptTemporalDepthDescription;
 
+/* Semantic encoding of the three packed material resources expected by modern
+ * decoupled ray denoisers such as FSR Ray Regeneration. `normal_roughness_
+ * material` stores octahedral normal UV in RG, linear roughness in B, and a
+ * normalized 0..1 material category in A. `diffuse_albedo` and
+ * `specular_albedo` are sqrt encoded. */
+typedef struct VkptTemporalDenoiserMaterialDescription_s {
+	uint32_t struct_size;
+	uint32_t normal_encoding;
+	uint32_t albedo_encoding;
+	uint32_t material_type_count;
+} VkptTemporalDenoiserMaterialDescription;
+
 typedef struct VkptTemporalInputs_s {
 	uint32_t struct_size;
 	uint32_t available_inputs;
@@ -224,11 +253,15 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalImage normals;
 	VkptTemporalImage albedo;
 	VkptTemporalImage roughness;
+	VkptTemporalImage denoiser_normal_roughness_material;
+	VkptTemporalImage denoiser_diffuse_albedo;
+	VkptTemporalImage denoiser_specular_albedo;
 	VkptTemporalImage reactive_mask;
 	VkptTemporalImage transparency_and_composition_mask;
 	VkptTemporalMotionDescription motion_description;
 	VkptTemporalDepthDescription view_z_description;
 	VkptTemporalDepthDescription device_depth_description;
+	VkptTemporalDenoiserMaterialDescription denoiser_material_description;
 } VkptTemporalInputs;
 
 typedef struct VkptTemporalUiDescription_s {

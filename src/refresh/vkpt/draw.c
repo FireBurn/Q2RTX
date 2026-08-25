@@ -47,7 +47,9 @@ enum
 /* A generated and a real frame may be recorded from the same engine frame.
  * They need distinct writable final-blit descriptors while their command
  * buffers are in flight. */
-#define FINAL_BLIT_SETS_PER_FRAME 2
+#define FINAL_BLIT_SETS_PER_FRAME 3
+#define FINAL_BLIT_DESCRIPTOR_SLOT_PRESENT 0
+#define FINAL_BLIT_DESCRIPTOR_SLOT_SCREENSHOT 2
 
 static drawStatic_t draw = {
 	.scale = 1.0f,
@@ -1066,12 +1068,15 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 	return VK_SUCCESS;
 }
 
-VkResult
-vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf, VkImageView image_view,
-	VkExtent2D extent, VkptTemporalDebugView view)
+static VkResult
+vkpt_temporal_debug_blit_view_to_slot(VkCommandBuffer cmd_buf,
+	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view,
+	unsigned int descriptor_slot)
 {
+	if (descriptor_slot >= FINAL_BLIT_SETS_PER_FRAME)
+		return VK_ERROR_INITIALIZATION_FAILED;
 	VkDescriptorSet final_blit_set = desc_set_final_blit[
-		qvk.current_frame_index * FINAL_BLIT_SETS_PER_FRAME];
+		qvk.current_frame_index * FINAL_BLIT_SETS_PER_FRAME + descriptor_slot];
 	VkDescriptorImageInfo img_info_input = {
 		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
 		.imageView = image_view,
@@ -1099,7 +1104,7 @@ vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf, VkImageView image_view,
 	};
 
 	if (!image_view || view <= VKPT_TEMPORAL_DEBUG_OFF ||
-		view > VKPT_TEMPORAL_DEBUG_FSR4_REPROJECTED)
+		view > VKPT_TEMPORAL_DEBUG_DENOISER_SPECULAR_ALBEDO)
 		return VK_ERROR_INITIALIZATION_FAILED;
 	vkUpdateDescriptorSets(qvk.device, 1, &write, 0, NULL);
 	/* The private FSR4 diagnostic views are produced by the immediately
@@ -1124,6 +1129,22 @@ vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf, VkImageView image_view,
 	vkCmdDraw(cmd_buf, 4, 1, 0, 0);
 	vkCmdEndRenderPass(cmd_buf);
 	return VK_SUCCESS;
+}
+
+VkResult
+vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf, VkImageView image_view,
+	VkExtent2D extent, VkptTemporalDebugView view)
+{
+	return vkpt_temporal_debug_blit_view_to_slot(cmd_buf, image_view, extent,
+		view, FINAL_BLIT_DESCRIPTOR_SLOT_PRESENT);
+}
+
+VkResult
+vkpt_temporal_debug_blit_for_screenshot(VkCommandBuffer cmd_buf,
+	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view)
+{
+	return vkpt_temporal_debug_blit_view_to_slot(cmd_buf, image_view, extent,
+		view, FINAL_BLIT_DESCRIPTOR_SLOT_SCREENSHOT);
 }
 
 VkResult
