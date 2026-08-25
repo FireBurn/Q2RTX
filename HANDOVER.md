@@ -58,6 +58,14 @@ Current truth:
   steady path). The repeat paused FI/OF for the menu, resumed it at
   contract-v11/frame-1985, and captured a coherent scene with no VUID/error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_menu_resume_verified.png`.
+  The native FSR3.1.4 FI path passed the same transition at frame 1984:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR314_framegen_menu_resume.png`.
+
+- A real `gamemap base2` scene replacement (not a full server restart) kept
+  source-v07 FSR4 plus SDK-3.1.6 FI/OF enabled. It retained the expected
+  scene/menu reset `0x840`, then reached an eligible/history-valid v11 frame
+  1579 with no VUID/error and a coherent `base2` capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_map_transition.png`.
 
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
