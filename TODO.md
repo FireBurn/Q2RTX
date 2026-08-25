@@ -300,7 +300,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   rather than labelling both generically.
   The reusable API now also passes the public sRGB/PQ/scRGB transfer function
   and luminance range through both OF and FI; Q2RTX selects scRGB in HDR mode.
-  A physical HDR-surface run remains outstanding.
+  A physical RX 6800M HDR-surface run is validation-clean: source-v07 FSR4
+  Quality plus SDK-3.1.6 FI/OF was active under `vid_hdr=1`, and
+  `screenshothdr` produced `FSR4_hdr_fiog.hdr`. Broader visual/lifecycle
+  coverage remains experimental.
   GCC 16 and Clang 22 both build this coexistence gate while the reusable suite
   passes 36/36. The added Q2RTX-profile FI/OF smoke uses RGBA16F color/output
   and the engine's RGBA16F `FLAT_MOTION` input, verifying that the SDK samples

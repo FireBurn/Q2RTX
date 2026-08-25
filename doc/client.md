@@ -870,8 +870,9 @@ latter imports Q2RTX's
 RGBA16F HUDless color/output, R32F device depth, and RGBA16F motion surface;
 only the normalized motion in RG is sampled, leaving the engine's BA metadata
 untouched. It selects sRGB in SDR and scRGB with Q2RTX HDR presentation; the
-public shader profile handles that at runtime. It remains experimental pending
-physical-HDR and broader visual/lifecycle coverage.
+public shader profile handles that at runtime. A validation-clean physical HDR
+surface smoke has passed; broader visual/lifecycle coverage remains
+experimental.
 `flt_frame_generation_reason` identifies the active scheduler.
 
 #### `flt_frame_generation_min_rendered_fps`
@@ -2139,6 +2140,11 @@ Takes the screenshot in JPG format. If `filename` argument is given, saves
 the screenshot into `screenshots/_filename_.jpg`. Otherwise, file name is
 picked up automatically. If `quality` argument is given, saves with this
 quality level. Otherwise, saves with `gl_screenshot_quality` level.
+
+#### `screenshothdr [filename]`
+Takes a linear Radiance HDR screenshot. Use this command while `vid_hdr` is
+enabled; PNG, JPG, and TGA screenshots are intentionally unavailable in HDR
+mode. If `filename` is given, it saves to `screenshots/_filename_.hdr`.
 
 #### `screenshottga [filename]`
 Takes the screenshot in TGA format. If `filename` argument is given, saves

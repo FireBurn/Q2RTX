@@ -4790,7 +4790,13 @@ IMG_ReadPixelsHDR_RTX(screenshot_t *s)
 		.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
 	);
 
-	IMAGE_BARRIER(cmd_buf,
+	/* Host-read access is only valid at the HOST pipeline stage. The generic
+	 * IMAGE_BARRIER helper expands to ALL_COMMANDS on both sides, which Vulkan
+	 * validation rejects for HDR screenshot readback. Match the established SDR
+	 * capture ownership transition explicitly. */
+	IMAGE_BARRIER_STAGES(cmd_buf,
+		VK_PIPELINE_STAGE_HOST_BIT,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 		.image = qvk.screenshot_image,
 		.subresourceRange = subresource_range,
 		.srcAccessMask = VK_ACCESS_HOST_READ_BIT,
@@ -4819,7 +4825,9 @@ IMG_ReadPixelsHDR_RTX(screenshot_t *s)
 		.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 	);
 
-	IMAGE_BARRIER(cmd_buf,
+	IMAGE_BARRIER_STAGES(cmd_buf,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_HOST_BIT,
 		.image = qvk.screenshot_image,
 		.subresourceRange = subresource_range,
 		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,

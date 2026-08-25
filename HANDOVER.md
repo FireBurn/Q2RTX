@@ -77,6 +77,16 @@ Current truth:
   coherent and the script restored the original geometry before exit:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_resize_fiog.png`.
 
+- Physical HDR presentation is now covered on the RX 6800M. With `vid_hdr=1`,
+  source-v07 FSR4 Quality and SDK-3.1.6 FI/OF were active at 960x540, and
+  `screenshothdr` saved a coherent linear capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_hdr_fiog.hdr`.
+  Validation initially exposed HDR-only readback barriers that paired
+  `HOST_READ` access with `ALL_COMMANDS`; `IMG_ReadPixelsHDR_RTX` now uses the
+  valid HOST -> ALL_COMMANDS and ALL_COMMANDS -> HOST transitions already used
+  by SDR capture. The repeat run had no VUID/error, rebuilt cleanly when HDR
+  was disabled again, and exited normally.
+
 - The updated reusable `ffx-vulkan::effects` package was reinstalled into a
   fresh temporary prefix after the reset-slot and mode-transition policy API
   changes. An independent `examples/installed-full-stack` CMake consumer then

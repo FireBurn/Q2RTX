@@ -91,6 +91,11 @@ present it again with a separate completion semaphore; never reuse
 `current_swap_chain_image_index` after presentation or alter that renderer
 state for a screenshot.
 
+HDR captures use `screenshothdr`, not a PNG/JPEG command.  Its host-readable
+image transitions must use HOST -> ALL_COMMANDS before the copy and
+ALL_COMMANDS -> HOST afterwards: a generic ALL_COMMANDS -> ALL_COMMANDS
+barrier is invalid when either access mask is `HOST_READ`.
+
 Q2RTX signal conventions currently exposed by the contract:
 
 - `FLAT_COLOR`: dense render-resolution RGBA16F linear HDR, stored at 128x
