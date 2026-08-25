@@ -1480,10 +1480,10 @@ void vkpt_fsr_init_cvars(void)
      * normal present path until that presenter has acquired two images. */
     cvar_flt_frame_generation = Cvar_Get("flt_frame_generation", "0",
                                          CVAR_ARCHIVE);
-    /* Keep the live-validated 1.1.4 provider as the default. The newer SDK
-     * 2.3 FI/OF path is separately selectable until its presenter path has
-     * equivalent long-duration game coverage. */
-    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "0",
+    /* Prefer the newer public SDK 3.1.6 FI/OF provider for fresh configs. Its
+     * explicit Vulkan presenter and resource-retirement path has current
+     * validation coverage; archived user choices are deliberately preserved. */
+    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "1",
                                                  CVAR_ARCHIVE);
     /* Analytical interpolation is most convincing at a sustained high input
      * rate. Thirty is a conservative default safety floor; set zero to

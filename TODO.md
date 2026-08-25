@@ -268,8 +268,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   validation warnings/errors in both RGBA8 and Q2RTX-compatible RGBA16F
   modes. Frame-ID retirement makes the caller's fence boundary explicit while
   retaining multiple queue-ordered frames safely. It is now selectable in
-  Q2RTX as `flt_frame_generation_backend 1`, while the longer-tested 1.1.4
-  backend remains the default (`0`). The integration imports Q2RTX's RGBA16F
+  Q2RTX as `flt_frame_generation_backend 1` and is the default for fresh
+  configs; the longer-tested 1.1.4 backend remains available as `0`. The
+  integration imports Q2RTX's RGBA16F
   HUDless color, R32F device depth, and RGBA16F motion surface (the SDK
   samples its XY channels), then retires imports at the frame-slot fence. A
   30-second RX 6800M `base1` run at 1280x720, with validation enabled,
@@ -565,7 +566,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   page and showed the live startup/fallback state, zero cadence, and safe
   reason truncation without a VUID or parser error; capture:
   `/home/fireburn/Screenshot_temporal_diagnostics_window_20260820.png`.
-  Pacing controls still need design and implementation.
+  There is deliberately no selectable pacing mode: active analytical FG always
+  recreates the swapchain for FIFO so every generated->real pair is presented
+  in order; Mailbox can replace a generated image and Immediate can tear it.
+  The independent FPS safety floor is the relevant user-facing pacing knob.
 - [-] Resolve requested versus active implementation through a central
   capability/fallback resolver and display one precise fallback reason.
   `flt_upscaler_active` and `flt_upscaler_reason` now publish the exact live

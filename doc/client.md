@@ -850,9 +850,10 @@ frame, both presentation paths safely use the real scene instead.
 #### `flt_frame_generation_backend`
 
 Selects the FI/OF scheduler while leaving the presentation policy and temporal
-input contract shared. `0` (default) uses the longer-tested native Vulkan FSR3
-1.1.4 implementation. `1` selects the reusable public-SDK FSR3 3.1.6 Optical
-Flow and Frame Interpolation Vulkan profile. The latter imports Q2RTX's
+input contract shared. `0` uses the longer-tested native Vulkan FSR3
+1.1.4 implementation. `1` (the default for fresh configs) selects the reusable
+public-SDK FSR3 3.1.6 Optical Flow and Frame Interpolation Vulkan profile. The
+latter imports Q2RTX's
 RGBA16F HUDless color/output, R32F device depth, and RGBA16F motion surface;
 only the normalized motion in RG is sampled, leaving the engine's BA metadata
 untouched. It selects sRGB in SDR and scRGB with Q2RTX HDR presentation; the

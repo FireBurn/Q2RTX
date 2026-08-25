@@ -101,6 +101,16 @@ Current truth:
   (83.3 logical FPS, gate disabled), with no VUID/error. Its 960x540 capture
   is full colour and coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_colour_after_rr.png`.
+  A longer current-layout run remained active through frame 2150 at the normal
+  30-FPS safety floor (52.6 logical / 100 nominal generated FPS), with no
+  VUID/error and another coherent capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_60s_after_rr.png`.
+  It is therefore the default scheduler for fresh configs; existing archived
+  `flt_frame_generation_backend` choices are intentionally not migrated. An
+  isolated fresh XDG profile (linked game data but no config) verified that
+  omitting the cvar selects SDK 3.1.6 and reaches active v11/frame 401 FIFO
+  presentation, full colour and validation-clean:
+  `/tmp/q2rtx-fresh-fg.F4n4pa/quake2rtx/baseq2/screenshots/FSR316_fresh_default.png`.
 
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
@@ -404,9 +414,10 @@ Current truth:
   frames with zero validation warnings/errors in both RGBA8 and Q2RTX's
   RGBA16F presentation format. `RetireFrame(completedFrameId)` is deliberately
   required after the application's submission fence, retaining multiple
-  queue-ordered imported-view sets safely until GPU completion. Q2RTX now
-  selects this provider through `flt_frame_generation_backend 1` (default 0
-  retains the 1.1.4 implementation), maps the RGBA16F HUDless color, R32F
+  queue-ordered imported-view sets safely until GPU completion. Q2RTX selects
+  this provider through `flt_frame_generation_backend 1` (the default for
+  fresh configs; `0` retains the 1.1.4 implementation), maps the RGBA16F
+  HUDless color, R32F
   device depth, and RGBA16F motion input, and retires imports at the frame-slot
   fence. A validation-enabled 30-second RX 6800M 1280x720 `base1` run recreated
   its contexts then reached active FIFO paired presentation with no VUID,

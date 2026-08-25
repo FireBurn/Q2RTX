@@ -164,9 +164,9 @@ begin video
 		pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3 3.1.4 or experimental 3.1.5, rectilinear single-GPU rendering, and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait. Enabling it recreates the swapchain with FIFO pacing so Mailbox/Immediate cannot discard or tear the generated-real pair." \
 			"FSR3 frame generation" flt_frame_generation \
 			"Off" 0 "Analytical (experimental)" 1
-		pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port, validated for RGBA16F, sRGB/scRGB transfer handling, and fence-token view retirement, but remains experimental in Q2RTX. Legacy 1.1.4 is the default live-tested path." \
+		pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port and the default for fresh configs; it is validated for RGBA16F, sRGB/scRGB transfer handling, fence-token view retirement, and current RX 6800M FIFO presentation. Legacy 1.1.4 remains available for comparison." \
 			"FSR3 FG scheduler" flt_frame_generation_backend \
-			"Legacy 1.1.4" 0 "SDK 3.1.6 (experimental)" 1
+			"Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
 		range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation and eight samples at threshold plus 2 FPS resume it." \
 			"FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
 		action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
