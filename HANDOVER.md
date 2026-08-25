@@ -13,12 +13,16 @@ Current truth:
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, FSR3.1.4/3.1.5/FI status, source-v07 FSR4 model/tier/permutation,
-  and provider memory accounting without changing a context or recording work.
-  In the 2026-08-25 RX 6800M Quality run it reported an eligible 644x361 ->
-  960x540 v07 dispatch, all required scene/motion/view-Z inputs, and 40.01 MiB
-  of provider-owned FSR4 allocation (19.91 MiB activation scratch). The log had
+  and effect memory accounting without changing a context or recording work.
+  Both reusable FSR3 upscaler APIs now publish their SDK-reported memory totals:
+  the 3.1.5 bridge reports actual Vulkan allocation sizes and zero aliasable
+  bytes because it deliberately uses independent allocations. In the
+  2026-08-25 RX 6800M Quality run it reported an eligible 644x361 -> 960x540
+  v07 dispatch, all required scene/motion/view-Z inputs, 28.27 MiB FSR3.1.4
+  (6.16 MiB aliasable), 28.16 MiB FSR3.1.5 (0 aliasable), and 40.01 MiB
+  provider-owned FSR4 allocation (19.91 MiB activation scratch). The log had
   no VUID/error and the captured output was coherent:
-  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_diagnostics_20260825.png`.
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_diagnostics_memory_20260825.png`.
 
 - Console screenshot readback now respects WSI ownership.  It no longer
   transitions `current_swap_chain_image_index` after its normal present;
@@ -970,10 +974,12 @@ acquire/copy/present cycle rather than a stale last-presented-image transition.
 
 - The source-v07 FSR4 backend now reports the provider's actual Vulkan memory
   requirements after context creation. A validation-enabled RX 6800M run at
-  960x540 reported 39.10 MiB provider-owned allocations, including 19.91 MiB
+  960x540 reported 40.01 MiB provider-owned allocations, including 19.91 MiB
   activation scratch, with no VUID, validation warning, or error. This count
   includes Vulkan allocation alignment and excludes opaque descriptor-pool
-  driver overhead; it is not a heuristic estimate.
+  driver overhead; it is not a heuristic estimate. The same run verified
+  FSR3.1.4's 28.27 MiB (6.16 MiB aliasable) and the SDK-3.1.5 bridge's exact
+  28.16 MiB (0 aliasable) through the newly public reusable queries.
 - The reusable FSR4 v07 backend no longer recycles descriptor pools and
   host-visible constant-buffer bytes on a Q2RTX-specific frame cadence.
   `ffxFsr4VkBeginFrame` reserves one of three partitions and

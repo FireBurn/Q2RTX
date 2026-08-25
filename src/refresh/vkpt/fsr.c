@@ -1278,6 +1278,28 @@ void vkpt_fsr_print_diagnostics(void)
         cvar_flt_fsr3_sharpening ? cvar_flt_fsr3_sharpening->value : 0.0f);
     Com_Printf("  FSR3 3.1.5: context=%s SDK=2.3.0, embedded fixed Vulkan profile\n",
         fsr3_315_context_ok ? "ready" : "not ready");
+    if (fsr3_context_ok && fsr3_context) {
+        FfxVkPortableMemoryUsage usage = { .structSize = sizeof(usage) };
+        FfxVkPortableResult result = ffxVkPortableUpscaleContextGetMemoryUsage(
+            fsr3_context, &usage);
+        if (result == FFX_VK_PORTABLE_OK)
+            Com_Printf("  FSR3 3.1.4 memory: %.2f MiB SDK-reported (%.2f MiB aliasable)\n",
+                (double)usage.totalUsageInBytes / (1024.0 * 1024.0),
+                (double)usage.aliasableUsageInBytes / (1024.0 * 1024.0));
+        else
+            Com_Printf("  FSR3 3.1.4 memory: unavailable (%d)\n", (int)result);
+    }
+    if (fsr3_315_context_ok && fsr3_315_context) {
+        FfxVkFsr3_3_1_5MemoryUsage usage = {0};
+        FfxVkFsr3_3_1_5Result result =
+            ffxVkFsr3_3_1_5UpscalerContextGetMemoryUsage(fsr3_315_context, &usage);
+        if (result == FFX_VK_FSR3_3_1_5_OK)
+            Com_Printf("  FSR3 3.1.5 memory: %.2f MiB SDK-reported (%.2f MiB aliasable)\n",
+                (double)usage.totalUsageInBytes / (1024.0 * 1024.0),
+                (double)usage.aliasableUsageInBytes / (1024.0 * 1024.0));
+        else
+            Com_Printf("  FSR3 3.1.5 memory: unavailable (%d)\n", (int)result);
+    }
     Com_Printf("  FSR3 FI/OF: requested=%s backend=%s context=%s active=%s "
                "rendered=%.1f generated=%.1f\n",
         cvar_flt_frame_generation && cvar_flt_frame_generation->integer ? "on" : "off",
