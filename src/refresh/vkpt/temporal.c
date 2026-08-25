@@ -17,6 +17,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "vkpt.h"
+#include "ffx_vk_temporal_lifecycle.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -57,19 +58,18 @@ static bool
 camera_cut_detected(const VkptTemporalCamera *current,
 	const VkptTemporalCamera *previous)
 {
-	const float dx = current->position[0] - previous->position[0];
-	const float dy = current->position[1] - previous->position[1];
-	const float dz = current->position[2] - previous->position[2];
-	const float distance_squared = dx * dx + dy * dy + dz * dz;
-	const float forward_dot =
-		current->forward[0] * previous->forward[0] +
-		current->forward[1] * previous->forward[1] +
-		current->forward[2] * previous->forward[2];
-	const float fov_delta = fabsf(current->vertical_fov_radians -
-		previous->vertical_fov_radians);
+	const FfxVkTemporalCameraState portable_current = {
+		.position = { current->position[0], current->position[1], current->position[2] },
+		.forward = { current->forward[0], current->forward[1], current->forward[2] },
+		.verticalFovRadians = current->vertical_fov_radians,
+	};
+	const FfxVkTemporalCameraState portable_previous = {
+		.position = { previous->position[0], previous->position[1], previous->position[2] },
+		.forward = { previous->forward[0], previous->forward[1], previous->forward[2] },
+		.verticalFovRadians = previous->vertical_fov_radians,
+	};
 
-	return distance_squared > 256.0f * 256.0f ||
-		forward_dot < 0.0f || fov_delta > 0.35f;
+	return ffxVkTemporalCameraCutDetected(&portable_current, &portable_previous);
 }
 
 static bool

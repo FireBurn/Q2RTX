@@ -40,6 +40,11 @@ other Vulkan applications.
   A rate-gated fallback learns FI cost and requires that headroom on recovery;
   do not replace it with a simple threshold +2 loop, which oscillates when
   disabling FI itself raises the frame rate.
+- Camera-cut classification is shared through
+  `ffx-vulkan::temporal-lifecycle`, not duplicated per provider. It resets
+  history for a teleport over 256 world units, a turn over 90 degrees, a lens
+  jump over 0.35 radians, or invalid camera data; the boundary tests must stay
+  strict about ordinary motion and exact threshold values.
 
 ## Ground truth architecture
 

@@ -51,6 +51,16 @@ Current truth:
   and the captured output was coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_fiof_diagnostics_memory_20260825.png`.
 
+- Camera-discontinuity handling is now a tested reusable package target rather
+  than an untested Q2RTX-local heuristic. `ffx-vulkan::temporal-lifecycle`
+  classifies a >256-unit teleport, >90-degree turn, >0.35-radian lens jump, or
+  non-finite input as a cut; Q2RTX adapts its resolved camera into that API
+  before setting `VKPT_TEMPORAL_RESET_CAMERA_CUT`. Exact boundaries remain
+  ordinary reprojectable motion, including a float-safe FOV comparison. The
+  standalone test covers each case and the Q2RTX client links the same target.
+  A live free-camera/teleport capture is still needed to prove the end-to-end
+  game-input route.
+
 - The menu revision now exposes all provider-neutral RR input views through
   view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the
   working source-v07 Vulkan path from official FSR 4.1.1: AMD documents the

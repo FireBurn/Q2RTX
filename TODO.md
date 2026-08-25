@@ -604,8 +604,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   motion remains reprojectable. A validation-enabled 1280x720 FSR3.1.5
   gameplay smoke stayed active and coherent with no VUID/error:
   `/home/fireburn/Screenshot_FSR315_camera_tracking_smoke_20260820.png`.
-  A deliberate camera-cut stimulus is still needed to validate the reset
-  branch and tune thresholds.
+  The classifier is now factored into the installed reusable
+  `ffx-vulkan::temporal-lifecycle` target, and its boundary test proves normal
+  movement, exact 256-unit/90-degree/0.35-radian boundaries, discontinuities,
+  and non-finite inputs. Q2RTX calls that same code before every provider
+  dispatch. A deliberate live camera-cut stimulus is still needed to validate
+  the full input-to-presentation reset branch and tune thresholds.
 - [x] Reset FSR history when temporal settings, including `flt_fsr_enable`,
   change so disable/re-enable cannot reuse stale recurrent state.
 - [x] Log provider/effect version, backend, model, active permutation, input,
