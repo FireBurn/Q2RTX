@@ -495,8 +495,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## P4 — Ray Regeneration and neural Frame Generation
 
-- [R] Capture Ray Regeneration 1.2 selected shaders/provider schedule.  Official
-  support is RX9000+/DX12; native RDNA2 viability is unknown.
+- [R] Capture Ray Regeneration 1.2 selected shaders/provider schedule. Official
+  support is RX9000+/DX12; the RX 6800M/RDNA2 DX12 probe does not select a
+  neural provider, and the current official SDK marks Vulkan unsupported.
 - [-] Add RR-compatible normals/roughness/material, diffuse/specular albedo,
   separate noisy direct/indirect diffuse/specular signals, hit distances,
   view-Z delta, and camera basis inputs while retaining ASVGF fallback.
@@ -539,8 +540,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `TEMPORAL_RR_MOTION` (PreviousUV-CurrentUV plus previous-minus-current
   signed-linear view-Z) rather than reusing `FLAT_MOTION`'s incompatible
   radial/reflection-denoiser Z channel. A provider dispatch remains outstanding.
-- [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
-  support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
+- [R] Capture ML Frame Generation 4.0.1 provider schedule/model. Official
+  support is RX9000+/Windows 11/DX12; the current official SDK has no Vulkan
+  route and this RX 6800M/RDNA2 configuration cannot select the ML provider.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes
   runnable; never intermingle UI with interpolated scene color.
 

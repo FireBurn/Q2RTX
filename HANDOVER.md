@@ -61,6 +61,17 @@ Current truth:
   A live free-camera/teleport capture is still needed to prove the end-to-end
   game-input route.
 
+- Official-source feasibility was rechecked on 2026-08-25 without altering the
+  user's SDK trees. The current AMD FSR SDK 2.3.0 repository lists FSR4.1.1,
+  ML Frame Generation 4.0.1, and Ray Regeneration 1.2, but its own known-issue
+  table says Vulkan is currently unsupported. The locally retained FSR4 fork is
+  SDK 2.0.0 and contains only DX12 signed DLLs (`upscaler`, `framegeneration`,
+  and loader), no RR module. Combined with the existing RX 6800M DX12 probe
+  selecting only analytical FSR3.1.5/2.3.4, there is no honest native-Vulkan
+  neural RR/MLFG provider to attach on this machine. Keep the working native
+  FSR3 FI/OF and source-v07 FSR4 paths distinct from that unavailable binary
+  feature set.
+
 - The menu revision now exposes all provider-neutral RR input views through
   view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the
   working source-v07 Vulkan path from official FSR 4.1.1: AMD documents the
