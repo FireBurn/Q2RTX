@@ -935,6 +935,13 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
   fixed 50% controller range (with RCAS/SPD enabled). Both 960x540 RX 6800M
   runs selected the expected model in the live resolver and had no VUID,
   validation warning, or error.
+- A clean standalone `extern/ffx-vulkan` Debug configure/build then passed all
+  31 CTest cases on the RX 6800M. Coverage includes the pinned FSR3 1.1.4
+  backend, public 3.1.5 bridge, 3.1.6 FI/OF API variants, generated SPIR-V and
+  source hashes, FSR4 v07 asset selection, and Vulkan-validation smokes. The
+  first attempt correctly exposed a duplicate RenderDoc layer warning left by
+  this session's failed capture registration; after removing only that
+  session-created user manifest, the same unmodified build was fully clean.
 - A temporary RenderDoc 1.40 command-line build succeeded, but its Vulkan
   layer is X11/XCB-only. The locally registered 1.39 layer is also X11/XCB-only.
   Q2RTX's SDL build reports `x11 not available`, while Wayland startup reports
