@@ -448,8 +448,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   stayed active at a 30-FPS floor (76.9 logical FPS), while the same scene at a
   60-FPS floor settled in safe fallback after one probe rather than oscillating
   (166.7 logical FPS versus a learned 181.6-FPS re-enable floor). Both runs
-  used validation with coherent screenshots and no VUID. Validate a genuinely
-  sustained >=60-FPS scene plus latency/pacing and broad lifecycle coverage.
+  used validation with coherent screenshots and no VUID. The legacy FSR3 1.1.4
+  FI backend also stayed active through the shared 30-FPS gate (83.3 logical
+  FPS) with a coherent validation-clean capture. Validate a genuinely sustained
+  >=60-FPS scene plus latency/pacing and broad lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research
 

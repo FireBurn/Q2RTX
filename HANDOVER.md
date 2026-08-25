@@ -19,6 +19,10 @@ Current truth:
   a generated pair was active. At a 30-FPS floor, SDK-3.1.6 remained active
   (76.9 logical FPS) with no VUID/error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_30fps_active_gate_20260825.png`.
+  The same shared gate also remained active with the older FSR3 1.1.4 FI
+  backend at the 30-FPS floor (83.3 logical / 166.7 nominal FPS), validation
+  clean and visually coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR314_FG_30fps_active_gate_20260825.png`.
   At a 60-FPS floor this scene falls below the floor with FI enabled. The
   adaptive recovery gate observed its enabled cost, briefly probed once, then
   remained safely in real-frame fallback (logical 166.7 FPS, re-enable floor
