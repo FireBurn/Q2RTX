@@ -116,6 +116,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   capped at native 100%, including the controller-empty startup case; a
   `viewsize 150` live validation resolved to 1280x720 -> 1280x720 and stayed
   validation-clean.
+  The later resolver fix was also verified across a live static
+  Performance→DRS switch with SDK-3.1.6 FI/OF active: it rebuilt the DRS graph,
+  reached v11/frame 1588 with the 50..100% controller enabled, and emitted no
+  VUID/error or fallback.
 - [x] Update the in-game video menu for the FSR3/FSR4 controls and deploy its
   loose source-menu override on this development system, where the installed
   `q2rtx_media.pkz` still contained the obsolete FSR 1.0 controls. Linux

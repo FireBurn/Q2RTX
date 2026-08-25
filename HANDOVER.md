@@ -85,6 +85,10 @@ Current truth:
   reached history-valid v11/frame 1585 without VUID/error, and captured a
   coherent scene:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_quality_switch_fiog.png`.
+  The same path was then exercised from static Performance to the dedicated
+  DRS graph: controller enabled at 50..100%, DRS model active at
+  history-valid v11/frame 1588, SDK FI/OF resumed, and no VUID/error occurred:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_drs_switch_fiog.png`.
 
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
