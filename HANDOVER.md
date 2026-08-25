@@ -179,6 +179,18 @@ Current truth:
   `baseq2/screenshots/RR_indirect_diffuse_hit_distance_20260825.png`.
   Diagnostics are in `baseq2/logs/RR_hit_distance_debug_20260825.log`.
 
+- Dominant-light investigation reached a concrete, deliberately unimplemented
+  boundary. `get_sunlight` already launches the suitable per-pixel sun shadow
+  ray, but `trace_shadow_ray` intentionally collapses it to binary visibility
+  and discards the blocker distance required by RR 1.2. Q2RTX's exact resolved
+  sun emission is also GPU-only in `sun_color_ubo`, while host-side
+  `sun_light.color` is only the pre-atmosphere/cvar value. Do not advertise a
+  dominant-light signal using that approximation. A correct next change must
+  retain the existing shadow ray's first hit distance (using FP16_MAX on a
+  miss) and publish emission from the same resolved GPU source, alongside the
+  sampled sun direction/radius. This requires a small explicit GPU-to-host or
+  provider-facing metadata bridge; it must not add a duplicate ray trace.
+
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.
   The prior safe-acquire-only code copied an arbitrary fresh image, producing

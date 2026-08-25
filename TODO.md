@@ -502,7 +502,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   indirect-lobe segment distance in the alpha channel of each indirect
   partition (finite 10,000-unit sky misses, negative for an untraced lobe).
   Direct alpha remains the documented non-negative undefined value. Dominant
-  light visibility and the official neural provider remain outstanding.
+  light visibility remains outstanding: the existing sunlight trace currently
+  returns only binary visibility and its exact resolved emission is GPU-only,
+  so do not publish host-side cvar colour as a false substitute. The official
+  neural provider also remains outstanding.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes
