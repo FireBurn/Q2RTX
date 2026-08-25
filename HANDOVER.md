@@ -50,6 +50,15 @@ Current truth:
   FI/OF at contract-v11/frame-910 with no VUID/error and a coherent capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_rate_recovery.png`.
 
+- The verified `pushmenu main` → `popmenu` lifecycle exposed a second real
+  bug: resuming paired presentation could re-signal a binary render-finished
+  semaphore before WSI consumed the normal/menu present wait. The reusable
+  presenter policy now asks for a one-time graphics-queue quiescence whenever
+  either side of ordinary↔generated presentation changes (not during either
+  steady path). The repeat paused FI/OF for the menu, resumed it at
+  contract-v11/frame-1985, and captured a coherent scene with no VUID/error:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_menu_resume_verified.png`.
+
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, the most recent retained temporal reset frame/reason bits,

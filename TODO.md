@@ -466,7 +466,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   presenting the real image twice before FI/OF resumes. A live forced
   240-FPS gate fallback→0-FPS-threshold recovery confirms the same guard when
   the provider alone requests reset (`v11/frame 910`, no VUID/error). Validate
-  a genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
+  A verified `pushmenu main` → `popmenu` lifecycle then exposed a binary WSI
+  semaphore re-signal on resume; the reusable presenter policy now quiesces
+  exactly once on either ordinary↔paired transition. The repeat resumed cleanly
+  at `v11/frame 1985`, with no VUID/error and a coherent capture. Validate a
+  genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
   cuts, alt-tab/loading, and broad lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research

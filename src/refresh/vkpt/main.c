@@ -3802,9 +3802,19 @@ R_BeginFrame_RTX(void)
 	 * one-image acquisition path as the fallback whenever its compute/presenter
 	 * prerequisites are not met. Three images avoid blocking a two-acquire frame
 	 * behind the presentation engine on minimum-double-buffer swapchains. */
+	const bool framegen_present_was_active = qvk.framegen_present_active;
 	qvk.framegen_present_active = framegen_present_requested && !qvk.frame_menu_mode &&
 		qvk.num_swap_chain_images >= qvk.framegen_required_swap_chain_images &&
 		vkpt_fsr_frame_generation_prepare_present();
+	/* A frame-slot fence proves the render submissions completed, but a WSI
+	 * present wait can still own the previous mode's binary semaphore. On the
+	 * one ordinary↔generated transition (menu, rate gate, or user toggle), wait
+	 * for the queue to consume it before reusing presentation semaphores. Do not
+	 * put this in either steady presentation path. */
+	if (ffxVkFrameGenerationTransitionNeedsQuiescence(
+		framegen_present_was_active, qvk.framegen_present_active)) {
+		_VK(vkQueueWaitIdle(qvk.queue_graphics));
+	}
 	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
 		vkpt_fsr_frame_generation_publish_status(false, "off");
 	else if (temporal_debug_requested)

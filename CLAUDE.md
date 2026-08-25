@@ -50,6 +50,11 @@ other Vulkan applications.
   valid intermediate image. The paired presenter must use the real scene for
   that one slot, including resets caused internally when the rate gate resumes;
   use `ffxVkFrameGenerationShouldPresentGenerated` and retain its policy test.
+- A binary semaphore passed to WSI can remain pending after its render fence.
+  On either transition between ordinary and paired generated→real presentation,
+  use `ffxVkFrameGenerationTransitionNeedsQuiescence` and wait for the present
+  queue once before reusing its presentation semaphores; never add that stall to
+  either steady presentation path.
 
 ## Ground truth architecture
 
@@ -372,9 +377,10 @@ samplers and a required write for every declared non-sampler binding.
 The installed package also exports
 `ffx-vulkan::framegeneration-presenter-policy`. It contains only reusable WSI
 policy (FIFO selection, image-count/pair validation, and image/GPU semaphore
-indexing, plus reset-slot generated-image suppression); applications must
-retain acquire, submit, present, fence, and platform-window ownership. Q2RTX
-must use this policy rather than recreating those invariants locally.
+indexing, reset-slot generated-image suppression, and mode-transition
+quiescence); applications must retain acquire, submit, present, fence, and
+platform-window ownership. Q2RTX must use this policy rather than recreating
+those invariants locally.
 
 Frame generation consumes the HUDless `VKPT_IMG_TAA_OUTPUT` scene. FSR3.1.4,
 FSR3.1.5, and the source-v07 FSR4 provider all publish their reconstructed

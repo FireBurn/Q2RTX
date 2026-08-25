@@ -855,6 +855,10 @@ The same real-image fallback is used for one paired slot immediately after a
 temporal reset (for example a camera cut): that dispatch initializes optical
 flow history but has no preceding image from which to synthesize a valid
 intermediate frame. Generation resumes on the next history-valid frame.
+Changing between ordinary and generated presentation pauses the graphics queue
+once to let WSI consume the old mode's binary present wait. This happens only
+on transitions such as opening/closing a menu, rate-gate fallback/recovery, or
+toggling frame generation—not during steady gameplay.
 
 #### `flt_frame_generation_backend`
 
