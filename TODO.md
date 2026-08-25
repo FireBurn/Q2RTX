@@ -359,7 +359,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   public record-only API owns separate OF/FI backends and shared resources;
   it validates 352 FI + 56 OF lookups and submits reset plus temporal frames
   on RX 6800M with finite, fully-overwritten RGBA16F output and zero validation
-  warnings/errors.
+  warnings/errors. A subsequent 45-second 960x540 FIFO-presenter smoke reached
+  active generated→real presentation with no validation message.
 - [-] Port/reconcile the newer public SDK 2.3 FSR3 3.1.6 analytical frame
   interpolation algorithms behind the reusable API. The fixed Vulkan profile
   and Q2RTX experimental scheduler selection work on SDR/RX 6800M; HDR,

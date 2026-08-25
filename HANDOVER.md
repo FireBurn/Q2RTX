@@ -71,6 +71,10 @@ Current truth:
   corrected path passed a 45-second RX 6800M FSR3.1.6 FIFO run at 960x540,
   reached active presentation, and logged no VUID, validation warning, or
   error. Device-group temporal input gathering remains separately unsupported.
+  The shared presenter was then exercised with its alternate reusable FSR3
+  1.1.4 Optical Flow/Frame Interpolation backend for 45 seconds at 960x540;
+  it also reached active FIFO presentation without a VUID, validation warning,
+  or error.
 
 - Presentation audit: `VKPT_IMG_TAA_OUTPUT` is already the dedicated
   display-resolution, tone-mapped-but-HUDless offscreen scene for both FI
