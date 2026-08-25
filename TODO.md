@@ -372,6 +372,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   second acquire and real-frame fallback. Distinct generated/real final-blit
   descriptors plus one UI upload eliminate the in-flight descriptor/host-write
   hazard, and same-queue order removes the former CPU replay wait. The reusable
+  `ffx-vulkan::framegeneration-presenter-policy` target now exports the
+  platform-neutral FIFO/image-count/acquired-pair/semaphore-ownership rules;
+  Q2RTX uses it and an installed-package consumer plus 32-test standalone
+  suite pass. Full acquire/submit/present callback extraction remains pending.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
   stayed active with no VUIDs. It now marks the presenter active and reports

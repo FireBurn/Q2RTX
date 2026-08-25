@@ -46,6 +46,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
+#include "ffx_vk_framegeneration_presenter.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -691,15 +693,6 @@ create_swapchain(void)
 	vkGetPhysicalDeviceSurfacePresentModesKHR(qvk.physical_device, qvk.surface, &num_present_modes, NULL);
 	VkPresentModeKHR *avail_present_modes = alloca(sizeof(VkPresentModeKHR) * num_present_modes);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(qvk.physical_device, qvk.surface, &num_present_modes, avail_present_modes);
-	bool immediate_mode_available = false;
-
-	for (int i = 0; i < num_present_modes; i++) {
-		if (avail_present_modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-			immediate_mode_available = true;
-			break;
-		}
-	}
-
 	qvk.surf_vsync = (cvar_vsync->integer != 0);
 	/* A generated/real pair is only meaningful if the presentation engine
 	 * displays both in order. FIFO is universally available and preserves that
@@ -709,13 +702,9 @@ create_swapchain(void)
 	qvk.surf_framegen_fifo = cvar_flt_frame_generation &&
 		cvar_flt_frame_generation->integer != 0;
 
-	if (qvk.surf_vsync || qvk.surf_framegen_fifo) {
-		qvk.present_mode = VK_PRESENT_MODE_FIFO_KHR;
-	} else if (immediate_mode_available) {
-		qvk.present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-	} else {
-		qvk.present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-	}
+	qvk.present_mode = ffxVkFrameGenerationSelectPresentMode(
+		qvk.surf_framegen_fifo, qvk.surf_vsync, avail_present_modes,
+		num_present_modes);
 	if (qvk.surf_framegen_fifo)
 		Com_Printf("FSR3 FG: FIFO presentation pacing selected for generated-real pairs.\n");
 
@@ -735,13 +724,10 @@ create_swapchain(void)
 	 * RADV's min=3 surface still intermittently rejects a second acquire from a
 	 * 4-image chain. */
 	qvk.framegen_required_swap_chain_images =
-		surf_capabilities.minImageCount + 2u;
-	uint32_t requested_image_count =
-		qvk.surf_framegen_fifo
-			? qvk.framegen_required_swap_chain_images : 2u;
-	uint32_t num_images = max(surf_capabilities.minImageCount, requested_image_count);
-	if(surf_capabilities.maxImageCount > 0)
-		num_images = min(num_images, surf_capabilities.maxImageCount);
+		ffxVkFrameGenerationRequiredImageCount(surf_capabilities.minImageCount, true);
+	uint32_t num_images = ffxVkFrameGenerationRequestedImageCount(
+		surf_capabilities.minImageCount, surf_capabilities.maxImageCount,
+		qvk.surf_framegen_fifo);
 
 	VkSwapchainCreateInfoKHR swpch_create_info = {
 		.sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -3845,7 +3831,10 @@ R_BeginFrame_RTX(void)
 			goto retry;
 		}
 		if (res_swapchain != VK_SUCCESS ||
-			qvk.current_swap_chain_image_index == qvk.framegen_generated_swap_chain_image_index) {
+			!ffxVkFrameGenerationValidateAcquiredPair(
+				qvk.framegen_generated_swap_chain_image_index,
+				qvk.current_swap_chain_image_index,
+				qvk.num_swap_chain_images)) {
 			if (res_swapchain != VK_NOT_READY)
 				Com_WPrintf("FSR3 FG: second swapchain acquisition failed; using real-frame fallback.\n");
 			qvk.current_swap_chain_image_index = qvk.framegen_generated_swap_chain_image_index;
@@ -3982,7 +3971,8 @@ R_EndFrame_RTX(void)
 		 * the image aliases another GPU's semaphore on a device-group build and
 		 * permits an illegal re-signal while its presentation is still pending. */
 		VkSemaphore generated_signal = qvk.swap_chain_render_finished[
-			(size_t)generated_index * (size_t)qvk.device_count];
+			ffxVkFrameGenerationRenderFinishedSemaphoreIndex(
+				generated_index, 0, qvk.device_count)];
 		VkSemaphore generated_wait = qvk.semaphores[qvk.current_frame_index][0].image_available;
 		VkPipelineStageFlags generated_wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		uint32_t device_index = 0;
@@ -4094,8 +4084,8 @@ R_EndFrame_RTX(void)
 	for (int gpu = 0; gpu < qvk.device_count; gpu++)
 	{
 		signal_semaphores[gpu] = qvk.swap_chain_render_finished[
-			(size_t)qvk.current_swap_chain_image_index * (size_t)qvk.device_count +
-			(size_t)gpu];
+			ffxVkFrameGenerationRenderFinishedSemaphoreIndex(
+				qvk.current_swap_chain_image_index, gpu, qvk.device_count)];
 		signal_device_indices[gpu] = gpu;
 	}
 

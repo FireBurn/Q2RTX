@@ -243,6 +243,13 @@ coexist with AMD's unversioned SDK symbols. Its dependency-complete FSR4
 subset installs as a CMake package; the full FSR3 source closure is consumed
 with `add_subdirectory` as documented in its README.
 
+The installed package also exports
+`ffx-vulkan::framegeneration-presenter-policy`. It contains only reusable WSI
+policy (FIFO selection, image-count/pair validation, and image/GPU semaphore
+indexing); applications must retain acquire, submit, present, fence, and
+platform-window ownership. Q2RTX must use this policy rather than recreating
+those invariants locally.
+
 Frame generation consumes the HUDless `VKPT_IMG_TAA_OUTPUT` scene. When it is
 active, UI is rendered once to a lazy per-frame-slot RGBA16F texture with
 premultiplied RGB/source alpha and published as

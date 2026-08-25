@@ -580,6 +580,7 @@ IF (TARGET client)
         ELSE ()
         TARGET_LINK_LIBRARIES(client vulkan)
         ENDIF()
+        TARGET_LINK_LIBRARIES(client ffx-vulkan::framegeneration-presenter-policy)
         IF (CONFIG_VKPT_FSR3)
             # Keep the stable 1.1.4 portable path and the public-SDK 3.1.5
             # scheduler bridge available to the same C renderer target.  The

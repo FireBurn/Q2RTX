@@ -36,6 +36,14 @@ Current truth:
   dependency-complete installed export. This remains experimental v07, never
   FSR4.1.1/RR/MLFG.
 
+- `ffx-vulkan::framegeneration-presenter-policy` now exports the reusable
+  window-system-neutral part of the FSR3 presentation contract: FIFO selection
+  for generated→real pairs, image-count requirements, pair validation, and
+  per-image/per-GPU render-complete semaphore indexing. Q2RTX consumes it;
+  its standalone test, an installed-package consumer, and a 45-second
+  RX 6800M FSR3.1.6 FIFO run all pass without a VUID/error. Hosts still own
+  acquire, submit, present, fences, and platform windowing.
+
 - Q2RTX now provides `flt_temporal_debug_view`, a presentation-only selector
   for all dense temporal inputs: pre-tone-map scene HDR, current-to-previous
   motion, conventional device depth, positive-forward view-Z, reactive and
