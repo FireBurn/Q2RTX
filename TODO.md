@@ -544,7 +544,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   branch and tune thresholds.
 - [x] Reset FSR history when temporal settings, including `flt_fsr_enable`,
   change so disable/re-enable cannot reuse stale recurrent state.
-- [-] Log provider/effect version, backend, model, active permutation, input,
+- [x] Log provider/effect version, backend, model, active permutation, input,
   and memory use. `fsr_diagnostics` is now a read-only in-game snapshot of the
   requested/resolved provider, temporal contract and image metadata, FSR3.1.4/
   3.1.5/FI backend state, source-v07 model/tier/permutation, and active FSR4
@@ -554,8 +554,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   does not alias heaps. The 2026-08-25 RX 6800M Quality capture reported a
   coherent 644x361 -> 960x540 dispatch, 28.27 MiB for FSR3.1.4 (6.16 MiB
   aliasable), 28.16 MiB for FSR3.1.5 (0 aliasable), and 40.01 MiB for FSR4
-  (19.91 MiB activation scratch), with no VUID/error. FI/OF allocation
-  accounting is still not exposed by the reusable lifecycle.
+  (19.91 MiB activation scratch), and 30.58 MiB for consolidated FSR3.1.6
+  FI/OF resident effect-owned resources (0 aliasable), with no VUID/error.
+  The FI/OF total includes the shared bridge plus five lifecycle-owned images,
+  and never double-counts its overlapping optical-flow/interpolation queries.
 - [-] Update in-game help, `doc/client.md`, notices, licenses, and screenshots.
   The source menu and client cvar documentation now describe the discrete v07
   model family, independent FSR3/FSR4 RCAS controls, deprecated inert cvars,

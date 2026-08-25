@@ -19,10 +19,11 @@ Current truth:
   bytes because it deliberately uses independent allocations. In the
   2026-08-25 RX 6800M Quality run it reported an eligible 644x361 -> 960x540
   v07 dispatch, all required scene/motion/view-Z inputs, 28.27 MiB FSR3.1.4
-  (6.16 MiB aliasable), 28.16 MiB FSR3.1.5 (0 aliasable), and 40.01 MiB
-  provider-owned FSR4 allocation (19.91 MiB activation scratch). The log had
-  no VUID/error and the captured output was coherent:
-  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_diagnostics_memory_20260825.png`.
+  (6.16 MiB aliasable), 28.16 MiB FSR3.1.5 (0 aliasable), 30.58 MiB
+  consolidated FSR3.1.6 FI/OF (0 aliasable), and 40.01 MiB provider-owned
+  FSR4 allocation (19.91 MiB activation scratch). The log had no VUID/error
+  and the captured output was coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_fiof_diagnostics_memory_20260825.png`.
 
 - Console screenshot readback now respects WSI ownership.  It no longer
   transitions `current_swap_chain_image_index` after its normal present;
@@ -978,8 +979,11 @@ acquire/copy/present cycle rather than a stale last-presented-image transition.
   activation scratch, with no VUID, validation warning, or error. This count
   includes Vulkan allocation alignment and excludes opaque descriptor-pool
   driver overhead; it is not a heuristic estimate. The same run verified
-  FSR3.1.4's 28.27 MiB (6.16 MiB aliasable) and the SDK-3.1.5 bridge's exact
-  28.16 MiB (0 aliasable) through the newly public reusable queries.
+  FSR3.1.4's 28.27 MiB (6.16 MiB aliasable), the SDK-3.1.5 bridge's exact
+  28.16 MiB (0 aliasable), and the consolidated FSR3.1.6 FI/OF lifecycle's
+  30.58 MiB (0 aliasable) through newly public reusable queries. FI/OF counts
+  the shared backend once plus its five owned shared images; caller frames are
+  imported and excluded.
 - The reusable FSR4 v07 backend no longer recycles descriptor pools and
   host-visible constant-buffer bytes on a Q2RTX-specific frame cadence.
   `ffxFsr4VkBeginFrame` reserves one of three partitions and

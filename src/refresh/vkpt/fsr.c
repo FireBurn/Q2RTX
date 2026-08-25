@@ -1316,6 +1316,18 @@ void vkpt_fsr_print_diagnostics(void)
             ? cvar_flt_frame_generation_rendered_fps->value : 0.0f,
         cvar_flt_frame_generation_generated_fps
             ? cvar_flt_frame_generation_generated_fps->value : 0.0f);
+    if (fsr3_316_frame_generation_context_ok && fsr3_316_frame_generation_context) {
+        FfxVkFsr3_3_1_6FrameGenerationMemoryUsage usage = {0};
+        FfxVkFsr3_3_1_6FrameGenerationResult result =
+            ffxVkFsr3_3_1_6FrameGenerationContextGetMemoryUsage(
+                fsr3_316_frame_generation_context, &usage);
+        if (result == FFX_VK_FSR3_3_1_6_FRAMEGEN_OK)
+            Com_Printf("  FSR3 FI/OF memory: %.2f MiB resident effect-owned (%.2f MiB aliasable)\n",
+                (double)usage.totalUsageInBytes / (1024.0 * 1024.0),
+                (double)usage.aliasableUsageInBytes / (1024.0 * 1024.0));
+        else
+            Com_Printf("  FSR3 FI/OF memory: unavailable (%d)\n", (int)result);
+    }
 #else
     Com_Printf("  FSR3: not compiled\n");
 #endif

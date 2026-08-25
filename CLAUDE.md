@@ -32,8 +32,8 @@ other Vulkan applications.
   contract.
 - Use the read-only `fsr_diagnostics` console command for a live provider
   audit. It must report the resolved provider/reason, temporal input contract,
-  current FSR4 model/permutation/memory, FSR3 upscaler memory, and FSR3/FI
-  state without mutating a context or recording GPU work.
+  current FSR4 model/permutation/memory, all FSR3/FI effect memory, and state
+  without mutating a context or recording GPU work.
 
 ## Ground truth architecture
 
