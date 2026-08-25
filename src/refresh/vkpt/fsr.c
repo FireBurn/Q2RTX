@@ -2260,7 +2260,8 @@ void vkpt_fsr_frame_generation_retire(uint32_t frame_slot)
     fsr3_316_frame_generation_frame_ids[frame_slot] = 0u;
 }
 
-VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
+VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
+    bool *out_generated_frame_safe)
 {
     const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
     const uint32_t required_inputs =
@@ -2270,10 +2271,15 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
     FfxVkPortableFrameGenerationDispatchInfo dispatch;
     FfxVkPortableImage source;
     FfxVkPortableResult result;
+    VkResult framegen_result;
     char temporal_reason[128];
     VkImageSubresourceRange color_range = {
         VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
     };
+    const bool reset = fsr3_frame_generation_reset_next || !frame->history_valid;
+
+    if (out_generated_frame_safe)
+        *out_generated_frame_safe = false;
 
     if (!vkpt_fsr_frame_generation_is_ready())
         return VK_NOT_READY;
@@ -2316,8 +2322,12 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
     }
 
     if (cvar_flt_frame_generation_backend &&
-        cvar_flt_frame_generation_backend->integer == 1)
-        return fsr3_316_frame_generation_record_after_inputs(cmd_buf, frame);
+        cvar_flt_frame_generation_backend->integer == 1) {
+        framegen_result = fsr3_316_frame_generation_record_after_inputs(cmd_buf, frame);
+        if (framegen_result == VK_SUCCESS && out_generated_frame_safe)
+            *out_generated_frame_safe = !reset;
+        return framegen_result;
+    }
 
     source = fsr3_screen_image(VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output,
         FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
@@ -2357,8 +2367,7 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
     prepare.cameraForward.x = frame->camera.forward[0];
     prepare.cameraForward.y = frame->camera.forward[1];
     prepare.cameraForward.z = frame->camera.forward[2];
-    prepare.reset = (fsr3_frame_generation_reset_next || !frame->history_valid)
-        ? VK_TRUE : VK_FALSE;
+    prepare.reset = reset ? VK_TRUE : VK_FALSE;
     prepare.frameId = frame->frame_id;
     result = ffxVkPortableFrameGenerationContextPrepare(
         fsr3_frame_generation_context, &prepare, &source);
@@ -2400,6 +2409,8 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf)
         return VK_ERROR_UNKNOWN;
     }
     fsr3_frame_generation_reset_next = false;
+    if (out_generated_frame_safe)
+        *out_generated_frame_safe = !reset;
     return VK_SUCCESS;
 }
 

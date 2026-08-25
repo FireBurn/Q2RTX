@@ -201,6 +201,13 @@ vkpt_temporal_request_reset(uint32_t reasons)
 }
 
 void
+vkpt_temporal_test_camera_cut(void)
+{
+	vkpt_temporal_request_reset(VKPT_TEMPORAL_RESET_CAMERA_CUT);
+	Com_Printf("Temporal test: queued simulated camera-cut reset.\n");
+}
+
+void
 vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	bool render_world, bool denoised)
 {

@@ -460,8 +460,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   (166.7 logical FPS versus a learned 181.6-FPS re-enable floor). Both runs
   used validation with coherent screenshots and no VUID. The legacy FSR3 1.1.4
   FI backend also stayed active through the shared 30-FPS gate (83.3 logical
-  FPS) with a coherent validation-clean capture. Validate a genuinely sustained
-  >=60-FPS scene plus latency/pacing and broad lifecycle coverage.
+  FPS) with a coherent validation-clean capture. A controlled camera-cut
+  regression now proves that FSR4 itself recovers cleanly and that the paired
+  presenter suppresses only the reset dispatch's undefined generated slot,
+  presenting the real image twice before FI/OF resumes. Validate a genuinely
+  sustained >=60-FPS scene plus latency/pacing, real focused-input cuts,
+  alt-tab/loading, and broad lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research
 
@@ -614,9 +618,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   v11/history-valid frame 243 with no VUID/error after linking this target.
   An XTest free-camera lens-jump attempt did not reach the Wayland SDL window;
   the retained diagnostic correctly showed only the ordinary startup/map reset.
-  Use a Wayland-native focused-input tool or controlled engine camera command
-  for the deliberate live cut needed to validate the full
-  input-to-presentation branch and tune thresholds.
+  `temporal_test_camera_cut` now supplies the controlled engine route: a live
+  RX 6800M FSR4-v07 + SDK-3.1.6 FI/OF run recorded its `0x800` reset and then
+  captured a coherent history-valid scene with no VUID/error. Continue to use
+  a Wayland-native focused-input tool for a physical camera-motion route and
+  threshold tuning.
 - [x] Reset FSR history when temporal settings, including `flt_fsr_enable`,
   change so disable/re-enable cannot reuse stale recurrent state.
 - [x] Log provider/effect version, backend, model, active permutation, input,

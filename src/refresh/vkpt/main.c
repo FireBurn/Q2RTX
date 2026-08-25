@@ -3494,9 +3494,20 @@ R_RenderFrame_RTX(refdef_t *fd)
 		END_PERF_MARKER(post_cmd_buf, PROFILER_TONE_MAPPING);
 
 		if (qvk.framegen_present_active) {
-			VkResult framegen_result = vkpt_fsr_frame_generation_record(post_cmd_buf);
+			bool generated_frame_safe = false;
+			VkResult framegen_result = vkpt_fsr_frame_generation_record(post_cmd_buf,
+				&generated_frame_safe);
 			if (framegen_result == VK_SUCCESS) {
-				qvk.framegen_generated_frame_ready = true;
+				/* A reset dispatch seeds optical-flow/interpolation history from
+				 * the current real frame.  It has no valid preceding frame from
+				 * which to synthesize an intermediate image, so presenting its
+				 * output can expose undefined/stale vectors as a bright flicker.
+				 * The paired presenter deliberately falls back to the real image
+				 * for this one generated slot; the provider is then ready to
+				 * interpolate the following history-valid frame. */
+				qvk.framegen_generated_frame_ready =
+					ffxVkFrameGenerationShouldPresentGenerated(true,
+						!generated_frame_safe);
 			} else {
 				/* The real HUDless scene is already complete. Present it on both
 				 * acquired images rather than using a failed/partial generated output. */
@@ -4448,6 +4459,7 @@ R_Init_RTX(bool total)
 	Cmd_AddCommand("show_pvs", (xcommand_t)&vkpt_show_pvs);
 	Cmd_AddCommand("next_sun", (xcommand_t)&vkpt_next_sun_preset);
 	Cmd_AddCommand("fsr_diagnostics", (xcommand_t)&vkpt_fsr_print_diagnostics);
+	Cmd_AddCommand("temporal_test_camera_cut", (xcommand_t)&vkpt_temporal_test_camera_cut);
 
 	vkpt_fog_init();
 	vkpt_cameras_init();
@@ -4482,6 +4494,7 @@ R_Shutdown_RTX(bool total)
 	Cmd_RemoveCommand("show_pvs");
 	Cmd_RemoveCommand("next_sun");
 	Cmd_RemoveCommand("fsr_diagnostics");
+	Cmd_RemoveCommand("temporal_test_camera_cut");
 
 	if (vkpt_refdef.bsp_mesh_world_loaded)
 	{

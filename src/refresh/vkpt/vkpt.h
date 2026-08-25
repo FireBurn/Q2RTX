@@ -773,6 +773,10 @@ VkResult vkpt_asvgf_gradient_reproject(VkCommandBuffer cmd_buf);
 
 /* Provider-neutral temporal resource/lifecycle adapter. */
 void vkpt_temporal_request_reset(uint32_t reasons);
+/* Developer regression hook: queue a provider-visible camera-cut reset without
+ * changing game state. The pure transform classifier is covered separately by
+ * ffx-vulkan::temporal-lifecycle boundary tests. */
+void vkpt_temporal_test_camera_cut(void);
 void vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 	bool render_world, bool denoised);
 void vkpt_temporal_mark_inputs_ready(void);
@@ -855,7 +859,8 @@ void vkpt_fsr_retire(uint32_t frame_slot);
 bool vkpt_fsr_frame_generation_is_ready(void);
 bool vkpt_fsr_frame_generation_prepare_present(void);
 void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason);
-VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf);
+VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
+	bool *out_generated_frame_safe);
 /* Called after Q2RTX's per-slot submission fence signals, so the SDK 2.3
  * frame generator may safely free its retained imported-image views. */
 void vkpt_fsr_frame_generation_retire(uint32_t frame_slot);

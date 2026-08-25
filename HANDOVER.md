@@ -36,6 +36,16 @@ Current truth:
   181.6 FPS) rather than continuously oscillating; capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_60fps_steady_gate_20260825.png`.
 
+- A camera-cut regression exposed a real FI/OF visual bug: presenting the
+  generated image from the reset dispatch showed bright/unstable blobs, while
+  the exact same FSR4-v07 run with FI/OF disabled was clean. The paired
+  presenter now uses the real scene for that one reset slot while still
+  recording the dispatch to seed optical-flow history. The next
+  history-valid frame resumes interpolation. The controlled
+  `temporal_test_camera_cut` run retained reset `0x800`, remained validation
+  clean, and produced a coherent FSR4 + SDK-3.1.6 FI/OF capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_camera_cut_fg_guard.png`.
+
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, the most recent retained temporal reset frame/reason bits,

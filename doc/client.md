@@ -851,6 +851,10 @@ image and Immediate may tear it. The active diagnostic says `FIFO pacing` when
 that contract is in use. This is a correctness-first policy, not yet a
 low-latency/VRR timing implementation. If interpolation rejects the temporal
 frame, both presentation paths safely use the real scene instead.
+The same real-image fallback is used for one paired slot immediately after a
+temporal reset (for example a camera cut): that dispatch initializes optical
+flow history but has no preceding image from which to synthesize a valid
+intermediate frame. Generation resumes on the next history-valid frame.
 
 #### `flt_frame_generation_backend`
 
@@ -934,6 +938,14 @@ projection transition and for a conservative camera-cut detection: a
 single-frame teleport over 256 Q2 units, a turn over 90 degrees, or a vertical
 FOV jump over 0.35 radians. Ordinary camera motion remains motion-vector
 reprojected.
+
+#### `temporal_test_camera_cut`
+
+Developer regression command that queues the provider-visible camera-cut reset
+for the next rendered frame without changing game or camera state. It exists to
+exercise upscaler, optical-flow, and frame-generation reset/recovery handling
+under automated scripts. It is not a substitute for the normal transform-based
+camera-cut detector.
 
 #### `flt_fsr_enable`
 Deprecated compatibility alias. An existing nonzero value is migrated to
