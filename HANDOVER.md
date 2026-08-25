@@ -167,7 +167,9 @@ Current truth:
   `FFX_VK_FSR4_V07_ASSET_DIR` to `find_package` consumers. A standalone
   reduced-closure build/install verified all six bundles and verified that
   unrelated generic `fsr4_initializers.bin`/`fsr4_pre_weights.bin` files were
-  not copied.
+  not copied. A fresh minimal C consumer then used `find_package(ffx-vulkan)`,
+  verified the exported installed directory and all six manifests, and linked
+  `ffx-vulkan::fsr4-v07-vulkan` successfully.
 
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
