@@ -912,9 +912,9 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 
 ## Known risks and cautions
 
-- `ffx_fsr4_vk.c` remains a prototype backend with fixed limits and still needs
-  an explicit in-flight retirement API, reflected per-pipeline layouts,
-  resource state tracking, and memory accounting.
+- The reusable source-v07 FSR4 backend remains experimental and has fixed
+  limits; it still needs an explicit in-flight retirement API, reflected
+  per-pipeline layouts, resource-state tracking, and memory accounting.
 - Conventional device depth is available only for single-device rendering and
   is now inspectable through the temporal-input diagnostic. Device-group input
   gathering remains unimplemented.
