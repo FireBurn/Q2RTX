@@ -10,6 +10,17 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- SDK-3.1.6 FI/OF did reach real generated→real WSI presentation on RX 6800M
+  at the requested 60-FPS gate (the diagnostic observed 84.2 rendered and
+  168.4 generated FPS) with a coherent 960x540 capture and no VUID/error:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR316_FG_60fps_20260825.png`.
+  Do not call the threshold policy validated: immediately afterwards it
+  repeatedly alternated active and `rendered input below 60 FPS` fallback.
+  The gate samples a timing value affected by FIFO's generated+real WSI pair,
+  creating feedback near the threshold. Replace it with an ungenerated
+  logical-render cadence measurement before closing the high-rate/hysteresis
+  TODO.
+
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
   metadata, FSR3.1.4/3.1.5/FI status, source-v07 FSR4 model/tier/permutation,

@@ -442,8 +442,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   generation resumes. `flt_frame_generation_min_rendered_fps` defaults to 30,
   pauses after four low completed frames, and resumes after eight frames at
   threshold +2 FPS (0 is an explicit test override). Both open and forced-240
-  FPS fallback branches were live-validated at 1280x720 without VUIDs.
-  Latency/pacing and broad lifecycle coverage remain.
+  FPS fallback branches were live-validated at 1280x720 without VUIDs. A
+  2026-08-25 960x540 SDK-3.1.6 run with a requested 60-FPS threshold did reach
+  active generated→real presentation (84.2 rendered / 168.4 generated) with a
+  coherent screenshot and no VUID/error, but then repeatedly fell back and
+  recovered. The gate currently samples a timing value perturbed by the FIFO
+  two-present path, creating a feedback loop near the threshold. Measure an
+  ungenerated logical-render cadence before declaring high-rate/hysteresis
+  validation complete. Latency/pacing and broad lifecycle coverage remain.
 
 ## P3 — FSR 4.1.1 binary-provider research
 
