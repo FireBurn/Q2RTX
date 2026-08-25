@@ -782,6 +782,10 @@ void vkpt_temporal_end_ui_composition(void);
 void vkpt_temporal_set_separate_ui_texture(const VkptTemporalImage *ui_texture);
 void vkpt_temporal_end_frame(bool presented);
 const VkptTemporalFrame *vkpt_temporal_get_frame(void);
+/* Return the last reset observed at frame begin. This diagnostic state is
+ * retained across later history-valid frames so a one-frame camera cut can be
+ * audited without racing a console command against the cut frame. */
+void vkpt_temporal_get_last_reset(uint64_t *frame_id, uint32_t *reasons);
 /* Resolve the selected debug cvar to an input that is valid this frame. */
 bool vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 	VkptTemporalDebugView *view, char *reason, size_t reason_size);

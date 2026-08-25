@@ -792,7 +792,10 @@ history; camera cuts, settings, projection, display-size, and presentation
 gaps still reset it. Static FSR4 models are never dispatched at a DRS ratio.
 The read-only `fsr_diagnostics` command reports the controller's current and
 effective scale, target, and bounds whenever this model is selected. The DRS
-model is experimental and is not FSR 4.1.1.
+model is experimental and is not FSR 4.1.1. The command also retains the last
+temporal reset frame and reason bits after later history-valid frames, so a
+single-frame camera cut can be audited without racing a console command
+against the cut frame.
 
 #### `flt_fsr3_sharpening`
 

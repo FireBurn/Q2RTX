@@ -1252,6 +1252,8 @@ static void fsr_print_temporal_image_diagnostic(const char *name,
 void vkpt_fsr_print_diagnostics(void)
 {
     const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    uint64_t last_reset_frame = 0;
+    uint32_t last_reset_reasons = 0;
     const char *reason = "startup";
     int active = VKPT_UPSCALER_Q2RTX;
     const bool resolved = resolve_upscaler(&active, &reason);
@@ -1268,6 +1270,12 @@ void vkpt_fsr_print_diagnostics(void)
         (unsigned long long)(frame ? frame->frame_id : 0u),
         frame ? frame->flags : 0u, frame ? frame->history_valid : 0u,
         frame ? frame->reset_reasons : 0u);
+    vkpt_temporal_get_last_reset(&last_reset_frame, &last_reset_reasons);
+    if (last_reset_reasons)
+        Com_Printf("  last temporal reset: frame=%llu reasons=0x%x\n",
+            (unsigned long long)last_reset_frame, last_reset_reasons);
+    else
+        Com_Printf("  last temporal reset: none\n");
     if (frame) {
         Com_Printf("  extents: render=%ux%u display=%ux%u, motion=%s %s %s\n",
             frame->render_size.width, frame->render_size.height,

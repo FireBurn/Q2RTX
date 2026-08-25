@@ -38,8 +38,9 @@ Current truth:
 
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
-  metadata, FSR3.1.4/3.1.5/FI status, source-v07 FSR4 model/tier/permutation,
-  and effect memory accounting without changing a context or recording work.
+  metadata, the most recent retained temporal reset frame/reason bits,
+  FSR3.1.4/3.1.5/FI status, source-v07 FSR4 model/tier/permutation, and effect
+  memory accounting without changing a context or recording work.
   Both reusable FSR3 upscaler APIs now publish their SDK-reported memory totals:
   the 3.1.5 bridge reports actual Vulkan allocation sizes and zero aliasable
   bytes because it deliberately uses independent allocations. In the

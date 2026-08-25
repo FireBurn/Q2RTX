@@ -28,6 +28,8 @@ typedef struct VkptTemporalState_s {
 	VkptTemporalFrame frame;
 	uint32_t pending_reset_reasons;
 	uint64_t previous_frame_id;
+	uint64_t last_reset_frame_id;
+	uint32_t last_reset_reasons;
 	VkExtent2D previous_display_size;
 	uint32_t previous_menu_mode;
 	VkptTemporalCamera previous_camera;
@@ -315,6 +317,10 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 		 * externally visible values after this transform-based reset decision. */
 		frame->reset_reasons = reset_reasons;
 		frame->history_valid = 0;
+	}
+	if (reset_reasons) {
+		temporal_state.last_reset_frame_id = frame->frame_id;
+		temporal_state.last_reset_reasons = reset_reasons;
 	}
 
 	frame->inputs.motion_description.space =
@@ -691,6 +697,15 @@ const VkptTemporalFrame *
 vkpt_temporal_get_frame(void)
 {
 	return &temporal_state.frame;
+}
+
+void
+vkpt_temporal_get_last_reset(uint64_t *frame_id, uint32_t *reasons)
+{
+	if (frame_id)
+		*frame_id = temporal_state.last_reset_frame_id;
+	if (reasons)
+		*reasons = temporal_state.last_reset_reasons;
 }
 
 bool

@@ -620,7 +620,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and memory use. `fsr_diagnostics` is now a read-only in-game snapshot of the
   requested/resolved provider, temporal contract and image metadata, FSR3.1.4/
   3.1.5/FI backend state, source-v07 model/tier/permutation, current/effective
-  bounded DRS scale, and active FSR4 allocation accounting. Both reusable FSR3
+  bounded DRS scale, retained last temporal-reset frame/reason bits, and active
+  FSR4 allocation accounting. Both reusable FSR3
   upscaler APIs now expose
   SDK-reported effect-owned allocation totals; the SDK-3.1.5 bridge counts its
   exact Vulkan allocation sizes and reports zero aliasable bytes because it

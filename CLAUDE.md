@@ -32,6 +32,7 @@ other Vulkan applications.
   contract.
 - Use the read-only `fsr_diagnostics` console command for a live provider
   audit. It must report the resolved provider/reason, temporal input contract,
+  the most recent retained temporal reset frame/reason bits,
   current FSR4 model/permutation/memory, current/effective bounded DRS scale
   when the DRS model is selected, all FSR3/FI effect memory, and state without
   mutating a context or recording GPU work.
