@@ -463,9 +463,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FPS) with a coherent validation-clean capture. A controlled camera-cut
   regression now proves that FSR4 itself recovers cleanly and that the paired
   presenter suppresses only the reset dispatch's undefined generated slot,
-  presenting the real image twice before FI/OF resumes. Validate a genuinely
-  sustained >=60-FPS scene plus latency/pacing, real focused-input cuts,
-  alt-tab/loading, and broad lifecycle coverage.
+  presenting the real image twice before FI/OF resumes. A live forced
+  240-FPS gate fallback→0-FPS-threshold recovery confirms the same guard when
+  the provider alone requests reset (`v11/frame 910`, no VUID/error). Validate
+  a genuinely sustained >=60-FPS scene plus latency/pacing, real focused-input
+  cuts, alt-tab/loading, and broad lifecycle coverage.
 
 ## P3 — FSR 4.1.1 binary-provider research
 

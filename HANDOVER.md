@@ -45,6 +45,10 @@ Current truth:
   `temporal_test_camera_cut` run retained reset `0x800`, remained validation
   clean, and produced a coherent FSR4 + SDK-3.1.6 FI/OF capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_camera_cut_fg_guard.png`.
+  A separate live 240-FPS rate-gate fallback→recovery run exercised the
+  provider-reset path that has valid engine camera history; it resumed active
+  FI/OF at contract-v11/frame-910 with no VUID/error and a coherent capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_rate_recovery.png`.
 
 - Q2RTX has a read-only `fsr_diagnostics` console command for live evidence.
   It reports requested/resolved provider and reason, temporal contract/image
