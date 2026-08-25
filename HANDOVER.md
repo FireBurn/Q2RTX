@@ -82,6 +82,16 @@ Current truth:
   error and a full-colour coherent HUD/viewmodel capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR3_FG_colour_after_rr.png`.
 
+- The RR motion resource added one global image descriptor. Because loose
+  user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
+  would otherwise be paired with the new host descriptor layout and produce a
+  validation type mismatch at pipeline creation. `setup/q2rtx.sh` now has a
+  versioned shader-layout migration: it moves the loose directory to a dated
+  `pre-2026-08-rr-motion-v2` backup and lets the matching packaged archive
+  load. Advanced users can retain a deliberately matching custom set with
+  `Q2RTX_SKIP_SHADER_CACHE_MIGRATION=1`. The Gentoo ebuild verifies that this
+  launcher migration is installed.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested

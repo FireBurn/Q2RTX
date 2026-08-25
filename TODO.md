@@ -536,6 +536,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## P5 — settings, UI, diagnostics, and documentation
 
+- [x] Migrate stale loose shader cache safely on descriptor-layout upgrades.
+  The launcher backs up `shader_vkpt` instead of deleting it, then permits the
+  packaged matching `shaders.pkz` to load. This prevents old SPIR-V from being
+  paired with the new RR-motion descriptor layout after a package upgrade.
+
 - [x] Make the Gentoo live ebuild package the usable Vulkan feature set:
   system Vulkan/SDL/OpenAL/curl/zlib dependencies, external 7-Zip and shader
   tools, release media/shareware import, `/usr/bin` launcher/server,

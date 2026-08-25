@@ -43,6 +43,29 @@ if [[ "${Q2RTX_SKIP_MENU_UPDATE:-0}" != "1" && -n "${MENU_SOURCE}" && -f "${MENU
 	fi
 fi
 
+# Renderer image additions can change the shader descriptor ABI. The engine
+# searches a loose per-user shader_vkpt directory ahead of the packaged
+# shaders.pkz archive, so stale cached SPIR-V would otherwise be paired with a
+# new descriptor layout after an upgrade. Preserve a custom/cache directory as
+# a recoverable backup, then let the packaged archive supply the matching
+# shaders. Set Q2RTX_SKIP_SHADER_CACHE_MIGRATION=1 only when maintaining a
+# matching custom shader set manually.
+SHADER_LAYOUT_REVISION="Q2RTX shader layout revision: 2026-08-rr-motion-v2"
+SHADER_LAYOUT_MARKER="${XDG_DATA_HOME}/quake2rtx/baseq2/.q2rtx_shader_layout_revision"
+SHADER_DEST="${XDG_DATA_HOME}/quake2rtx/baseq2/shader_vkpt"
+if [[ "${Q2RTX_SKIP_SHADER_CACHE_MIGRATION:-0}" != "1" ]] && \
+	{ [[ ! -f "${SHADER_LAYOUT_MARKER}" ]] ||
+	  ! grep -Fqx "${SHADER_LAYOUT_REVISION}" "${SHADER_LAYOUT_MARKER}"; }; then
+	if [[ -d "${SHADER_DEST}" ]]; then
+		SHADER_BACKUP="${SHADER_DEST}.pre-2026-08-rr-motion-v2"
+		if [[ -e "${SHADER_BACKUP}" ]]; then
+			SHADER_BACKUP="${SHADER_DEST}.pre-2026-08-rr-motion-v2-$(date +%s)"
+		fi
+		mv "${SHADER_DEST}" "${SHADER_BACKUP}"
+	fi
+	printf '%s\n' "${SHADER_LAYOUT_REVISION}" > "${SHADER_LAYOUT_MARKER}"
+fi
+
 # Only run this script on first-launch
 if [[ ! -f "${XDG_DATA_HOME}/quake2rtx/.retail_checked" ]]; then
 	${BIN_PREFIX}/find-retail-paks.sh
