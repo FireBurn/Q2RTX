@@ -36,10 +36,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 layout(constant_id = 0) const uint spec_enable_caustics = 0;
 
 void
-direct_lighting(ivec2 ipos, bool is_odd_checkerboard, out vec3 high_freq, out vec3 o_specular)
+direct_lighting(ivec2 ipos, bool is_odd_checkerboard, out vec3 high_freq,
+	out vec3 o_specular, out float sunlight_visibility)
 {
 	high_freq = vec3(0);
 	o_specular = vec3(0);
+	sunlight_visibility = -1.0;
 
 	rng_seed = texelFetch(TEX_ASVGF_RNG_SEED_A, ipos, 0).r;
 
@@ -113,6 +115,7 @@ direct_lighting(ivec2 ipos, bool is_odd_checkerboard, out vec3 high_freq, out ve
 	if(global_ubo.pt_direct_sun_light != 0)
 	{
 		vec3 direct_sun_diffuse, direct_sun_specular;
+		float direct_sun_hit_distance;
 		get_sunlight(
 			cluster_idx,
 			material_id,
@@ -127,10 +130,12 @@ direct_lighting(ivec2 ipos, bool is_odd_checkerboard, out vec3 high_freq, out ve
 			spec_enable_caustics != 0,
 			direct_sun_diffuse,
 			direct_sun_specular,
+			direct_sun_hit_distance,
 			shadow_cull_mask);
 
 		high_freq += direct_sun_diffuse;
 		o_specular += direct_sun_specular;
+		sunlight_visibility = direct_sun_hit_distance;
 	}
 
 	o_specular = demodulate_specular(primary_base_reflectivity, o_specular);
@@ -155,7 +160,9 @@ main()
 	bool is_odd_checkerboard = (rt_LaunchID.z != 0) || (push_constants.gpu_index == 1);
 
 	vec3 high_freq, specular;
-	direct_lighting(ipos, is_odd_checkerboard, high_freq, specular);
+	float sunlight_visibility;
+	direct_lighting(ipos, is_odd_checkerboard, high_freq, specular,
+		sunlight_visibility);
 
 	high_freq *= STORAGE_SCALE_HF;
 	specular *= STORAGE_SCALE_SPEC;
@@ -168,6 +175,9 @@ main()
 	 * combined SPEC channel. A future decoupled denoiser needs this partition,
 	 * not just Q2RTX's final demodulated specular total. */
 	imageStore(IMG_PT_DIRECT_SPEC, ipos, uvec4(packRGBE(specular)));
+	/* This is initialized even for a sky/invalid primary pixel so no stale
+	 * previous-frame blocker distance reaches the dense diagnostic image. */
+	imageStore(IMG_PT_SUNLIGHT_VISIBILITY, ipos, vec4(sunlight_visibility));
 	/* The first indirect bounce fills exactly one of these lobe distances.
 	 * A negative value says that lobe has no valid ray this frame. */
 	imageStore(IMG_PT_INDIRECT_DIFFUSE_DISTANCE, ipos, vec4(-1.0));

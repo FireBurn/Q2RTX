@@ -428,6 +428,7 @@ indirect_lighting(
 		if(sun_attenuation > 0)
 		{
 			vec3 bounce_sun_diffuse, bounce_sun_specular;
+			float bounce_sun_hit_distance;
 			get_sunlight(
 				bounce_cluster_idx,
 				bounce_material_id,
@@ -442,6 +443,7 @@ indirect_lighting(
 				false, // enable_caustics
 				bounce_sun_diffuse,
 				bounce_sun_specular,
+				bounce_sun_hit_distance,
 				shadow_cull_mask);
 			bounce_contrib += bounce_throughput * bounce_sun_diffuse * global_ubo.sun_bounce_scale * sun_attenuation;
 		}

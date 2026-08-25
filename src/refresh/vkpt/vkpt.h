@@ -677,7 +677,10 @@ typedef enum VkptTemporalDebugView_e {
 	VKPT_TEMPORAL_DEBUG_RR_DIRECT_SPECULAR,
 	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR,
 	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_DIFFUSE_HIT_DISTANCE,
-	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE
+	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE,
+	/* Primary direct-sun blocker distance. Diagnostic only until exact sun
+	 * emission metadata is exported for a full dominant-light input. */
+	VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY
 } VkptTemporalDebugView;
 VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);

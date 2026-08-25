@@ -91,6 +91,12 @@ void main()
         color = sample_value.a < 0.0 ? vec3(0.0) : vec3(
             log2(sample_value.a + 1.0) / log2(10001.0));
         break;
+    case 22u: /* Primary direct-sun blocker distance. */
+        /* A valid unoccluded ray is 65504 (FP16_MAX); negative means that no
+         * appropriate sun ray was traced for this primary pixel. */
+        color = sample_value.r < 0.0 ? vec3(0.0) : vec3(
+            log2(min(sample_value.r, 65504.0) + 1.0) / log2(65505.0));
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;

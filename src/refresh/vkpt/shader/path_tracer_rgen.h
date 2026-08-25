@@ -482,7 +482,8 @@ Ray get_shadow_ray(vec3 p1, vec3 p2, float tmin)
 }
 
 float
-trace_shadow_ray(Ray ray, int cull_mask)
+trace_shadow_ray_with_hit_distance(Ray ray, int cull_mask,
+	out float hit_distance)
 {
 	const uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipProceduralPrimitives;
 
@@ -510,10 +511,15 @@ trace_shadow_ray(Ray ray, int cull_mask)
 		}
 	}
 
-	if(rayQueryGetIntersectionTypeEXT(rayQuery, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+	if(rayQueryGetIntersectionTypeEXT(rayQuery, true) != gl_RayQueryCommittedIntersectionNoneEXT) {
+		hit_distance = rayQueryGetIntersectionTEXT(rayQuery, true);
 		return 0.0f;
-	else
+	} else {
+		/* RR's dominant-light contract uses the largest finite FP16 value to
+		 * distinguish an unoccluded ray from a real, finite blocker distance. */
+		hit_distance = 65504.0f;
 		return 1.0f;
+	}
 
 #else
 
@@ -526,9 +532,21 @@ trace_shadow_ray(Ray ray, int cull_mask)
 			SBT_RCHIT_GEOMETRY /*sbtRecordOffset*/, 0 /*sbtRecordStride*/, SBT_RMISS_EMPTY /*missIndex*/,
 			ray.origin, ray.t_min, ray.direction, ray.t_max, RT_PAYLOAD_GEOMETRY);
 
-	return found_intersection(ray_payload_geometry) ? 0.0 : 1.0;
+	if (found_intersection(ray_payload_geometry)) {
+		hit_distance = ray_payload_geometry.hit_distance;
+		return 0.0;
+	}
+	hit_distance = 65504.0f;
+	return 1.0;
 
 #endif
+}
+
+float
+trace_shadow_ray(Ray ray, int cull_mask)
+{
+	float unused_hit_distance;
+	return trace_shadow_ray_with_hit_distance(ray, cull_mask, unused_hit_distance);
 }
 
 vec3
@@ -850,10 +868,12 @@ get_sunlight(
 	bool enable_caustics, 
 	out vec3 diffuse, 
 	out vec3 specular, 
+	out float shadow_hit_distance,
 	int shadow_cull_mask)
 {
 	diffuse = vec3(0);
 	specular = vec3(0);
+	shadow_hit_distance = -1.0;
 
 	if(global_ubo.sun_visible == 0)
 		return;
@@ -877,7 +897,8 @@ get_sunlight(
 
 	Ray shadow_ray = get_shadow_ray(position - view_direction * 0.01, position + direction * 10000, 0);
  
-	float vis = trace_shadow_ray(shadow_ray, shadow_cull_mask);
+	float vis = trace_shadow_ray_with_hit_distance(shadow_ray, shadow_cull_mask,
+		shadow_hit_distance);
 
 	if(vis == 0)
 		return;

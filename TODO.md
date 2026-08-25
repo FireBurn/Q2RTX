@@ -501,10 +501,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   actual RR adapter. Contract v7 now carries the physically traced first
   indirect-lobe segment distance in the alpha channel of each indirect
   partition (finite 10,000-unit sky misses, negative for an untraced lobe).
-  Direct alpha remains the documented non-negative undefined value. Dominant
-  light visibility remains outstanding: the existing sunlight trace currently
-  returns only binary visibility and its exact resolved emission is GPU-only,
-  so do not publish host-side cvar colour as a false substitute. The official
+  Direct alpha remains the documented non-negative undefined value. The
+  primary direct-sun trace now also preserves its real blocker distance in a
+  dense `R16_SFLOAT` diagnostic image (FP16_MAX exposed, negative untraced),
+  without a duplicate ray trace. It remains unavailable as a complete
+  dominant-light provider input because exact resolved emission is GPU-only;
+  do not publish host-side cvar colour as a false substitute. The official
   neural provider also remains outstanding. The reusable
   `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package

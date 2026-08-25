@@ -179,17 +179,22 @@ Current truth:
   `baseq2/screenshots/RR_indirect_diffuse_hit_distance_20260825.png`.
   Diagnostics are in `baseq2/logs/RR_hit_distance_debug_20260825.log`.
 
-- Dominant-light investigation reached a concrete, deliberately unimplemented
-  boundary. `get_sunlight` already launches the suitable per-pixel sun shadow
-  ray, but `trace_shadow_ray` intentionally collapses it to binary visibility
-  and discards the blocker distance required by RR 1.2. Q2RTX's exact resolved
-  sun emission is also GPU-only in `sun_color_ubo`, while host-side
-  `sun_light.color` is only the pre-atmosphere/cvar value. Do not advertise a
-  dominant-light signal using that approximation. A correct next change must
-  retain the existing shadow ray's first hit distance (using FP16_MAX on a
-  miss) and publish emission from the same resolved GPU source, alongside the
-  sampled sun direction/radius. This requires a small explicit GPU-to-host or
-  provider-facing metadata bridge; it must not add a duplicate ray trace.
+- Temporal contract v8 now preserves the primary direct-sun ray's actual
+  first blocker distance without tracing a second ray. `trace_shadow_ray` has
+  a distance-returning form; the direct pass writes `R16_SFLOAT` where
+  FP16_MAX means fully exposed and a negative value means no suitable primary
+  sun ray ran. Interleave publishes a dense diagnostic image and view 22
+  presents its log-scaled values. A 960x540 RX 6800M `vk_validation=1` run
+  reached v8/history-valid frame 1080 with the image valid at 644x361 and no
+  validation error; the capture shows black untraced, finite blocker, and
+  white exposed regions:
+  `baseq2/screenshots/RR_dominant_sun_blocker_20260825.png`. This is still
+  deliberately *not* advertised as a complete dominant-light RR signal:
+  Q2RTX's exact resolved sun emission remains GPU-only in `sun_color_ubo`,
+  while host-side `sun_light.color` is only pre-atmosphere/cvar data. The next
+  change must publish emission from that resolved GPU source alongside the
+  sampled sun direction/radius through a small provider-facing metadata
+  bridge, without adding a duplicate trace.
 
 - `extern/ffx-vulkan` now exports the versioned, installable
   `ffx-vulkan::rayregeneration-contract` static target. Its public C ABI

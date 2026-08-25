@@ -1104,7 +1104,7 @@ vkpt_temporal_debug_blit_view_to_slot(VkCommandBuffer cmd_buf,
 	};
 
 	if (!image_view || view <= VKPT_TEMPORAL_DEBUG_OFF ||
-		view > VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE)
+		view > VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY)
 		return VK_ERROR_INITIALIZATION_FAILED;
 	vkUpdateDescriptorSets(qvk.device, 1, &write, 0, NULL);
 	/* The private FSR4 diagnostic views are produced by the immediately

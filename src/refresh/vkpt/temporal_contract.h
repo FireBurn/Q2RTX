@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 7u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 8u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -285,6 +285,10 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalImage rr_indirect_diffuse;
 	VkptTemporalImage rr_direct_specular;
 	VkptTemporalImage rr_indirect_specular;
+	/* Primary direct-sun blocker distance. This is diagnostic groundwork only:
+	 * it is not a complete RR dominant-light signal until exact sun emission is
+	 * exported alongside the sampled direction/radius. */
+	VkptTemporalImage rr_dominant_light_visibility;
 	VkptTemporalImage reactive_mask;
 	VkptTemporalImage transparency_and_composition_mask;
 	VkptTemporalMotionDescription motion_description;

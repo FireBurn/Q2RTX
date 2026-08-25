@@ -105,8 +105,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	/* First indirect-lobe ray distance for each mutually-exclusive lobe. */ \
 	IMG_DO(PT_INDIRECT_DIFFUSE_DISTANCE, 56, R16_SFLOAT, r16f, IMG_WIDTH_MGPU, IMG_HEIGHT ) \
 	IMG_DO(PT_INDIRECT_SPECULAR_DISTANCE,57, R16_SFLOAT, r16f, IMG_WIDTH_MGPU, IMG_HEIGHT ) \
+	/* First blocker distance for the primary direct-sun ray. FP16_MAX means
+	 * fully exposed; a negative value means that no suitable sun ray ran. */ \
+	IMG_DO(PT_SUNLIGHT_VISIBILITY,      58, R16_SFLOAT, r16f, IMG_WIDTH_MGPU, IMG_HEIGHT ) \
+	/* Dense copy of the primary direct-sun signal for provider diagnostics.
+	 * This alone is not a complete dominant-light RR input. */ \
+	IMG_DO(TEMPORAL_RR_DOMINANT_LIGHT_VISIBILITY, 59, R16_SFLOAT, r16f, IMG_WIDTH, IMG_HEIGHT ) \
 
-#define NUM_IMAGES_BASE     58
+#define NUM_IMAGES_BASE     60
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \

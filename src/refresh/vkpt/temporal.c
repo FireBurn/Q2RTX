@@ -182,6 +182,7 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 	initialize_image(&frame->inputs.rr_indirect_diffuse);
 	initialize_image(&frame->inputs.rr_direct_specular);
 	initialize_image(&frame->inputs.rr_indirect_specular);
+	initialize_image(&frame->inputs.rr_dominant_light_visibility);
 	initialize_image(&frame->inputs.reactive_mask);
 	initialize_image(&frame->inputs.transparency_and_composition_mask);
 	initialize_image(&frame->ui.scene_target);
@@ -475,6 +476,15 @@ vkpt_temporal_mark_inputs_ready(void)
 		VKPT_TEMPORAL_RESOURCE_PRE_UI | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA |
 		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	/* Do not put this into available_inputs yet: the image is a faithful
+	 * primary-sun shadow result, but the exact resolved sun emission required
+	 * by a complete dominant-light provider input remains GPU-only. */
+	set_image(&frame->inputs.rr_dominant_light_visibility,
+		VKPT_IMG_TEMPORAL_RR_DOMINANT_LIGHT_VISIBILITY, VK_FORMAT_R16_SFLOAT,
+		qvk.extent_screen_images, qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
 	if (qvk.device_count == 1)
 		frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_NORMALS |
 			VKPT_TEMPORAL_INPUT_ALBEDO | VKPT_TEMPORAL_INPUT_ROUGHNESS |
@@ -633,7 +643,7 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
 	if (cvar_flt_temporal_debug_view->integer >
-		VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE)
+		VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY)
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view %d",
 			cvar_flt_temporal_debug_view->integer);
@@ -711,6 +721,10 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 	case VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE:
 		image = &frame->inputs.rr_indirect_specular;
 		selected_image = VKPT_IMG_TEMPORAL_RR_INDIRECT_SPECULAR;
+		break;
+	case VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY:
+		image = &frame->inputs.rr_dominant_light_visibility;
+		selected_image = VKPT_IMG_TEMPORAL_RR_DOMINANT_LIGHT_VISIBILITY;
 		break;
 	default:
 		return temporal_validation_fail(reason, reason_size,

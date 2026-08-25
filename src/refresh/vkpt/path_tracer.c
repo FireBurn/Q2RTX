@@ -1143,6 +1143,7 @@ vkpt_pt_trace_lighting(VkCommandBuffer cmd_buf, float num_bounce_rays)
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_DIRECT_SPEC]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_DIFFUSE_DISTANCE]);
 	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_INDIRECT_SPECULAR_DISTANCE]);
+	BARRIER_COMPUTE(cmd_buf, qvk.images[VKPT_IMG_PT_SUNLIGHT_VISIBILITY]);
 
 	BUFFER_BARRIER(cmd_buf,
 		.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,

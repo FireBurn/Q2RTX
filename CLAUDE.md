@@ -97,7 +97,11 @@ Q2RTX signal conventions currently exposed by the contract:
   octahedral-normal/linear-roughness/category, sqrt diffuse albedo, and sqrt
   specular albedo respectively. Values 16-19 inspect Q2RTX's raw direct and
   indirect diffuse/specular radiance partitions. Values 20-21 visualize their
-  first-lobe hit distances from alpha (black means untraced). Those two FSR4
+  first-lobe hit distances from alpha (black means untraced); view 22 shows
+  the primary direct-sun blocker distance (black untraced, white FP16-max
+  exposed). The latter is diagnostic groundwork, not a complete
+  dominant-light provider input because exact resolved sun emission is still
+  unavailable at the CPU/provider boundary. Those two FSR4
   private surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
   as general renderer resources or record writes to them.
