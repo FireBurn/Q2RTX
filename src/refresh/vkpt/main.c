@@ -2644,6 +2644,7 @@ process_render_feedback(ref_feedback_t *feedback, mleaf_t* viewleaf, bool* sun_v
 
 		VectorCopy(readback.hdr_color, feedback->hdr_color);
 		feedback->adapted_luminance = readback.adapted_luminance;
+		vkpt_physical_sky_set_resolved_sun_color(readback.resolved_sun_color);
 
 		*sun_visible = readback.sun_luminance > 0.f;
 		*adapted_luminance = readback.adapted_luminance;
@@ -3216,6 +3217,15 @@ R_RenderFrame_RTX(refdef_t *fd)
 	vkpt_temporal_begin_frame(
 		frame_time <= 0.f ? frame_wallclock_time : frame_time,
 		temporal_frame_valid, render_world, ref_mode.enable_denoiser);
+	{
+		vec3_t resolved_sun_color = { 0.0f, 0.0f, 0.0f };
+		const bool have_resolved_sun_color = render_world &&
+			sun_light.use_physical_sky && sun_light.visible &&
+			vkpt_physical_sky_get_resolved_sun_color(resolved_sun_color);
+		vkpt_temporal_set_dominant_light(sun_light.direction,
+			resolved_sun_color, sun_light.angular_size_rad,
+			have_resolved_sun_color);
+	}
 
 	if(update_world_animations)
 		bsp_mesh_animate_light_polys(&vkpt_refdef.bsp_mesh_world);

@@ -690,6 +690,11 @@ VkResult vkpt_temporal_debug_blit_view(VkCommandBuffer cmd_buf,
  * generated-present descriptor set while it may still be in flight. */
 VkResult vkpt_temporal_debug_blit_for_screenshot(VkCommandBuffer cmd_buf,
 	VkImageView image_view, VkExtent2D extent, VkptTemporalDebugView view);
+/* Publishes exact, fence-retired physical-sky metadata for the already
+ * exported primary sun blocker image. Passing false keeps that incomplete
+ * signal unavailable to providers. */
+void vkpt_temporal_set_dominant_light(const vec3_t surface_to_light_direction,
+	const vec3_t emission, float angular_radius_radians, bool available);
 VkResult vkpt_draw_clear_stretch_pics(void);
 
 VkResult vkpt_uniform_buffer_create(void);

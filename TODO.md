@@ -503,11 +503,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   partition (finite 10,000-unit sky misses, negative for an untraced lobe).
   Direct alpha remains the documented non-negative undefined value. The
   primary direct-sun trace now also preserves its real blocker distance in a
-  dense `R16_SFLOAT` diagnostic image (FP16_MAX exposed, negative untraced),
-  without a duplicate ray trace. It remains unavailable as a complete
-  dominant-light provider input because exact resolved emission is GPU-only;
-  do not publish host-side cvar colour as a false substitute. The official
-  neural provider also remains outstanding. The reusable
+  dense `R16_SFLOAT` image (FP16_MAX exposed, negative untraced), without a
+  duplicate ray trace. Contract v9 pairs it with direction/radius and the
+  exact resolved `sun_color_ubo` emission via the existing fence-retired
+  primary-ray readback ring; it suppresses availability while that ring is
+  stale after a sky update. The official neural provider remains outstanding.
+  The reusable
   `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package
   consumer test); it does not certify pixel contents or implement a provider.

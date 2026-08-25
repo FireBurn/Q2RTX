@@ -42,6 +42,11 @@ VkResult vkpt_physical_sky_record_cmd_buffer(VkCommandBuffer cmd_buf);
 VkResult vkpt_physical_sky_update_ubo(QVKUniformBuffer_t * ubo, const sun_light_t* light, bool render_world);
 void vkpt_physical_sky_latch_local_time(void);
 bool vkpt_physical_sky_needs_update(void);
+/* Cache the exact sun emission copied by the fence-retired primary-ray
+ * readback. `get` returns false until that readback belongs to the most
+ * recently submitted physical-sky update. */
+void vkpt_physical_sky_set_resolved_sun_color(const vec3_t color);
+bool vkpt_physical_sky_get_resolved_sun_color(vec3_t color);
 void vkpt_next_sun_preset(void);
 
 void InitialiseSkyCVars(void);

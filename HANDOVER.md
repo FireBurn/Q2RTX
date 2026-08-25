@@ -179,22 +179,24 @@ Current truth:
   `baseq2/screenshots/RR_indirect_diffuse_hit_distance_20260825.png`.
   Diagnostics are in `baseq2/logs/RR_hit_distance_debug_20260825.log`.
 
-- Temporal contract v8 now preserves the primary direct-sun ray's actual
-  first blocker distance without tracing a second ray. `trace_shadow_ray` has
-  a distance-returning form; the direct pass writes `R16_SFLOAT` where
-  FP16_MAX means fully exposed and a negative value means no suitable primary
-  sun ray ran. Interleave publishes a dense diagnostic image and view 22
-  presents its log-scaled values. A 960x540 RX 6800M `vk_validation=1` run
-  reached v8/history-valid frame 1080 with the image valid at 644x361 and no
-  validation error; the capture shows black untraced, finite blocker, and
-  white exposed regions:
-  `baseq2/screenshots/RR_dominant_sun_blocker_20260825.png`. This is still
-  deliberately *not* advertised as a complete dominant-light RR signal:
-  Q2RTX's exact resolved sun emission remains GPU-only in `sun_color_ubo`,
-  while host-side `sun_light.color` is only pre-atmosphere/cvar data. The next
-  change must publish emission from that resolved GPU source alongside the
-  sampled sun direction/radius through a small provider-facing metadata
-  bridge, without adding a duplicate trace.
+- Temporal contract v9 completes Q2RTX's provider-neutral dominant-light
+  data bridge without tracing a second ray. The direct pass writes its actual
+  primary sun blocker distance to `R16_SFLOAT` (FP16_MAX exposed; negative
+  untraced), and the host now obtains the exact `sun_color_ubo.sun_color`
+  emission through the existing primary-ray fence-retired readback ring—not
+  through the pre-atmosphere/cvar `sun_light.color`. The signal stays
+  unavailable during the readback ring's stale window after a physical-sky
+  update; direction, radius, emission, and the image are published together
+  only once they correspond to the resolved sky. View 22 remains a log-scale
+  visualizer for the image. A 960x540 RX 6800M `vk_validation=1` run reached
+  v9/history-valid frame 874 with a valid 644x361 R16 image and exact metadata
+  `surface-to-light=(0.8754 -0.2346 0.4226)`,
+  `emission=(0.4834 0.1562 0.0263)`, radius `0.087266` radians; no validation
+  error was emitted. Capture:
+  `baseq2/screenshots/RR_dominant_sun_blocker_20260825.png`; log:
+  `baseq2/logs/RR_dominant_sun_metadata_20260825.log`. This establishes the
+  Q2RTX-side signal contract only, not availability of AMD's neural RR
+  provider.
 
 - `extern/ffx-vulkan` now exports the versioned, installable
   `ffx-vulkan::rayregeneration-contract` static target. Its public C ABI

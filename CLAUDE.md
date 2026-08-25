@@ -99,9 +99,11 @@ Q2RTX signal conventions currently exposed by the contract:
   indirect diffuse/specular radiance partitions. Values 20-21 visualize their
   first-lobe hit distances from alpha (black means untraced); view 22 shows
   the primary direct-sun blocker distance (black untraced, white FP16-max
-  exposed). The latter is diagnostic groundwork, not a complete
-  dominant-light provider input because exact resolved sun emission is still
-  unavailable at the CPU/provider boundary. Those two FSR4
+  exposed). Contract v9 pairs that image with the exact resolved GPU sun
+  emission, surface-to-light direction, and angular radius only after the
+  primary-ray readback ring has fence-retired the matching physical-sky
+  update. It remains provider-neutral groundwork, not proof that a neural RR
+  provider is active. Those two FSR4
   private surfaces must be
   obtained only through `ffxFsr4GetDebugResource`; do not expose their handles
   as general renderer resources or record writes to them.

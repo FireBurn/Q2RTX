@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 8u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 9u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -108,7 +108,8 @@ typedef enum VkptTemporalInputFlagBits_e {
 	VKPT_TEMPORAL_INPUT_RR_DIRECT_DIFFUSE = 1u << 13,
 	VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE = 1u << 14,
 	VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR = 1u << 15,
-	VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR = 1u << 16
+	VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR = 1u << 16,
+	VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY = 1u << 17
 } VkptTemporalInputFlagBits;
 
 typedef enum VkptTemporalNormalEncoding_e {
@@ -266,6 +267,18 @@ typedef struct VkptTemporalRadianceDescription_s {
 	uint32_t indirect_distance_bounce_index;
 } VkptTemporalRadianceDescription;
 
+/* The dominant-light direction points from the shaded point toward the
+ * emitter—the same direction used by Q2RTX's primary direct-sun ray. Emission
+ * is the exact resolved GPU sky value which contributed to that ray. */
+typedef struct VkptTemporalDominantLightDescription_s {
+	uint32_t struct_size;
+	float surface_to_light_direction[3];
+	float angular_radius_radians;
+	float emission[3];
+	/* FP16_MAX means fully exposed in rr_dominant_light_visibility. */
+	float fully_exposed_distance;
+} VkptTemporalDominantLightDescription;
+
 typedef struct VkptTemporalInputs_s {
 	uint32_t struct_size;
 	uint32_t available_inputs;
@@ -296,6 +309,7 @@ typedef struct VkptTemporalInputs_s {
 	VkptTemporalDepthDescription device_depth_description;
 	VkptTemporalDenoiserMaterialDescription denoiser_material_description;
 	VkptTemporalRadianceDescription radiance_description;
+	VkptTemporalDominantLightDescription dominant_light_description;
 } VkptTemporalInputs;
 
 typedef struct VkptTemporalUiDescription_s {

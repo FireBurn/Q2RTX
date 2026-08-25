@@ -1304,8 +1304,23 @@ void vkpt_fsr_print_diagnostics(void)
 			frame->inputs.radiance_description.no_hit_distance,
 			frame->inputs.radiance_description.indirect_distance_bounce_index);
 		Com_Printf("  RR dominant sun: primary direct-shadow hit distance "
-			"(negative=untraced, FP16_MAX=fully exposed); diagnostic only, "
-			"exact resolved emission bridge pending\n");
+			"(negative=untraced, FP16_MAX=fully exposed); provider dispatch "
+			"remains pending\n");
+		if (frame->inputs.available_inputs &
+			VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY) {
+			const VkptTemporalDominantLightDescription *dominant =
+				&frame->inputs.dominant_light_description;
+			Com_Printf("  RR dominant metadata: surface-to-light=(%.4f %.4f %.4f) "
+				"emission=(%.4f %.4f %.4f) radius=%.6f rad\n",
+				dominant->surface_to_light_direction[0],
+				dominant->surface_to_light_direction[1],
+				dominant->surface_to_light_direction[2],
+				dominant->emission[0], dominant->emission[1],
+				dominant->emission[2], dominant->angular_radius_radians);
+		} else {
+			Com_Printf("  RR dominant metadata: unavailable until a matching "
+				"physical-sky resolve readback is fence-retired\n");
+		}
         Com_Printf("  RR material encoding: normal=%s albedo=%s types=%u "
                    "(provider-neutral input foundation)\n",
             frame->inputs.denoiser_material_description.normal_encoding ==

@@ -132,6 +132,12 @@ BEGIN_SHADER_STRUCT( ReadbackBuffer )
 
 	vec3 hdr_color;
 	float adapted_luminance;
+
+	/* Exact resolved physical-sky sun emission sampled from sun_color_ubo by
+	 * primary_rays. The CPU sees this only through the fence-retired readback
+	 * ring; it must not be replaced with the pre-atmosphere cvar colour. */
+	vec3 resolved_sun_color;
+	float padding_resolved_sun_color;
 }
 END_SHADER_STRUCT( ReadbackBuffer )
 

@@ -167,6 +167,8 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 		sizeof(frame->inputs.denoiser_material_description);
 	frame->inputs.radiance_description.struct_size =
 		sizeof(frame->inputs.radiance_description);
+	frame->inputs.dominant_light_description.struct_size =
+		sizeof(frame->inputs.dominant_light_description);
 	frame->ui.struct_size = sizeof(frame->ui);
 	initialize_image(&frame->inputs.scene_color);
 	initialize_image(&frame->inputs.motion_vectors);
@@ -340,6 +342,7 @@ vkpt_temporal_begin_frame(float frame_time_seconds, bool q2_history_valid,
 		VKPT_TEMPORAL_RADIANCE_ALPHA_FIRST_LOBE_HIT_DISTANCE;
 	frame->inputs.radiance_description.no_hit_distance = PRIMARY_RAY_T_MAX;
 	frame->inputs.radiance_description.indirect_distance_bounce_index = 0;
+	frame->inputs.dominant_light_description.fully_exposed_distance = 65504.0f;
 
 	frame->ui.mode = VKPT_TEMPORAL_UI_DIRECT_AFTER_SCENE;
 
@@ -531,6 +534,48 @@ vkpt_temporal_mark_inputs_ready(void)
 	}
 
 	frame->stage = VKPT_TEMPORAL_STAGE_INPUTS_READY;
+}
+
+void
+vkpt_temporal_set_dominant_light(const vec3_t surface_to_light_direction,
+	const vec3_t emission, float angular_radius_radians, bool available)
+{
+	VkptTemporalFrame *frame = &temporal_state.frame;
+	VkptTemporalDominantLightDescription *description =
+		&frame->inputs.dominant_light_description;
+	const float fully_exposed_distance = description->fully_exposed_distance;
+	float direction_length_squared;
+
+	frame->inputs.available_inputs &=
+		~VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY;
+	if (!temporal_state.frame_open || !available || qvk.device_count != 1)
+		return;
+	if (!isfinite(surface_to_light_direction[0]) ||
+		!isfinite(surface_to_light_direction[1]) ||
+		!isfinite(surface_to_light_direction[2]) ||
+		!isfinite(emission[0]) || !isfinite(emission[1]) ||
+		!isfinite(emission[2]) || !isfinite(angular_radius_radians) ||
+		emission[0] < 0.0f || emission[1] < 0.0f || emission[2] < 0.0f ||
+		angular_radius_radians <= 0.0f)
+		return;
+
+	direction_length_squared =
+		surface_to_light_direction[0] * surface_to_light_direction[0] +
+		surface_to_light_direction[1] * surface_to_light_direction[1] +
+		surface_to_light_direction[2] * surface_to_light_direction[2];
+	if (!(direction_length_squared > 1e-6f))
+		return;
+
+	description->surface_to_light_direction[0] = surface_to_light_direction[0];
+	description->surface_to_light_direction[1] = surface_to_light_direction[1];
+	description->surface_to_light_direction[2] = surface_to_light_direction[2];
+	description->angular_radius_radians = angular_radius_radians;
+	description->emission[0] = emission[0];
+	description->emission[1] = emission[1];
+	description->emission[2] = emission[2];
+	description->fully_exposed_distance = fully_exposed_distance;
+	frame->inputs.available_inputs |=
+		VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY;
 }
 
 void
@@ -775,6 +820,9 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 			&frame->inputs.rr_direct_specular, "RR direct specular" },
 		{ VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR,
 			&frame->inputs.rr_indirect_specular, "RR indirect specular" },
+		{ VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY,
+			&frame->inputs.rr_dominant_light_visibility,
+			"RR dominant light visibility" },
 		{ VKPT_TEMPORAL_INPUT_REACTIVE_MASK, &frame->inputs.reactive_mask, "reactive mask" },
 	};
 
@@ -828,6 +876,29 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 			VKPT_TEMPORAL_DEPTH_UNAVAILABLE)
 		return temporal_validation_fail(reason, reason_size,
 			"view-Z convention is unavailable");
+	if ((required_inputs & VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY) &&
+		(frame->inputs.dominant_light_description.struct_size !=
+			sizeof(frame->inputs.dominant_light_description) ||
+		!isfinite(frame->inputs.dominant_light_description.surface_to_light_direction[0]) ||
+		!isfinite(frame->inputs.dominant_light_description.surface_to_light_direction[1]) ||
+		!isfinite(frame->inputs.dominant_light_description.surface_to_light_direction[2]) ||
+		!isfinite(frame->inputs.dominant_light_description.emission[0]) ||
+		!isfinite(frame->inputs.dominant_light_description.emission[1]) ||
+		!isfinite(frame->inputs.dominant_light_description.emission[2]) ||
+		!isfinite(frame->inputs.dominant_light_description.angular_radius_radians) ||
+		(frame->inputs.dominant_light_description.surface_to_light_direction[0] *
+			 frame->inputs.dominant_light_description.surface_to_light_direction[0] +
+		 frame->inputs.dominant_light_description.surface_to_light_direction[1] *
+			 frame->inputs.dominant_light_description.surface_to_light_direction[1] +
+		 frame->inputs.dominant_light_description.surface_to_light_direction[2] *
+			 frame->inputs.dominant_light_description.surface_to_light_direction[2]) <= 1e-6f ||
+		frame->inputs.dominant_light_description.emission[0] < 0.0f ||
+		frame->inputs.dominant_light_description.emission[1] < 0.0f ||
+		frame->inputs.dominant_light_description.emission[2] < 0.0f ||
+		frame->inputs.dominant_light_description.angular_radius_radians <= 0.0f ||
+		frame->inputs.dominant_light_description.fully_exposed_distance != 65504.0f))
+		return temporal_validation_fail(reason, reason_size,
+			"dominant-light metadata is invalid");
 
 	for (size_t i = 0; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
 		if (!(required_inputs & inputs[i].bit))

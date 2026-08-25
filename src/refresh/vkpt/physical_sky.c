@@ -39,6 +39,10 @@ static int width  = 1024,
            height = 1024;
 
 static int skyNeedsUpdate = VK_TRUE;
+static vec3_t resolved_sun_color;
+static bool resolved_sun_color_valid;
+static uint64_t resolved_sun_color_update_frame = UINT64_MAX;
+static uint64_t resolved_sun_color_readback_frame;
 
 cvar_t *sun_color[3];
 cvar_t *sun_elevation;
@@ -461,6 +465,32 @@ bool vkpt_physical_sky_needs_update()
 	return skyNeedsUpdate;
 }
 
+void
+vkpt_physical_sky_set_resolved_sun_color(const vec3_t color)
+{
+	if (!isfinite(color[0]) || !isfinite(color[1]) || !isfinite(color[2]) ||
+		color[0] < 0.0f || color[1] < 0.0f || color[2] < 0.0f) {
+		resolved_sun_color_valid = false;
+		return;
+	}
+
+	VectorCopy(color, resolved_sun_color);
+	resolved_sun_color_valid = true;
+	resolved_sun_color_readback_frame = qvk.frame_counter;
+}
+
+bool
+vkpt_physical_sky_get_resolved_sun_color(vec3_t color)
+{
+	if (!color || !resolved_sun_color_valid ||
+		resolved_sun_color_update_frame == UINT64_MAX ||
+		resolved_sun_color_readback_frame < resolved_sun_color_update_frame +
+			MAX_FRAMES_IN_FLIGHT)
+		return false;
+	VectorCopy(resolved_sun_color, color);
+	return true;
+}
+
 extern float terrain_shadowmap_viewproj[16];
 
 VkResult
@@ -468,6 +498,10 @@ vkpt_physical_sky_record_cmd_buffer(VkCommandBuffer cmd_buf)
 {
 	if (!skyNeedsUpdate)
 		return VK_SUCCESS;
+	/* The exact resolve runs in this command buffer. Keep the previous cached
+	 * colour unavailable until this frame's primary-ray readback has completed
+	 * a full per-slot fence cycle. */
+	resolved_sun_color_update_frame = qvk.frame_counter;
 
 	RecordCommandBufferShadowmap(cmd_buf);
 
@@ -526,7 +560,7 @@ vkpt_physical_sky_record_cmd_buffer(VkCommandBuffer cmd_buf)
 		.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT
 	);
 
-    skyNeedsUpdate = VK_FALSE;
+	skyNeedsUpdate = VK_FALSE;
 	
     return VK_SUCCESS;
 }
