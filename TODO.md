@@ -610,8 +610,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `ffx-vulkan::temporal-lifecycle` target, and its boundary test proves normal
   movement, exact 256-unit/90-degree/0.35-radian boundaries, discontinuities,
   and non-finite inputs. Q2RTX calls that same code before every provider
-  dispatch. A deliberate live camera-cut stimulus is still needed to validate
-  the full input-to-presentation reset branch and tune thresholds.
+  dispatch. A rebuilt RX 6800M FSR4-v07 DRS + SDK-3.1.6 FI/OF smoke reached
+  v11/history-valid frame 243 with no VUID/error after linking this target.
+  A deliberate live camera-cut stimulus is still needed to validate the full
+  input-to-presentation reset branch and tune thresholds.
 - [x] Reset FSR history when temporal settings, including `flt_fsr_enable`,
   change so disable/re-enable cannot reuse stale recurrent state.
 - [x] Log provider/effect version, backend, model, active permutation, input,

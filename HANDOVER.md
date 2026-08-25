@@ -61,6 +61,12 @@ Current truth:
   A live free-camera/teleport capture is still needed to prove the end-to-end
   game-input route.
 
+- The post-link RX 6800M live regression is clean: the rebuilt Q2RTX client
+  selected source-v07 FSR4 DRS plus active SDK-3.1.6 FI/OF, reached temporal
+  contract v11/history-valid frame 243, and logged no VUID/error. The current
+  full-colour coherent capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_v07_colour_after_rr.png`.
+
 - Official-source feasibility was rechecked on 2026-08-25 without altering the
   user's SDK trees. The current AMD FSR SDK 2.3.0 repository lists FSR4.1.1,
   ML Frame Generation 4.0.1, and Ray Regeneration 1.2, but its own known-issue
