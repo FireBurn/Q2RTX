@@ -82,6 +82,12 @@ Current truth:
   error and a full-colour coherent HUD/viewmodel capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR3_FG_colour_after_rr.png`.
 
+- The public-SDK FSR3.1.5 Vulkan bridge also completed a post-RR-resource
+  visual smoke at Quality, reaching temporal contract v11/history-valid frame
+  864 without a VUID/error. Its 960x540 `base1` capture is full colour and
+  coherent, including the HUD and viewmodel:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_colour_after_rr.png`.
+
 - The RR motion resource added one global image descriptor. Because loose
   user `baseq2/shader_vkpt` files override packaged `shaders.pkz`, an old cache
   would otherwise be paired with the new host descriptor layout and produce a
