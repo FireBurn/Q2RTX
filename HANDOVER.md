@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The development config's `flt_temporal_debug_view` is reset to `0` (Off).
+  It had been left at view 22 while capturing the grayscale dominant-light
+  blocker signal, which intentionally replaces normal colour output. A fresh
+  960x540 FSR3 run with the selector Off rendered a full-colour `base1` scene;
+  its scripted diagnostic console overlay does not affect the underlying scene:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/quake001.png`.
+
 - SDK-3.1.6 FI/OF reaches real generated→real WSI presentation on RX 6800M
   with Vulkan validation and coherent 960x540 captures. The rate telemetry
   and gate now use Q2RTX's completed logical-render cadence—not CPU submission
