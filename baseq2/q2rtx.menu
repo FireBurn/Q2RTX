@@ -123,7 +123,7 @@ begin photomode
 end
 
 begin video
-// Q2RTX menu revision: 2026-08-fsr3-fsr4-v07
+// Q2RTX menu revision: 2026-08-fsr3-fsr4-v07-rr
 //title "Video Setup"
     background #212F3CD0
     style --compact
@@ -147,7 +147,7 @@ begin video
 		pairs --status "used whenever the selected temporal upscaler is off or unavailable" \
 			"fallback anti-aliasing" flt_taa \
 			"none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
-		pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment; FSR4 is the source-v07 INT8 model family, not 4.1.1. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
+		pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment. FSR4 v07 is an experimental source INT8 model, not official FSR 4.1.1; AMD's current 4.1.1 provider is signed DX12/Windows-only and needs RX 7000+/9000, so native Vulkan/RDNA2 uses this v07 path. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
 			"temporal upscaler" flt_upscaler \
 			"Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
 		pairs --status "selects matching FSR3 or FSR4 v07 model ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. Changing it rebuilds FSR4's complete model graph and resets history." \
@@ -223,7 +223,7 @@ begin temporal_diagnostics
 		"FSR output" 10 "FSR4 history" 11 "FSR4 reprojected" 12 \
 		"RR normal/rough/material" 13 "RR diffuse albedo" 14 "RR specular albedo" 15 \
 		"RR direct diffuse" 16 "RR indirect diffuse" 17 "RR direct specular" 18 "RR indirect specular" 19 \
-		"RR indirect diffuse distance" 20 "RR indirect specular distance" 21
+		"RR indirect diffuse distance" 20 "RR indirect specular distance" 21 "RR dominant light visibility" 22
     static --width 52 --status "active temporal-upscaler provider or the exact fallback reason" \
         "upscaler" flt_upscaler_reason
     static --width 52 --status "active analytical-frame-generation state or the exact suspension/fallback reason" \

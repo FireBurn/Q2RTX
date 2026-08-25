@@ -44,6 +44,12 @@ Current truth:
   and the captured output was coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_fiof_diagnostics_memory_20260825.png`.
 
+- The menu revision now exposes all provider-neutral RR input views through
+  view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the
+  working source-v07 Vulkan path from official FSR 4.1.1: AMD documents the
+  latter as a signed DX12/Windows provider for RX 7000-series discrete GPUs or
+  newer, so it cannot run in native Vulkan Q2RTX on the RX 6800M/RDNA2.
+
 - Console screenshot readback now respects WSI ownership.  It no longer
   transitions `current_swap_chain_image_index` after its normal present;
   `IMG_ReadPixels[_HDR]_RTX` locally acquires an image, initializes it if
@@ -537,7 +543,8 @@ Current truth:
   repackaged. On this development machine the installed user archive was still
   stale, so the verified source `baseq2/q2rtx.menu` is also deployed as the
   higher-priority loose `/home/fireburn/.local/share/quake2rtx/baseq2/q2rtx.menu`
-  override (SHA-256 `a66b0744ec168e289a7845b7e0ffbb27e1b0cb4939e5ffe941250170f9008a86`).
+  override (revision `2026-08-fsr3-fsr4-v07-rr`, SHA-256
+  `24f08bb266982349008453ca2d8137d2928ca88628bf095031b0311c876297fb`).
 - Both FSR3 and FSR4 v07 expose Native AA (100%), Quality (67%), Balanced
   (59%), Performance (50%), and Ultra Performance (33%) through
   `flt_fsr_quality`. FSR4 selects a complete matching model/initializer/weight

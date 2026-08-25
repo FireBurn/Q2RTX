@@ -557,7 +557,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   render-complete semaphores, eliminating presentation-engine semaphore reuse
   validation errors and establishing the required ownership model for FG.
 - [x] Remove the inert old 0..2 “lower is sharper” menu control and truth-label
-  the source-v07 model family as experimental and not FSR 4.1.1.
+  the source-v07 model family as experimental and not FSR 4.1.1. The menu now
+  records the actual native-Vulkan/RDNA2 boundary and exposes all RR substrate
+  views through dominant-light blocker view 22.
 - [x] Implement real FSR4 v07 RCAS and expose its independent [0,1] amount;
   retain the legacy FSR1 sharpness cvar solely as a no-op migration alias.
 - [-] Reset histories on provider/preset/size/HDR/projection/camera-cut changes.

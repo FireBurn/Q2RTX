@@ -756,8 +756,11 @@ supported single Vulkan GPU and perspective projection. If the selected
 provider cannot run, Q2RTX uses the `flt_taa` fallback instead.
 
 This experimental source-v07 path is based on an older FSR4 model payload; it
-must not be described as FSR 4.1.1. The implemented v07 static models cover the
-listed discrete quality ratios and expose a separate dynamic-resolution model.
+must not be described as FSR 4.1.1. AMD's current FSR 4.1.1 is a signed binary
+provider requiring Windows, DX12, and an RX 7000-series discrete GPU or newer.
+It cannot run in Q2RTX's native Vulkan renderer or on the RX 6800M/RDNA2. The
+implemented v07 static models cover the listed discrete quality ratios and
+expose a separate dynamic-resolution model.
 
 Linux package launches keep a revisioned loose `q2rtx.menu` in the user
 `baseq2` directory so an old user-local `q2rtx_media.pkz` cannot hide new
@@ -907,9 +910,14 @@ exported by Q2RTX: pre-tone-map scene HDR, current-to-previous motion,
 conventional device depth, positive-forward view-Z, reactive/composition
 masks, geometric normals, albedo, roughness, or active FSR reconstructed
 output. FSR4 v07 additionally exposes its previous reconstructed history and
-pre/post reprojected bridge as borrowed read-only diagnostics. Scene HDR is shown with a
-simple debug tone map; motion uses RG for signed direction and B for pixel
-magnitude; view-Z is log-scaled from the near surface to the 10,000-unit sky.
+pre/post reprojected bridge as borrowed read-only diagnostics. Views 13–22
+show the provider-neutral Ray-Regeneration substrate: packed material/albedo,
+four noisy radiance partitions, their indirect-lobe hit distances, and the
+primary-sun blocker distance (negative means untraced; FP16_MAX means fully
+exposed). These are diagnostic inputs, not activation of AMD's DX12-only
+neural Ray Regeneration provider. Scene HDR is shown with a simple debug tone
+map; motion uses RG for signed direction and B for pixel magnitude; view-Z is
+log-scaled from the near surface to the 10,000-unit sky.
 It does not alter any input, provider dispatch, or history. Analytical FSR3
 frame generation is suspended while a view is active so both presentations
 cannot describe different scene representations. Set it back to `0` (Off)
