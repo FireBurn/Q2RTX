@@ -139,6 +139,9 @@ typedef enum VkptTemporalUiMode_e {
 	VKPT_TEMPORAL_UI_SEPARATE_TEXTURE
 } VkptTemporalUiMode;
 
+/* Separate UI textures contain premultiplied RGB plus straight alpha. A host
+ * composites `ui.rgb + scene.rgb * (1 - ui.a)` after interpolation. */
+
 typedef struct VkptTemporalImage_s {
 	uint32_t struct_size;
 	uint32_t flags;

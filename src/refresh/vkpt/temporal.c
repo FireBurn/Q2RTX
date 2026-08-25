@@ -481,6 +481,22 @@ vkpt_temporal_begin_ui_composition(void)
 }
 
 void
+vkpt_temporal_set_separate_ui_texture(const VkptTemporalImage *ui_texture)
+{
+	VkptTemporalFrame *frame = &temporal_state.frame;
+
+	if (!temporal_state.frame_open || !ui_texture ||
+		ui_texture->struct_size != sizeof(*ui_texture) ||
+		!(ui_texture->flags & VKPT_TEMPORAL_RESOURCE_VALID) ||
+		!ui_texture->image || !ui_texture->view)
+		return;
+
+	frame->ui.mode = VKPT_TEMPORAL_UI_SEPARATE_TEXTURE;
+	frame->ui.ui_texture = *ui_texture;
+	frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_UI;
+}
+
+void
 vkpt_temporal_end_ui_composition(void)
 {
 	if (!temporal_state.frame_open)

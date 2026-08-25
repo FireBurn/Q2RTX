@@ -138,12 +138,16 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   masks; view-model pixels feed reactive history rejection. A 1280x720 RX
   6800M run recreated the menu context, activated FSR3, and passed Vulkan
   validation with both masks registered.
-- [-] Keep the dedicated HUDless offscreen scene target and add a separate
-  alpha UI target. `TAA_OUTPUT` already is the display-resolution,
-  tone-mapped-but-HUDless scene consumed by both FSR3 FI implementations; the
-  current generated→real path safely replays the one uploaded UI queue onto
-  both swapchain images. What remains is a reusable alpha-UI texture and
-  compositor for screenshots, external presentation, and non-replayable UI.
+- [x] Keep the dedicated HUDless offscreen scene target and add a separate
+  alpha UI target. `TAA_OUTPUT` is the display-resolution,
+  tone-mapped-but-HUDless scene consumed by both FSR3 FI implementations.
+  Active FG now renders the queued UI once to a per-frame-slot linear RGBA16F
+  premultiplied-alpha texture and composites it over both generated and real
+  scenes. The provider-neutral temporal contract publishes this as
+  `VKPT_TEMPORAL_UI_SEPARATE_TEXTURE`; ordinary rendering retains direct UI.
+  Targets allocate lazily only while FG runs. A RX 6800M `vk_validation=1`
+  FSR3.1.6 FIFO run was coherent with no VUID/error:
+  `/home/fireburn/Screenshot_FSR3_alpha_ui_lazy_20260825.png`.
 - [x] Add per-input debug views in the live renderer. The contract validator is
   already executed immediately before FSR3, FSR4 v07, and analytical FG imports.
 - [x] Add FSR reconstructed-output and private FSR4 history/reprojected views

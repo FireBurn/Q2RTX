@@ -3936,6 +3936,7 @@ R_EndFrame_RTX(void)
 {
 	LOG_FUNC();
 	bool framegen_generated_presented = false;
+	bool framegen_alpha_ui_composited = false;
 	bool temporal_debug_active = false;
 	unsigned int temporal_debug_image = VKPT_IMG_CLEAR;
 	VkImageView temporal_debug_image_view = VK_NULL_HANDLE;
@@ -3971,6 +3972,10 @@ R_EndFrame_RTX(void)
 	if (qvk.framegen_present_active) {
 		const uint32_t generated_index = qvk.framegen_generated_swap_chain_image_index;
 		const uint32_t real_index = qvk.current_swap_chain_image_index;
+		const bool alpha_ui_ready = vkpt_draw_prepare_alpha_ui_texture() == VK_SUCCESS;
+		if (!alpha_ui_ready) {
+			Com_WPrintf("FSR3 FG: alpha UI target unavailable; using direct UI replay.\n");
+		}
 		VkCommandBuffer generated_cmd = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
 		VkSemaphore generated_signal = qvk.swap_chain_render_finished[generated_index];
 		VkSemaphore generated_wait = qvk.semaphores[qvk.current_frame_index][0].image_available;
@@ -3979,16 +3984,33 @@ R_EndFrame_RTX(void)
 
 		qvk.current_swap_chain_image_index = generated_index;
 		ensure_acquired_swapchain_image_initialized(generated_cmd, generated_index);
+		/* Render UI once into an alpha texture. Both presentation images sample
+		 * it below, which makes the temporal contract usable by non-replayable UI
+		 * and capture clients as well as Q2RTX's current stretch-pic queue. */
+		if (alpha_ui_ready &&
+			vkpt_draw_submit_stretch_pics_to_alpha_texture(generated_cmd) == VK_SUCCESS) {
+			VkptTemporalImage alpha_ui_texture;
+			if (vkpt_draw_get_alpha_ui_texture(&alpha_ui_texture)) {
+				vkpt_temporal_set_separate_ui_texture(&alpha_ui_texture);
+				framegen_alpha_ui_composited = true;
+			}
+		}
 		if (frame_ready) {
 			vkpt_final_blit_with_descriptor_slot(generated_cmd,
 				qvk.framegen_generated_frame_ready ? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_TAA_OUTPUT,
 				qvk.extent_taa_output, false,
 				vkpt_refdef.fd && (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) &&
-				cvar_pt_waterwarp->integer, 1);
+				cvar_pt_waterwarp->integer, 1, framegen_alpha_ui_composited);
 		}
-		/* Do not consume the queued UI: the real frame below receives exactly the
-		 * same UI after its HUDless scene blit. */
-		vkpt_draw_submit_stretch_pics_ex(generated_cmd, true);
+		if (framegen_alpha_ui_composited) {
+			/* The uploaded frame-slot buffer remains in use until the real submission
+			 * completes. Clearing only the CPU queue prevents a second direct replay. */
+			vkpt_draw_clear_stretch_pics();
+		} else {
+			/* Graceful fallback: preserve the proven direct replay path if alpha UI
+			 * preparation or recording failed. */
+			vkpt_draw_submit_stretch_pics_ex(generated_cmd, true);
+		}
 		vkpt_submit_command_buffer(generated_cmd, qvk.queue_graphics, 1,
 			1, &generated_wait, &generated_wait_stage, &device_index,
 			1, &generated_signal, &device_index, VK_NULL_HANDLE);
@@ -4019,11 +4041,15 @@ R_EndFrame_RTX(void)
 		}
 		else if (vkpt_fsr_is_enabled() && !qvk.frame_menu_mode)
 		{
-			vkpt_fsr_final_blit(cmd_buf, waterwarp);
+			vkpt_final_blit_with_descriptor_slot(cmd_buf, VKPT_IMG_TAA_OUTPUT,
+				qvk.extent_unscaled, false, waterwarp, 0,
+				framegen_alpha_ui_composited);
 		}
 		else if (qvk.effective_aa_mode == AA_MODE_UPSCALE)
 		{
-			vkpt_final_blit(cmd_buf, VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output, false, waterwarp);
+			vkpt_final_blit_with_descriptor_slot(cmd_buf, VKPT_IMG_TAA_OUTPUT,
+				qvk.extent_taa_output, false, waterwarp, 0,
+				framegen_alpha_ui_composited);
 		}
 		else
 		{
@@ -4033,9 +4059,13 @@ R_EndFrame_RTX(void)
 
 			if (extents_equal(qvk.extent_render, qvk.extent_unscaled) ||
 				(extents_equal(qvk.extent_render, extent_unscaled_half) && drs_effective_scale == 0)) // don't do nearest filter 2x upscale with DRS enabled
-				vkpt_final_blit(cmd_buf, VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output, false, waterwarp);
+				vkpt_final_blit_with_descriptor_slot(cmd_buf, VKPT_IMG_TAA_OUTPUT,
+					qvk.extent_taa_output, false, waterwarp, 0,
+					framegen_alpha_ui_composited);
 			else
-				vkpt_final_blit(cmd_buf, VKPT_IMG_TAA_OUTPUT, qvk.extent_taa_output, true, waterwarp);
+				vkpt_final_blit_with_descriptor_slot(cmd_buf, VKPT_IMG_TAA_OUTPUT,
+					qvk.extent_taa_output, true, waterwarp, 0,
+					framegen_alpha_ui_composited);
 		}
 
 		frame_ready = false;

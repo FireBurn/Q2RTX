@@ -36,10 +36,13 @@ layout(constant_id = 1) const uint spec_final_blit_water_warp = 0;
 
 layout(push_constant, std430) uniform PushConstants {
     vec2 input_dimensions;
+    uint temporal_debug_view;
+    uint composite_alpha_ui;
 } push;
 
 layout(set = 1, binding = 0) uniform sampler2D final_blit_input_image;
 layout(set = 1, binding = 1) uniform sampler2D debug_lines_input_image;
+layout(set = 1, binding = 2) uniform sampler2D alpha_ui_input_image;
 
 layout(location = 0) in vec2 tex_coord;
 layout(location = 0) out vec4 outColor;
@@ -132,6 +135,14 @@ main()
 
     vec4 lines_color = textureLod(debug_lines_input_image, tex_coord, 0);
     color.rgb = color.rgb * (1 - lines_color.a) + lines_color.rgb * global_ubo.ui_color_scale;
+
+    if (push.composite_alpha_ui != 0) {
+        /* The alpha-UI render pass stores premultiplied RGB and source alpha.
+         * It is therefore safe to use for generated and real presentation,
+         * captures, or an external presenter without replaying draw calls. */
+        vec4 ui = textureLod(alpha_ui_input_image, tex_coord, 0);
+        color = ui.rgb + color * (1.0 - ui.a);
+    }
 
     outColor = vec4(color, 1);
 }

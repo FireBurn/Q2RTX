@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-08-20, Europe/London.  Update this file at every meaningful
+Last updated: 2026-08-25, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,20 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- Analytical frame generation now has a reusable separate alpha-UI path.
+  `VKPT_IMG_TAA_OUTPUT` remains the HUDless display-resolution scene; when FG
+  is active, Q2RTX renders the queued UI once into a lazily allocated per-frame
+  slot `R16G16B16A16_SFLOAT` texture with premultiplied RGB/source alpha, then
+  composites `ui.rgb + scene.rgb * (1-ui.a)` in the generated and real final
+  blits. `VkptTemporalFrame.ui` now publishes
+  `VKPT_TEMPORAL_UI_SEPARATE_TEXTURE` and full resource metadata. Allocation
+  happens before command recording because the existing lazy-image helper has
+  a one-time submission; if it fails, the known-good direct replay path is
+  retained. A fresh 960x540 RX 6800M `vk_validation=1` FSR3.1.6 FIFO run
+  allocated both slots lazily, reached active presentation, logged no VUID or
+  validation warning/error, and captured a coherent scene/HUD at
+  `/home/fireburn/Screenshot_FSR3_alpha_ui_lazy_20260825.png`.
 
 - `extern/ffx-vulkan` is now a consumable Vulkan project rather than merely a
   Q2RTX-adjacent source tree. The source-v07 FSR4 provider, types, schedule,

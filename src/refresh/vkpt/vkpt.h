@@ -635,10 +635,18 @@ VkResult vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf);
  * Frame generation uses this to compose identical UI over generated and real
  * scene images; ordinary rendering should use the consuming wrapper above. */
 VkResult vkpt_draw_submit_stretch_pics_ex(VkCommandBuffer cmd_buf, bool preserve_queue);
+/* Render the queued UI once to the current frame-slot's premultiplied-alpha
+ * texture. Frame generation composites this texture over generated and real
+ * scenes, so non-replayable future UI/capture paths have one shared source. */
+VkResult vkpt_draw_submit_stretch_pics_to_alpha_texture(VkCommandBuffer cmd_buf);
+/* May submit one-time image initialization work, so call before beginning the
+ * command buffer that will render/composite the alpha UI. */
+VkResult vkpt_draw_prepare_alpha_ui_texture(void);
+bool vkpt_draw_get_alpha_ui_texture(VkptTemporalImage *out_image);
 VkResult vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index, VkExtent2D extent, bool filtered, bool warped);
 VkResult vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, bool filtered, bool warped,
-	unsigned int descriptor_slot);
+	unsigned int descriptor_slot, bool composite_alpha_ui);
 /* Present a provider-neutral temporal input with a semantic debug mapping.
  * The caller supplies one of VkptTemporalDebugView and an input image whose
  * valid extent is `extent`. This is intentionally presentation-only: it does
@@ -748,6 +756,7 @@ void vkpt_temporal_mark_inputs_ready(void);
 void vkpt_temporal_mark_scene_presented(void);
 void vkpt_temporal_begin_ui_composition(void);
 void vkpt_temporal_end_ui_composition(void);
+void vkpt_temporal_set_separate_ui_texture(const VkptTemporalImage *ui_texture);
 void vkpt_temporal_end_frame(bool presented);
 const VkptTemporalFrame *vkpt_temporal_get_frame(void);
 /* Resolve the selected debug cvar to an input that is valid this frame. */

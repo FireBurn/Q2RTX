@@ -243,6 +243,13 @@ coexist with AMD's unversioned SDK symbols. Its dependency-complete FSR4
 subset installs as a CMake package; the full FSR3 source closure is consumed
 with `add_subdirectory` as documented in its README.
 
+Frame generation consumes the HUDless `VKPT_IMG_TAA_OUTPUT` scene. When it is
+active, UI is rendered once to a lazy per-frame-slot RGBA16F texture with
+premultiplied RGB/source alpha and published as
+`VKPT_TEMPORAL_UI_SEPARATE_TEXTURE`; final presentation composites
+`ui.rgb + scene.rgb * (1-ui.a)`. Do not replace this with a second direct UI
+draw unless falling back after alpha-target creation/recording failed.
+
 DXIL tooling:
 
 ```sh

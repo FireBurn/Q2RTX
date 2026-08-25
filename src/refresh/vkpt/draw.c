@@ -70,6 +70,7 @@ typedef struct {
 typedef struct {
 	vec2_t input_dimensions;
 	uint32_t temporal_debug_view;
+	uint32_t composite_alpha_ui;
 } FinalBlitPushConstants_t;
 
 static clipRect_t clip_rect;
@@ -81,10 +82,14 @@ static bool stretch_pic_queue_uploaded = false;
 static VkPipelineLayout        pipeline_layout_stretch_pic;
 static VkPipelineLayout        pipeline_layout_final_blit;
 static VkRenderPass            render_pass_stretch_pic;
+static VkRenderPass            render_pass_alpha_ui;
 static VkPipeline              pipeline_stretch_pic[STRETCH_PIC_NUM_PIPELINES];
+static VkPipeline              pipeline_stretch_pic_alpha_ui[STRETCH_PIC_NUM_PIPELINES];
 static VkPipeline              pipeline_final_blit[FINAL_BLIT_NUM_PIPELINES];
 static VkPipeline              pipeline_temporal_debug;
 static VkFramebuffer*          framebuffer_stretch_pic = NULL;
+static VkFramebuffer           framebuffer_alpha_ui[MAX_FRAMES_IN_FLIGHT];
+static vkpt_lazy_image_t       alpha_ui_images[MAX_FRAMES_IN_FLIGHT];
 static BufferResource_t        buf_stretch_pic_queue[MAX_FRAMES_IN_FLIGHT];
 static BufferResource_t        buf_ubo[MAX_FRAMES_IN_FLIGHT];
 static VkDescriptorSetLayout   desc_set_layout_sbo;
@@ -255,6 +260,37 @@ create_render_pass(void)
 
 	_VK(vkCreateRenderPass(qvk.device, &render_pass_info, NULL, &render_pass_stretch_pic));
 	ATTACH_LABEL_VARIABLE(render_pass_stretch_pic, RENDER_PASS);
+
+	/* Frame generation needs one reusable UI result, not two direct replays.
+	 * Keep it linear RGBA16F, premultiply RGB in the blend state below, and
+	 * leave it in GENERAL for the two subsequent final-blit samples. */
+	color_attachment.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+	color_attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+	VkSubpassDependency alpha_ui_dependencies[] = {
+		{
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		},
+		{
+			.srcSubpass = 0,
+			.dstSubpass = VK_SUBPASS_EXTERNAL,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+		},
+	};
+	render_pass_info.pAttachments = &color_attachment;
+	render_pass_info.pDependencies = alpha_ui_dependencies;
+	render_pass_info.dependencyCount = LENGTH(alpha_ui_dependencies);
+	_VK(vkCreateRenderPass(qvk.device, &render_pass_info, NULL,
+		&render_pass_alpha_ui));
+	ATTACH_LABEL_VARIABLE(render_pass_alpha_ui, RENDER_PASS);
 }
 
 VkResult
@@ -353,6 +389,12 @@ vkpt_draw_initialize()
 			.binding         = 1,
 			.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
+		{
+			.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.binding         = 2,
+			.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	};
 
 	VkDescriptorSetLayoutCreateInfo layout_info_final_blit = {
@@ -365,6 +407,10 @@ vkpt_draw_initialize()
 	ATTACH_LABEL_VARIABLE(desc_set_layout_final_blit, DESCRIPTOR_SET_LAYOUT);
 
 	VkDescriptorPoolSize pool_size_final_blit[] = {
+		{
+			.type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME,
+		},
 		{
 			.type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.descriptorCount = MAX_FRAMES_IN_FLIGHT * FINAL_BLIT_SETS_PER_FRAME,
@@ -482,6 +528,7 @@ vkpt_draw_destroy_pipelines()
 	LOG_FUNC();
 	for(int i = 0; i < STRETCH_PIC_NUM_PIPELINES; i++) {
 		vkDestroyPipeline(qvk.device, pipeline_stretch_pic[i], NULL);
+		vkDestroyPipeline(qvk.device, pipeline_stretch_pic_alpha_ui[i], NULL);
 	}
 	for(int i = 0; i < FINAL_BLIT_NUM_PIPELINES; i++) {
 		vkDestroyPipeline(qvk.device, pipeline_final_blit[i], NULL);
@@ -494,8 +541,16 @@ vkpt_draw_destroy_pipelines()
 	}
 	free(framebuffer_stretch_pic);
 	framebuffer_stretch_pic = NULL;
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+		vkDestroyFramebuffer(qvk.device, framebuffer_alpha_ui[i], NULL);
+		framebuffer_alpha_ui[i] = VK_NULL_HANDLE;
+		vkpt_destroy_lazy_image(alpha_ui_images + i);
+	}
 
 	vkDestroyRenderPass(qvk.device, render_pass_stretch_pic, NULL);
+	vkDestroyRenderPass(qvk.device, render_pass_alpha_ui, NULL);
+	render_pass_stretch_pic = VK_NULL_HANDLE;
+	render_pass_alpha_ui = VK_NULL_HANDLE;
 	
 	return VK_SUCCESS;
 }
@@ -667,6 +722,25 @@ vkpt_draw_create_pipelines()
 	_VK(vkCreateGraphicsPipelines(qvk.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline_stretch_pic[STRETCH_PIC_HDR]));
 	ATTACH_LABEL_VARIABLE(pipeline_stretch_pic[STRETCH_PIC_HDR], PIPELINE);
 
+	/* Premultiplied RGB makes the subsequent compositor a single stable
+	 * `ui.rgb + scene.rgb * (1 - ui.a)` operation. Unlike the swapchain path,
+	 * alpha itself must retain source coverage rather than source-alpha squared. */
+	color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	pipeline_info.renderPass = render_pass_alpha_ui;
+	pipeline_info.pStages = shader_info_SDR;
+	_VK(vkCreateGraphicsPipelines(qvk.device, VK_NULL_HANDLE, 1, &pipeline_info,
+		NULL, &pipeline_stretch_pic_alpha_ui[STRETCH_PIC_SDR]));
+	ATTACH_LABEL_VARIABLE(pipeline_stretch_pic_alpha_ui[STRETCH_PIC_SDR], PIPELINE);
+	pipeline_info.pStages = shader_info_HDR;
+	_VK(vkCreateGraphicsPipelines(qvk.device, VK_NULL_HANDLE, 1, &pipeline_info,
+		NULL, &pipeline_stretch_pic_alpha_ui[STRETCH_PIC_HDR]));
+	ATTACH_LABEL_VARIABLE(pipeline_stretch_pic_alpha_ui[STRETCH_PIC_HDR], PIPELINE);
+
+	/* Final blit always writes opaque scene pixels; restore the conventional
+	 * attachment state before creating it. */
+	color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	pipeline_info.renderPass = render_pass_stretch_pic;
+
 
 	VkSpecializationMapEntry final_blit_spec_entries[] = {
 		{ .constantID = 0, .offset = 0, .size = sizeof(uint32_t) },
@@ -786,9 +860,124 @@ vkpt_draw_submit_stretch_pics(VkCommandBuffer cmd_buf)
 }
 
 VkResult
+vkpt_draw_prepare_alpha_ui_texture(void)
+{
+	const uint32_t frame_index = qvk.current_frame_index;
+	vkpt_lazy_image_t *alpha_ui = alpha_ui_images + frame_index;
+
+	/* Most sessions never enable analytical FG. Allocate a slot's UI target
+	 * only on its first generated/real pair; the ordinary frame fence ensures a
+	 * reused slot is no longer sampled before this function is called again. */
+	if (!alpha_ui->image) {
+		VkResult result = vkpt_prepare_lazy_image(alpha_ui,
+			(int)vkpt_draw_get_extent().width, (int)vkpt_draw_get_extent().height,
+			VK_FORMAT_R16G16B16A16_SFLOAT, va("framegen alpha UI %u", frame_index));
+		if (result != VK_SUCCESS)
+			return result;
+	}
+	if (!framebuffer_alpha_ui[frame_index]) {
+		VkImageView attachments[] = { alpha_ui->image_view };
+		VkFramebufferCreateInfo alpha_ui_fb_info = {
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = render_pass_alpha_ui,
+			.attachmentCount = 1,
+			.pAttachments = attachments,
+			.width = vkpt_draw_get_extent().width,
+			.height = vkpt_draw_get_extent().height,
+			.layers = 1,
+		};
+		VkResult result = vkCreateFramebuffer(qvk.device, &alpha_ui_fb_info,
+			NULL, framebuffer_alpha_ui + frame_index);
+		if (result != VK_SUCCESS)
+			return result;
+		ATTACH_LABEL_VARIABLE(framebuffer_alpha_ui[frame_index], FRAMEBUFFER);
+	}
+	return VK_SUCCESS;
+}
+
+VkResult
+vkpt_draw_submit_stretch_pics_to_alpha_texture(VkCommandBuffer cmd_buf)
+{
+	const uint32_t frame_index = qvk.current_frame_index;
+	vkpt_lazy_image_t *alpha_ui = alpha_ui_images + frame_index;
+	VkClearValue clear_value = { .color = {{0.0f, 0.0f, 0.0f, 0.0f}} };
+	VkRenderPassBeginInfo render_pass_info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = render_pass_alpha_ui,
+		.framebuffer = framebuffer_alpha_ui[frame_index],
+		.renderArea.offset = { 0, 0 },
+		.renderArea.extent = vkpt_draw_get_extent(),
+		.clearValueCount = 1,
+		.pClearValues = &clear_value,
+	};
+
+	if (!render_pass_alpha_ui || !framebuffer_alpha_ui[frame_index] ||
+		!alpha_ui->image_view)
+		return VK_ERROR_INITIALIZATION_FAILED;
+
+	/* Use the existing per-slot upload buffer. This upload is deliberately
+	 * performed once: both generated and real final blits sample the same UI. */
+	if (num_stretch_pics && !stretch_pic_queue_uploaded) {
+		BufferResource_t *buf_spq = buf_stretch_pic_queue + frame_index;
+		StretchPic_t *spq_dev = (StretchPic_t *)buffer_map(buf_spq);
+		memcpy(spq_dev, stretch_pic_queue, sizeof(StretchPic_t) * num_stretch_pics);
+		buffer_unmap(buf_spq);
+
+		BufferResource_t *ubo_res = buf_ubo + frame_index;
+		StretchPic_UBO_t *ubo = (StretchPic_UBO_t *)buffer_map(ubo_res);
+		ubo->hdr_color_scale = cvar_ui_hdr_nits->value * 0.0125;
+		ubo->tm_hdr_saturation_scale = cvar_tm_hdr_saturation_scale->value;
+		buffer_unmap(ubo_res);
+		stretch_pic_queue_uploaded = true;
+	}
+
+	VkDescriptorSet desc_sets[] = {
+		desc_set_sbo[frame_index], qvk_get_current_desc_set_textures(),
+		desc_set_ubo[frame_index],
+	};
+	vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	if (num_stretch_pics) {
+		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipeline_layout_stretch_pic, 0, LENGTH(desc_sets), desc_sets, 0, 0);
+		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipeline_stretch_pic_alpha_ui[qvk.surf_is_hdr ?
+				STRETCH_PIC_HDR : STRETCH_PIC_SDR]);
+		vkCmdDraw(cmd_buf, 4, num_stretch_pics, 0, 0);
+	}
+	vkCmdEndRenderPass(cmd_buf);
+	return VK_SUCCESS;
+}
+
+bool
+vkpt_draw_get_alpha_ui_texture(VkptTemporalImage *out_image)
+{
+	const vkpt_lazy_image_t *ui_image = alpha_ui_images + qvk.current_frame_index;
+
+	if (!out_image || !ui_image->image || !ui_image->image_view)
+		return false;
+	memset(out_image, 0, sizeof(*out_image));
+	out_image->struct_size = sizeof(*out_image);
+	out_image->flags = VKPT_TEMPORAL_RESOURCE_VALID |
+		VKPT_TEMPORAL_RESOURCE_LINEAR | VKPT_TEMPORAL_RESOURCE_ALPHA_METADATA;
+	out_image->image = ui_image->image;
+	out_image->view = ui_image->image_view;
+	out_image->format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	out_image->layout = VK_IMAGE_LAYOUT_GENERAL;
+	out_image->allocation_extent = vkpt_draw_get_extent();
+	out_image->valid_extent = vkpt_draw_get_extent();
+	out_image->producer_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	out_image->producer_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	out_image->usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+		VK_IMAGE_USAGE_SAMPLED_BIT;
+	out_image->queue_family_index = (uint32_t)qvk.queue_idx_graphics;
+	out_image->value_scale = 1.0f;
+	return true;
+}
+
+VkResult
 vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, bool filtered, bool warped,
-	unsigned int descriptor_slot)
+	unsigned int descriptor_slot, bool composite_alpha_ui)
 {
 	assert(descriptor_slot < FINAL_BLIT_SETS_PER_FRAME);
 	VkDescriptorSet final_blit_set = desc_set_final_blit[
@@ -805,6 +994,13 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
 		.imageView   = debug_lines_view,
 		.sampler     = qvk.tex_sampler_nearest,
+	};
+	const vkpt_lazy_image_t *alpha_ui = alpha_ui_images + qvk.current_frame_index;
+	VkDescriptorImageInfo img_info_alpha_ui = {
+		.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.imageView = composite_alpha_ui && alpha_ui->image_view
+			? alpha_ui->image_view : qvk.images_views[VKPT_IMG_CLEAR],
+		.sampler = qvk.tex_sampler,
 	};
 	VkWriteDescriptorSet elem_images[] = {
 		{
@@ -825,6 +1021,15 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 			.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			.pImageInfo      = &img_info_debug_lines,
 		},
+		{
+			.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet          = final_blit_set,
+			.dstBinding      = 2,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo      = &img_info_alpha_ui,
+		},
 	};
 
 	vkUpdateDescriptorSets(qvk.device, LENGTH(elem_images), elem_images, 0, NULL);
@@ -844,7 +1049,8 @@ vkpt_final_blit_with_descriptor_slot(VkCommandBuffer cmd_buf,
 
 	FinalBlitPushConstants_t push_constants = {
 		.input_dimensions = {extent.width, extent.height},
-		.temporal_debug_view = VKPT_TEMPORAL_DEBUG_OFF
+		.temporal_debug_view = VKPT_TEMPORAL_DEBUG_OFF,
+		.composite_alpha_ui = composite_alpha_ui ? 1u : 0u,
 	};
 
 	vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
@@ -933,7 +1139,7 @@ vkpt_final_blit(VkCommandBuffer cmd_buf, unsigned int image_index,
 	VkExtent2D extent, bool filtered, bool warped)
 {
 	return vkpt_final_blit_with_descriptor_slot(cmd_buf, image_index, extent,
-		filtered, warped, 0);
+		filtered, warped, 0, false);
 }
 
 void R_SetClipRect_RTX(const clipRect_t *clip) 
