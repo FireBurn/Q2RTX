@@ -602,9 +602,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   fallback. The menu now has a read-only diagnostics page for both provider
   reasons and frame-generation cadence; its 2560x1440 Vulkan-validation
   capture is `/home/fireburn/Screenshot_temporal_diagnostics_window_20260820.png`.
-- [x] Replace per-frame-slot present semaphores with per-swapchain-image
-  render-complete semaphores, eliminating presentation-engine semaphore reuse
-  validation errors and establishing the required ownership model for FG.
+- [x] Use per-swapchain-image render-complete semaphores for generated/real
+  ownership, and quiesce the present queue exactly once when switching between
+  ordinary and paired presentation. Per-image ownership alone did not prove
+  that WSI had consumed a previous mode's binary wait; the live menu-resume
+  VUID exposed that gap. The reusable policy test and the repeated RX 6800M
+  menu smoke now prove the complete ownership rule.
 - [x] Remove the inert old 0..2 “lower is sharper” menu control and truth-label
   the source-v07 model family as experimental and not FSR 4.1.1. The menu now
   records the actual native-Vulkan/RDNA2 boundary and exposes all RR substrate
