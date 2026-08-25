@@ -22,7 +22,7 @@
 //     bind 35      SAMPLER                 s0
 //     bind 43      UNIFORM_BUFFER          b0 (MLSR_Optimized_Constants / cbRCAS / etc.)
 
-#include "ffx_fsr4_vk.h"
+#include "ffx_vk_fsr4_v07.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

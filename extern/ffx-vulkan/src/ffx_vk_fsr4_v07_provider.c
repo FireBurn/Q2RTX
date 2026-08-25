@@ -1,11 +1,11 @@
 /*
  * ffx_functions_q2rtx.c
  *
- * Implements the four FFX API entry points (ffxCreateContext, ffxDestroyContext,
- * ffxQuery, ffxDispatch) without linking AMD's signed DLL.
+ * Implements the versioned FSR4-v07 provider entry points without linking
+ * AMD's signed DLL.
  *
  * Instead of going through the provider/DLL layer, all calls route through
- * g_vkBackendOverride — the FfxInterface set up by fsr.c before every call.
+ * an explicit FfxInterface installed before context creation.
  *
  * The FSR4 upscaler context is modelled as a thin wrapper that stores the
  * FfxInterface pointer and the per-frame cbuffer data.  The 14-pass compute
@@ -15,18 +15,54 @@
  * generates (see ffxQueryDescUpscaleGetJitterOffset handling below).
  */
 
-#include "ffx_types_q2rtx.h"
-#include "ffx_fsr4_vk.h"
-#include "ffx_fsr4_schedule.h"
-#include "../conversion.h"
+#include "ffx_vk_fsr4_v07_types.h"
+#include "ffx_vk_fsr4_v07.h"
+#include "ffx_vk_fsr4_v07_schedule.h"
 
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 
-/* ── global override pointer (defined in fsr.c) ──────────────────────────── */
-extern FfxInterface *g_vkBackendOverride;
+/* The interface is copied during context creation; it is not a renderer
+ * global and does not need to remain installed for dispatch/destroy. */
+static FfxInterface *g_fsr4_backend_interface;
+
+void
+ffxFsr4V07SetBackendInterface(FfxInterface *backend)
+{
+    g_fsr4_backend_interface = backend;
+}
+
+static uint16_t float_to_half(float value)
+{
+    union { float f; int32_t si; uint32_t ui; } v, s;
+    const int32_t inf_n = 0x7f800000;
+    const int32_t max_n = 0x477fe000;
+    const int32_t min_n = 0x38800000;
+    const int32_t sign_n = (int32_t)0x80000000u;
+    const int32_t nan_n = 0x7f802000;
+    const int32_t max_c = 0x23bff;
+    const int32_t mul_n = 0x52000000;
+    const int32_t sub_c = 0x003ff;
+    const int32_t max_d = 0x1c000;
+    const int32_t min_d = 0x1c000;
+    uint32_t sign;
+
+    v.f = value;
+    sign = (uint32_t)v.si & (uint32_t)sign_n;
+    v.si ^= (int32_t)sign;
+    sign >>= 16u;
+    s.si = mul_n;
+    s.si = (int32_t)(s.f * v.f);
+    v.si ^= (s.si ^ v.si) & -(min_n > v.si);
+    v.si ^= (inf_n ^ v.si) & -((inf_n > v.si) & (v.si > max_n));
+    v.si ^= (nan_n ^ v.si) & -((nan_n > v.si) & (v.si > inf_n));
+    v.ui >>= 13u;
+    v.si ^= ((v.si - max_d) ^ v.si) & -(v.si > max_c);
+    v.si ^= ((v.si - min_d) ^ v.si) & -(v.si > sub_c);
+    return (uint16_t)(v.ui | sign);
+}
 
 /* ── internal context ────────────────────────────────────────────────────── */
 
@@ -212,14 +248,14 @@ static FfxErrorCode create_internal_resources(Fsr4Context *c)
 
 /* ── ffxCreateContext ─────────────────────────────────────────────────────── */
 
-ffxReturnCode_t ffxCreateContext(ffxContext *ctx,
+ffxReturnCode_t ffxFsr4V07CreateContext(ffxContext *ctx,
     ffxCreateContextDescHeader *desc,
     const ffxAllocationCallbacks *mem)
 {
     (void)mem;
 
     if (!ctx || !desc) return FFX_API_RETURN_ERROR_PARAMETER;
-    if (!g_vkBackendOverride) return FFX_API_RETURN_ERROR;
+    if (!g_fsr4_backend_interface) return FFX_API_RETURN_ERROR;
 
     /* Find the upscale descriptor in the linked list */
     ffxCreateContextDescUpscale *upscaleDesc = NULL;
@@ -241,8 +277,8 @@ ffxReturnCode_t ffxCreateContext(ffxContext *ctx,
     Fsr4Context *c = (Fsr4Context *)calloc(1, sizeof(Fsr4Context));
     if (!c) return FFX_API_RETURN_ERROR;
 
-    /* Copy the interface so we can use it after g_vkBackendOverride is cleared */
-    c->iface          = *g_vkBackendOverride;
+    /* Copy the interface so the caller may clear its creation binding. */
+    c->iface          = *g_fsr4_backend_interface;
     c->maxRenderSize  = upscaleDesc->maxRenderSize;
     c->maxUpscaleSize = upscaleDesc->maxUpscaleSize;
     c->flags          = upscaleDesc->flags;
@@ -271,7 +307,7 @@ ffxReturnCode_t ffxCreateContext(ffxContext *ctx,
 
 /* ── ffxDestroyContext ────────────────────────────────────────────────────── */
 
-ffxReturnCode_t ffxDestroyContext(ffxContext *ctx,
+ffxReturnCode_t ffxFsr4V07DestroyContext(ffxContext *ctx,
     const ffxAllocationCallbacks *mem)
 {
     (void)mem;
@@ -288,7 +324,7 @@ ffxReturnCode_t ffxDestroyContext(ffxContext *ctx,
 
 /* ── ffxQuery ─────────────────────────────────────────────────────────────── */
 
-ffxReturnCode_t ffxQuery(ffxContext *ctx, ffxQueryDescHeader *desc)
+ffxReturnCode_t ffxFsr4V07Query(ffxContext *ctx, ffxQueryDescHeader *desc)
 {
     if (!desc) return FFX_API_RETURN_ERROR_PARAMETER;
 
@@ -370,7 +406,7 @@ static FfxErrorCode reg_resource(Fsr4Context *c,
 /* Sentinel for "no resource at this slot" — writeFullDs/writeModelDs skip these */
 static const FfxResourceInternal RI_NONE = { UINT32_MAX };
 
-ffxReturnCode_t ffxDispatch(ffxContext *ctx, const ffxDispatchDescHeader *desc)
+ffxReturnCode_t ffxFsr4V07Dispatch(ffxContext *ctx, const ffxDispatchDescHeader *desc)
 {
     if (!ctx || !*ctx || !desc) return FFX_API_RETURN_ERROR_PARAMETER;
     Fsr4Context *c = (Fsr4Context *)(*ctx);
@@ -693,8 +729,8 @@ ffxReturnCode_t ffxDispatch(ffxContext *ctx, const ffxDispatchDescHeader *desc)
 
         memset(&rcas_cb, 0, sizeof(rcas_cb));
         memcpy(&rcas_cb.config[0], &rcas_linear, sizeof(rcas_linear));
-        rcas_cb.config[1] = (uint32_t)floatToHalf(rcas_linear) |
-                            ((uint32_t)floatToHalf(rcas_linear) << 16u);
+        rcas_cb.config[1] = (uint32_t)float_to_half(rcas_linear) |
+                            ((uint32_t)float_to_half(rcas_linear) << 16u);
         rcas_cb.preExposure = cb.preExposure;
         if (c->iface.fpStageConstantBufferDataFunc(&c->iface, &rcas_cb,
                 (FfxUInt32)sizeof(rcas_cb), &rcas_handle) != FFX_OK)
@@ -777,7 +813,7 @@ ffxFsr4GetDebugResource(ffxContext *ctx, FfxFsr4DebugResource resource,
 
 /* ── ffxConfigure (stub — not needed for basic upscaling) ─────────────────── */
 
-ffxReturnCode_t ffxConfigure(ffxContext *ctx, const ffxApiHeader *desc)
+ffxReturnCode_t ffxFsr4V07Configure(ffxContext *ctx, const ffxApiHeader *desc)
 {
     (void)ctx; (void)desc;
     return FFX_API_RETURN_OK;

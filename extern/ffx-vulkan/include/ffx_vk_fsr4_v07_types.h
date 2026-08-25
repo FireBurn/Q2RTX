@@ -1,8 +1,8 @@
 /*
- * ffx_types_q2rtx.h
+ * ffx_vk_fsr4_v07_types.h
  *
  * Self-contained type definitions extracted from the AMD FidelityFX SDK
- * (Kits/FidelityFX/api/internal/) for use in Q2RTX.
+ * (Kits/FidelityFX/api/internal/) for the source-v07 Vulkan provider.
  *
  * This replaces all dependencies on:
  *   ffx_api.h, ffx_api.hpp, ffx_api_types.h, ffx_interface.h,
@@ -607,26 +607,34 @@ typedef struct ffxAllocationCallbacks {
     ffxDealloc  fpDealloc;
 } ffxAllocationCallbacks;
 
-/* ── API function declarations (implemented in ffx_functions_q2rtx.c) ─────── */
+/* ── Versioned v07 provider API ──────────────────────────────────────────── */
 
-ffxReturnCode_t ffxCreateContext(ffxContext *ctx,
-                                 ffxCreateContextDescHeader *desc,
-                                 const ffxAllocationCallbacks *mem);
+/*
+ * Set the backend interface used by the next CreateContext call.  The provider
+ * copies that interface into the created context, so it may be cleared once
+ * creation returns.  This avoids an AMD-DLL/global-symbol dependency and lets
+ * an application keep its Vulkan backend ownership explicit.
+ */
+void ffxFsr4V07SetBackendInterface(FfxInterface *backend);
 
-ffxReturnCode_t ffxDestroyContext(ffxContext *ctx,
-                                  const ffxAllocationCallbacks *mem);
+ffxReturnCode_t ffxFsr4V07CreateContext(ffxContext *ctx,
+                                        ffxCreateContextDescHeader *desc,
+                                        const ffxAllocationCallbacks *mem);
 
-ffxReturnCode_t ffxQuery(ffxContext *ctx,
-                         ffxQueryDescHeader *desc);
+ffxReturnCode_t ffxFsr4V07DestroyContext(ffxContext *ctx,
+                                         const ffxAllocationCallbacks *mem);
 
-ffxReturnCode_t ffxDispatch(ffxContext *ctx,
-                            const ffxDispatchDescHeader *desc);
+ffxReturnCode_t ffxFsr4V07Query(ffxContext *ctx,
+                                ffxQueryDescHeader *desc);
+
+ffxReturnCode_t ffxFsr4V07Dispatch(ffxContext *ctx,
+                                   const ffxDispatchDescHeader *desc);
 
 int ffxFsr4GetDebugResource(ffxContext *ctx, FfxFsr4DebugResource resource,
                             FfxApiResource *out_resource);
 
-ffxReturnCode_t ffxConfigure(ffxContext *ctx,
-                             const ffxApiHeader *desc);
+ffxReturnCode_t ffxFsr4V07Configure(ffxContext *ctx,
+                                    const ffxApiHeader *desc);
 
 #ifdef __cplusplus
 } /* extern "C" */

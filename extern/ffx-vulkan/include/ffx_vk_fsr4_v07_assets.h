@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "ffx_fsr4_schedule.h"
+#include "ffx_vk_fsr4_v07_schedule.h"
 
 #ifdef __cplusplus
 extern "C" {

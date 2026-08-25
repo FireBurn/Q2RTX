@@ -11,6 +11,8 @@ if(IS_64_BIT AND CONFIG_VKPT_RENDERER AND CONFIG_VKPT_FSR3)
         "Build the portable FidelityFX Vulkan contract tests" FORCE)
     set(FFX_VK_PORTABLE_BUILD_PROBE OFF CACHE BOOL
         "Build the Vulkan device capability probe" FORCE)
+    set(FFX_VK_PORTABLE_INSTALL OFF CACHE BOOL
+        "Install portable headers, libraries, and a CMake package" FORCE)
     add_subdirectory(ffx-vulkan)
 endif()
 

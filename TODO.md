@@ -107,6 +107,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Add a reusable FSR4 v07 asset-set contract that selects matching model,
   tensor tier, initializer, pass-0 weights, RCAS, and SPD names without tying
   another Vulkan application to Q2RTX's filesystem/backend policy.
+- [x] Promote the complete source-v07 Vulkan provider into
+  `extern/ffx-vulkan` as `ffx-vulkan::fsr4-v07-vulkan`. Q2RTX now links that
+  exact library, its public headers/versioned `ffxFsr4V07…` API avoid AMD SDK
+  symbol collisions, and an installed-package consumer contract builds/links
+  without the renderer. The full FSR3 source closure remains an
+  `add_subdirectory` integration until it has a dependency-complete export.
 - [x] Expose dense scene color, current-to-previous motion, stable primary
   view-Z, camera matrices/jitter, reset reasons, frame ID, and pre-UI boundary.
 - [x] Preserve primary view-Z before reflection passes overwrite denoiser depth.

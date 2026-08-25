@@ -804,12 +804,9 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf);
  * frame generator may safely free its retained imported-image views. */
 void vkpt_fsr_frame_generation_retire(uint32_t frame_slot);
 
-/* FSR4: global backend override pointer.
-   Set to &fsr4_backend before calling ffxCreate/Dispatch/Query,
-   then cleared to NULL.  Defined in fsr.c, used by ffx_functions_q2rtx.c
-   to route all FFX API calls through the Vulkan backend. */
-#include "fsr4/ffx_fsr4_vk.h"
-extern FfxInterface *g_vkBackendOverride;
+/* FSR4 v07 Vulkan provider public API.  The renderer supplies its FfxInterface
+ * explicitly while creating a context; the provider then owns a copied view. */
+#include "ffx_vk_fsr4_v07.h"
 
 VkResult vkpt_bloom_initialize(void);
 VkResult vkpt_bloom_destroy(void);

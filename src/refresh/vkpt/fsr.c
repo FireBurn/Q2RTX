@@ -21,9 +21,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "vkpt.h"
 #include "system/system.h"
-#include "fsr4/ffx_fsr4_vk.h"
-#include "fsr4/ffx_fsr4_schedule.h"
-#include "fsr4/ffx_fsr4_assets.h"
+#include "ffx_vk_fsr4_v07.h"
+#include "ffx_vk_fsr4_v07_schedule.h"
+#include "ffx_vk_fsr4_v07_assets.h"
 #ifdef VKPT_FSR3
 #include "ffx_vk_portable.h"
 #include "ffx_vk_fsr3_3_1_5_bridge.h"
@@ -68,11 +68,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 /* ── backend state ───────────────────────────────────────────────────────── */
-
-/* Definition of the global override pointer declared extern in vkpt.h.
-   Set to &fsr4_backend around every ffx::* call so the FSR4 provider
-   routes through our Vulkan backend instead of the DX12 path. */
-FfxInterface *g_vkBackendOverride = NULL;
 
 static FfxInterface     fsr4_backend;
 static void *           fsr4_scratch     = NULL;
@@ -318,9 +313,7 @@ static void fsr4_destroy_provider_context(void)
 {
     if (!fsr4_context_ok)
         return;
-    g_vkBackendOverride = &fsr4_backend;
-    ffxDestroyContext(&fsr4_context, NULL);
-    g_vkBackendOverride = NULL;
+    ffxFsr4V07DestroyContext(&fsr4_context, NULL);
     fsr4_context_ok = false;
     fsr4_ctx_dw = fsr4_ctx_dh = 0;
 }
@@ -510,7 +503,7 @@ static VkResult fsr4_recreate_context(void)
 
     fsr4_destroy_provider_context();
 
-    g_vkBackendOverride = &fsr4_backend;
+    ffxFsr4V07SetBackendInterface(&fsr4_backend);
 
     ffxCreateContextDescUpscale desc;
     memset(&desc, 0, sizeof(desc));
@@ -531,8 +524,8 @@ static VkResult fsr4_recreate_context(void)
     if (fsr4_dynamic_resolution_requested())
         desc.flags |= FFX_UPSCALE_ENABLE_DYNAMIC_RESOLUTION;
 
-    ffxReturnCode_t ret = ffxCreateContext(&fsr4_context, &desc.header, NULL);
-    g_vkBackendOverride = NULL;
+    ffxReturnCode_t ret = ffxFsr4V07CreateContext(&fsr4_context, &desc.header, NULL);
+    ffxFsr4V07SetBackendInterface(NULL);
 
     if (ret != FFX_API_RETURN_OK) {
         Com_WPrintf("FSR4: ffx::CreateContext failed (%d)\n", (int)ret);
@@ -1424,7 +1417,7 @@ uint32_t vkpt_fsr_jitter_phase_count(void)
     query.displayWidth = qvk.extent_unscaled.width;
     query.renderWidth = qvk.extent_render.width;
     query.pOutPhaseCount = &phase_count;
-    if (ffxQuery(&fsr4_context, &query.header) != FFX_API_RETURN_OK ||
+    if (ffxFsr4V07Query(&fsr4_context, &query.header) != FFX_API_RETURN_OK ||
         phase_count <= 0)
         return 0;
     return (uint32_t)phase_count;
@@ -2353,9 +2346,7 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
     d.cameraFovAngleVertical = frame->camera.vertical_fov_radians;
     d.viewSpaceToMetersFactor = frame->camera.view_space_to_meters;
 
-    g_vkBackendOverride = &fsr4_backend;
-    dispatch_result = ffxDispatch(&fsr4_context, &d.header);
-    g_vkBackendOverride = NULL;
+    dispatch_result = ffxFsr4V07Dispatch(&fsr4_context, &d.header);
     if (dispatch_result != FFX_API_RETURN_OK) {
         END_PERF_MARKER(cmd_buf, PROFILER_FSR);
         fsr4_reset_next = true;

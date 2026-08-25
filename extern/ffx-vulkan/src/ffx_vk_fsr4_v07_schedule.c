@@ -1,4 +1,4 @@
-#include "ffx_fsr4_schedule.h"
+#include "ffx_vk_fsr4_v07_schedule.h"
 
 #include <limits.h>
 #include <string.h>

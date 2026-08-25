@@ -264,10 +264,6 @@ SET(SRC_VKPT
 	refresh/vkpt/cameras.c
 	refresh/vkpt/freecam.c
 	refresh/vkpt/fsr.c
-	refresh/vkpt/fsr4/ffx_fsr4_vk.c
-	refresh/vkpt/fsr4/ffx_fsr4_schedule.c
-	refresh/vkpt/fsr4/ffx_fsr4_assets.c
-	refresh/vkpt/fsr4/ffx_functions_q2rtx.c
 	refresh/vkpt/main.c
 	refresh/vkpt/material.c
 	refresh/vkpt/matrix.c
@@ -293,10 +289,8 @@ SET(SRC_VKPT
 
 IF(BUILD_TESTING)
     add_executable(fsr4_schedule_test
-        refresh/vkpt/fsr4/ffx_fsr4_schedule.c
-        refresh/vkpt/fsr4/ffx_fsr4_assets.c
-        refresh/vkpt/fsr4/tests/test_fsr4_schedule.c)
-    target_include_directories(fsr4_schedule_test PRIVATE refresh/vkpt/fsr4)
+        ${CMAKE_SOURCE_DIR}/extern/ffx-vulkan/tests/fsr4_v07_assets_test.c)
+    target_link_libraries(fsr4_schedule_test PRIVATE ffx-vulkan::fsr4-v07-assets)
     add_test(NAME fsr4_schedule COMMAND fsr4_schedule_test)
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
@@ -572,7 +566,7 @@ IF (TARGET client)
         # FSR4 backend headers
         TARGET_INCLUDE_DIRECTORIES(client PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt
-            ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4)
+            ${CMAKE_SOURCE_DIR}/extern/ffx-vulkan/include)
         LINK_DIRECTORIES(client PRIVATE ${CMAKE_SOURCE_DIR})
         TARGET_COMPILE_DEFINITIONS(client PRIVATE REF_VKPT=1 USE_REF=1)
         IF (CONFIG_VKPT_ENABLE_DEVICE_GROUPS)
@@ -592,6 +586,7 @@ IF (TARGET client)
             # latter is selected only by its explicit experimental cvar.
             TARGET_LINK_LIBRARIES(client
                 ffx-vulkan::portable
+                ffx-vulkan::fsr4-v07-vulkan
                 ffx-vulkan::fsr3-vk-backend-3.1.5
                 ffx-vulkan::fsr3-vk-framegeneration-3.1.6)
             TARGET_COMPILE_DEFINITIONS(client PRIVATE VKPT_FSR3=1)

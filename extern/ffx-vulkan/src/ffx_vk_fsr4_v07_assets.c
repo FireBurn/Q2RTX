@@ -1,4 +1,4 @@
-#include "ffx_fsr4_assets.h"
+#include "ffx_vk_fsr4_v07_assets.h"
 
 #include <stdio.h>
 #include <string.h>

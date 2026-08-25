@@ -235,6 +235,14 @@ ctest --test-dir build/ffx-vulkan --output-on-failure
 build/ffx-vulkan/ffx_vk_capability_probe
 ```
 
+`extern/ffx-vulkan` is the canonical home for the reusable FSR4 v07 Vulkan
+provider and public headers. Q2RTX links `ffx-vulkan::fsr4-v07-vulkan`; do not
+reintroduce a renderer-private copy. The provider uses versioned
+`ffxFsr4V07…` entry points and an explicit backend-interface setter so it can
+coexist with AMD's unversioned SDK symbols. Its dependency-complete FSR4
+subset installs as a CMake package; the full FSR3 source closure is consumed
+with `add_subdirectory` as documented in its README.
+
 DXIL tooling:
 
 ```sh

@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- `extern/ffx-vulkan` is now a consumable Vulkan project rather than merely a
+  Q2RTX-adjacent source tree. The source-v07 FSR4 provider, types, schedule,
+  and asset helper are its canonical sources; Q2RTX links the same
+  `ffx-vulkan::fsr4-v07-vulkan` static library. Its versioned
+  `ffxFsr4V07…` API receives a caller-installed `FfxInterface` only during
+  context creation, avoiding both Q2RTX globals and AMD SDK symbol collisions.
+  The dependency-complete FSR4 subset installs/exports a CMake package and its
+  downstream consumer contract passed. Full FSR3 remains intended for vendored
+  `add_subdirectory` use because its pinned SDK closure is not yet a
+  dependency-complete installed export. This remains experimental v07, never
+  FSR4.1.1/RR/MLFG.
+
 - Q2RTX now provides `flt_temporal_debug_view`, a presentation-only selector
   for all dense temporal inputs: pre-tone-map scene HDR, current-to-previous
   motion, conventional device depth, positive-forward view-Z, reactive and

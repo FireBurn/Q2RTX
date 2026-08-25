@@ -1,5 +1,4 @@
-// ffx_fsr4_vk.h
-// Vulkan backend for FidelityFX FSR4 (INT8 / dot4add path)
+// Experimental source-v07 FSR4 INT8/DOT4 Vulkan backend.
 //
 // Drop-in replacement for the DX12 backend. Implements the FfxInterface
 // callback table so the existing ffx_provider_fsr4 dispatch logic can run
@@ -28,7 +27,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "ffx_types_q2rtx.h"
+#include "ffx_vk_fsr4_v07_types.h"
 
 #ifdef __cplusplus
 extern "C" {
