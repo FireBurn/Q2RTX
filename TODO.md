@@ -39,7 +39,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   1280x720 -> 2560x1440 Performance, sharpening off, explicit exposure.
   Standard validation, live visual testing, and GPU-assisted validation pass at
   both 640x360 -> 1280x720 and the target 1440p output.
-- [ ] Capture every pass in RenderDoc/RGP and prove descriptor/resource bounds.
+- [-] Capture every pass in RenderDoc/RGP and prove descriptor/resource bounds.
+  The available RenderDoc 1.39 Vulkan layer supports X11/XCB but not Wayland;
+  Q2RTX's current SDL build is Wayland-only, so an injected capture fails at
+  `VID_Init` before Vulkan work. Do not count this as an FSR4 failure. A live
+  960x540 FSR4 v07 validation run is clean; use an X11-enabled SDL build or a
+  Wayland-capable capture tool to complete the per-pass evidence.
 - [-] Take before/after screenshots and verify static detail, camera motion,
   weapon motion, emissives, disocclusions, resize, reset, and map transitions.
   Static output plus sustained forward/rotation motion are coherent and the old

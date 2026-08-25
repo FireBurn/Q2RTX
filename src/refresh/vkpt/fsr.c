@@ -340,6 +340,7 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
     void *pre_pass_weights = NULL;
     size_t model_initializer_size = 0;
     size_t pre_pass_weights_size = 0;
+    size_t shader_bytes = 0;
     bool ok = true;
     VkResult result;
     FfxFsr4ModelPreset preset;
@@ -435,6 +436,9 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         goto cleanup;
     }
 
+    for (uint32_t i = 0; i < FFX_FSR4_VK_PASS_COUNT; ++i)
+        shader_bytes += blobs[i].sizeBytes;
+
     memset(&ci, 0, sizeof(ci));
     ci.device = qvk.device;
     ci.physicalDevice = qvk.physical_device;
@@ -452,8 +456,14 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         Q_strlcpy(fsr4_shader_tier, tier, sizeof(fsr4_shader_tier));
         Q_strlcpy(fsr4_shader_model, model, sizeof(fsr4_shader_model));
         fsr4_unavailable_reason[0] = '\0';
-        Com_Printf("FSR4: Vulkan backend ready (INT8/DOT4, %s, %s tier).\n",
-                   model, tier);
+        Com_Printf("FSR4: source-v07 Vulkan backend ready (INT8/DOT4; %s, "
+                   "%s tier; %u shader passes, %.1f KiB SPIR-V; "
+                   "model %.1f + %.1f KiB; backend %.1f KiB).\n",
+                   model, tier, (unsigned)FFX_FSR4_VK_PASS_COUNT,
+                   (double)shader_bytes / 1024.0,
+                   (double)model_initializer_size / 1024.0,
+                   (double)pre_pass_weights_size / 1024.0,
+                   (double)ci.scratchBufferSize / 1024.0);
     } else {
         Com_WPrintf("FSR4: Vulkan backend creation failed (%d); FSR4 disabled.\n",
                     result);
@@ -545,6 +555,24 @@ static VkResult fsr4_recreate_context(void)
     Com_Printf("FSR4: context ready %ux%u -> %ux%u\n",
                qvk.extent_render.width,   qvk.extent_render.height,
                qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+    {
+        FfxApiEffectMemoryUsage memory_usage = {0};
+        FfxErrorCode memory_result =
+            fsr4_backend.fpGetEffectGpuMemoryUsage(&fsr4_backend, 0,
+                                                    &memory_usage);
+        size_t activation_bytes = ffxFsr4GetDot4ScratchSize(
+            qvk.extent_unscaled.width, qvk.extent_unscaled.height);
+        if (memory_result == FFX_OK) {
+            Com_Printf("FSR4: provider-owned Vulkan allocations %.2f MiB "
+                       "(includes %.2f MiB activation scratch; excludes "
+                       "driver descriptor-pool overhead).\n",
+                       (double)memory_usage.totalUsageInBytes / (1024.0 * 1024.0),
+                       (double)activation_bytes / (1024.0 * 1024.0));
+        } else {
+            Com_WPrintf("FSR4: provider allocation accounting unavailable (%d).\n",
+                        (int)memory_result);
+        }
+    }
     return VK_SUCCESS;
 }
 

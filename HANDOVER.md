@@ -910,11 +910,28 @@ the acquired-frame lifecycle and needs its own offscreen/readback redesign.
 8. Continue measured 4.1.1/RR/ML-FG provider capture research in parallel; do
    not relabel the current v07 model as 4.1.1.
 
+## Latest diagnostic evidence (2026-08-25)
+
+- The source-v07 FSR4 backend now reports the provider's actual Vulkan memory
+  requirements after context creation. A validation-enabled RX 6800M run at
+  960x540 reported 39.10 MiB provider-owned allocations, including 19.91 MiB
+  activation scratch, with no VUID, validation warning, or error. This count
+  includes Vulkan allocation alignment and excludes opaque descriptor-pool
+  driver overhead; it is not a heuristic estimate.
+- A temporary RenderDoc 1.40 command-line build succeeded, but its Vulkan
+  layer is X11/XCB-only. The locally registered 1.39 layer is also X11/XCB-only.
+  Q2RTX's SDL build reports `x11 not available`, while Wayland startup reports
+  that RenderDoc lacks `VK_KHR_wayland_surface`; both capture attempts stop at
+  `VID_Init` before FSR4 dispatch. No `.rdc`, proprietary payload, or capture
+  artifact was retained or committed. Complete the deferred pass audit with an
+  X11-enabled SDL build or a Wayland-capable capture tool.
+
 ## Known risks and cautions
 
 - The reusable source-v07 FSR4 backend remains experimental and has fixed
   limits; it still needs an explicit in-flight retirement API, reflected
-  per-pipeline layouts, resource-state tracking, and memory accounting.
+  per-pipeline layouts, and resource-state tracking. Its provider-owned Vulkan
+  allocation accounting is now live and verified at 960x540.
 - Conventional device depth is available only for single-device rendering and
   is now inspectable through the temporal-input diagnostic. Device-group input
   gathering remains unimplemented.
