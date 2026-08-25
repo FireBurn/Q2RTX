@@ -3870,6 +3870,14 @@ R_BeginFrame_RTX(void)
 		if (res_swapchain != VK_SUCCESS || !pair.paired) {
 			if (res_swapchain != VK_NOT_READY)
 				Com_WPrintf("FSR3 FG: second swapchain acquisition failed; using real-frame fallback.\n");
+			/* A callback returning the same index twice is a broken WSI contract,
+			 * not a recoverable missing-second-image case: both images are already
+			 * acquired, so presenting only the first would strand the second. */
+			if (pair.realImageAcquired) {
+				Com_EPrintf("FSR3 FG: swapchain returned an invalid acquired image pair.\n");
+				recreate_swapchain();
+				goto retry;
+			}
 			if (!pair.generatedImageAcquired) {
 				Com_EPrintf("Error %d in vkAcquireNextImageKHR\n", res_swapchain);
 				return;
