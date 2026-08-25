@@ -172,6 +172,7 @@ initialize_frame_structures(VkptTemporalFrame *frame)
 	frame->ui.struct_size = sizeof(frame->ui);
 	initialize_image(&frame->inputs.scene_color);
 	initialize_image(&frame->inputs.motion_vectors);
+	initialize_image(&frame->inputs.rr_motion_vectors);
 	initialize_image(&frame->inputs.view_z);
 	initialize_image(&frame->inputs.device_depth);
 	initialize_image(&frame->inputs.normals);
@@ -387,6 +388,17 @@ vkpt_temporal_mark_inputs_ready(void)
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
 		1.0f);
 	frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_MOTION_VECTORS;
+
+	set_image(&frame->inputs.rr_motion_vectors, VKPT_IMG_TEMPORAL_RR_MOTION,
+		VK_FORMAT_R16G16B16A16_SFLOAT, qvk.extent_screen_images,
+		qvk.extent_render,
+		VKPT_TEMPORAL_RESOURCE_DENSE | VKPT_TEMPORAL_RESOURCE_PRE_UI |
+		VKPT_TEMPORAL_RESOURCE_SINGLE_DEVICE,
+		qvk.use_ray_query ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT :
+			VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+		VK_ACCESS_SHADER_WRITE_BIT, 1.0f);
+	if (qvk.device_count == 1)
+		frame->inputs.available_inputs |= VKPT_TEMPORAL_INPUT_RR_MOTION_VECTORS;
 
 	/* These masks are primary-surface authored rather than inferred from the
 	 * denoised image.  That preserves explicit knowledge of transparent,
@@ -808,6 +820,8 @@ vkpt_temporal_validate_current_frame(uint32_t required_inputs,
 	} inputs[] = {
 		{ VKPT_TEMPORAL_INPUT_SCENE_COLOR, &frame->inputs.scene_color, "scene color" },
 		{ VKPT_TEMPORAL_INPUT_MOTION_VECTORS, &frame->inputs.motion_vectors, "motion vectors" },
+		{ VKPT_TEMPORAL_INPUT_RR_MOTION_VECTORS, &frame->inputs.rr_motion_vectors,
+			"RR motion vectors" },
 		{ VKPT_TEMPORAL_INPUT_VIEW_Z, &frame->inputs.view_z, "view Z" },
 		{ VKPT_TEMPORAL_INPUT_DEVICE_DEPTH, &frame->inputs.device_depth, "device depth" },
 		{ VKPT_TEMPORAL_INPUT_NORMALS, &frame->inputs.normals, "normals" },

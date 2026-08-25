@@ -1279,6 +1279,8 @@ void vkpt_fsr_print_diagnostics(void)
                 ? "jitter-free" : "jittered");
         fsr_print_temporal_image_diagnostic("scene HDR", &frame->inputs.scene_color);
         fsr_print_temporal_image_diagnostic("motion", &frame->inputs.motion_vectors);
+		fsr_print_temporal_image_diagnostic("RR motion",
+			&frame->inputs.rr_motion_vectors);
         fsr_print_temporal_image_diagnostic("view-Z", &frame->inputs.view_z);
         fsr_print_temporal_image_diagnostic("device depth", &frame->inputs.device_depth);
         fsr_print_temporal_image_diagnostic("reactive", &frame->inputs.reactive_mask);
@@ -1302,6 +1304,11 @@ void vkpt_fsr_print_diagnostics(void)
 			&frame->inputs.rr_indirect_specular);
 		fsr_print_temporal_image_diagnostic("RR sun blocker",
 			&frame->inputs.rr_dominant_light_visibility);
+		Com_Printf("  RR motion contract: XY=PreviousUV-CurrentUV, "
+			"Z=previous-current signed linear view-Z; scale=(1 1 1); "
+			"camera previous-current=(%.4f %.4f %.4f)\n",
+			-frame->camera.position_delta[0], -frame->camera.position_delta[1],
+			-frame->camera.position_delta[2]);
 		Com_Printf("  RR radiance alpha: direct=non-negative undefined; "
 			"indirect=first-lobe hit distance (negative=untraced, sky=%.0f, bounce=%u)\n",
 			frame->inputs.radiance_description.no_hit_distance,
@@ -1320,7 +1327,7 @@ void vkpt_fsr_print_diagnostics(void)
 				dominant->surface_to_light_direction[2],
 				dominant->emission[0], dominant->emission[1],
 				dominant->emission[2], dominant->angular_radius_radians);
-			Com_Printf("  RR provider mapping: light-to-surface=(%.4f %.4f %.4f)\n",
+			Com_Printf("  RR provider mapping: light-to-target=(%.4f %.4f %.4f)\n",
 				-dominant->surface_to_light_direction[0],
 				-dominant->surface_to_light_direction[1],
 				-dominant->surface_to_light_direction[2]);
@@ -1765,6 +1772,7 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
 {
     const uint32_t required_inputs =
         VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+		VKPT_TEMPORAL_INPUT_RR_MOTION_VECTORS |
         VKPT_TEMPORAL_INPUT_VIEW_Z |
         VKPT_TEMPORAL_INPUT_DENOISER_NORMAL_ROUGHNESS_MATERIAL |
         VKPT_TEMPORAL_INPUT_DENOISER_DIFFUSE_ALBEDO |
@@ -1796,7 +1804,7 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
     inputs.renderSize.height = frame->render_size.height;
     inputs.linearDepth = fsr3_temporal_image(&frame->inputs.view_z,
         FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
-    inputs.motionVectors = fsr3_temporal_image(&frame->inputs.motion_vectors,
+    inputs.motionVectors = fsr3_temporal_image(&frame->inputs.rr_motion_vectors,
         FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
     inputs.normalsRoughnessMaterial = fsr3_temporal_image(
         &frame->inputs.denoiser_normal_roughness_material,
@@ -1807,15 +1815,16 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
     inputs.specularAlbedo = fsr3_temporal_image(
         &frame->inputs.denoiser_specular_albedo,
         FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
-    inputs.motionVectorScale.x =
-        frame->inputs.motion_description.to_render_pixels[0];
-    inputs.motionVectorScale.y =
-        frame->inputs.motion_description.to_render_pixels[1];
+    inputs.motionVectorScale.x = 1.0f;
+    inputs.motionVectorScale.y = 1.0f;
+    inputs.motionVectorScale.z = 1.0f;
     inputs.jitterOffset.x = frame->camera.jitter_render_pixels[0];
     inputs.jitterOffset.y = frame->camera.jitter_render_pixels[1];
-    inputs.cameraPositionDelta.x = frame->camera.position_delta[0];
-    inputs.cameraPositionDelta.y = frame->camera.position_delta[1];
-    inputs.cameraPositionDelta.z = frame->camera.position_delta[2];
+    /* Q2RTX publishes current-minus-previous camera motion. RR's provider
+     * ABI instead explicitly requires previous-minus-current. */
+    inputs.cameraPositionDelta.x = -frame->camera.position_delta[0];
+    inputs.cameraPositionDelta.y = -frame->camera.position_delta[1];
+    inputs.cameraPositionDelta.z = -frame->camera.position_delta[2];
     memcpy(inputs.view, frame->camera.view, sizeof(inputs.view));
     memcpy(inputs.projection, frame->camera.projection_matrix,
         sizeof(inputs.projection));

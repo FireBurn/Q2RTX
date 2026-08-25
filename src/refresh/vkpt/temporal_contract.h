@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 
-#define VKPT_TEMPORAL_CONTRACT_VERSION 10u
+#define VKPT_TEMPORAL_CONTRACT_VERSION 11u
 
 typedef enum VkptTemporalStage_e {
 	VKPT_TEMPORAL_STAGE_CLOSED = 0,
@@ -109,7 +109,10 @@ typedef enum VkptTemporalInputFlagBits_e {
 	VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE = 1u << 14,
 	VKPT_TEMPORAL_INPUT_RR_DIRECT_SPECULAR = 1u << 15,
 	VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR = 1u << 16,
-	VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY = 1u << 17
+	VKPT_TEMPORAL_INPUT_RR_DOMINANT_LIGHT_VISIBILITY = 1u << 17,
+	/* Dense primary-surface motion with UV and signed-linear view-Z delta,
+	 * specifically for RR-style consumers. */
+	VKPT_TEMPORAL_INPUT_RR_MOTION_VECTORS = 1u << 18
 } VkptTemporalInputFlagBits;
 
 typedef enum VkptTemporalNormalEncoding_e {
@@ -288,6 +291,10 @@ typedef struct VkptTemporalInputs_s {
 	uint32_t available_inputs;
 	VkptTemporalImage scene_color;
 	VkptTemporalImage motion_vectors;
+	/* Unlike motion_vectors/FLAT_MOTION, this is never overwritten by
+	 * reflection/refraction handling: XY is PreviousUV-CurrentUV and Z is
+	 * previous-minus-current signed linear view-Z. */
+	VkptTemporalImage rr_motion_vectors;
 	VkptTemporalImage view_z;
 	VkptTemporalImage device_depth;
 	/* Q2RTX currently exports a dense geometric normal in linear XYZ [-1, 1],

@@ -111,8 +111,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	/* Dense copy of the primary direct-sun signal for provider diagnostics.
 	 * This alone is not a complete dominant-light RR input. */ \
 	IMG_DO(TEMPORAL_RR_DOMINANT_LIGHT_VISIBILITY, 59, R16_SFLOAT, r16f, IMG_WIDTH, IMG_HEIGHT ) \
+	/* Primary-surface RR motion: PreviousUV-CurrentUV and previous-minus-
+	 * current signed linear view-Z delta. Kept separate from FLAT_MOTION,
+	 * whose Z channel is radial/reflective-denoiser metadata. */ \
+	IMG_DO(TEMPORAL_RR_MOTION, 60, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
 
-#define NUM_IMAGES_BASE     60
+#define NUM_IMAGES_BASE     61
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \

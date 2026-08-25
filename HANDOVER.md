@@ -227,7 +227,7 @@ Current truth:
   validates provider-neutral RR-style sampled image metadata: signed linear
   depth, motion, compact material/albedo inputs, camera/motion/jitter/depth
   metadata, radiance-partition alpha rules, optional dominant-light data, and
-  the two optional scalar AO/specular-occlusion signals. Contract v2 validates
+  the two optional scalar AO/specular-occlusion signals. Contract v3 validates
   those additions while retaining the real-provider rule that one primary
   radiance or dominant-light signal is required; it rejects unknown flag bits.
   Q2RTX maps its four radiance partitions plus dominant light and does not yet
@@ -236,6 +236,19 @@ Current truth:
   record a dispatch, or make AMD's signed neural RR provider available. Its
   unit test and both standalone/full-stack installed-consumer contracts pass;
   see this milestone's commit for exact build evidence.
+
+- RR motion correctness was tightened against AMD's current integration
+  contract. The reusable v3 ABI has a three-component scale (XY UV, Z
+  signed-linear depth delta) and previous-minus-current camera motion. Q2RTX's
+  usual `FLAT_MOTION` cannot provide that Z value because reflection/refraction
+  handling changes it to radial metadata. Temporal contract v11 therefore
+  exports `TEMPORAL_RR_MOTION`, written directly by primary rays with
+  `PreviousUV-CurrentUV` XY and previous-minus-current signed-linear view-Z.
+  The RR bridge uses it at scale `(1,1,1)` and negates Q2RTX's published
+  current-minus-previous camera delta. A fresh RX 6800M `vk_validation=1`
+  FSR3 run reached v11/history-valid frame 149 with `issues=0x0` and no
+  validation error. This proves the input bridge/barriers, not a neural RR
+  dispatch.
 
 - Console screenshot readback now deterministically renders a requested
   temporal debug view into its freshly acquired WSI image before copying it.

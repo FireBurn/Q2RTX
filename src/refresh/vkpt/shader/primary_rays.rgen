@@ -229,6 +229,8 @@ main()
 		imageStore(IMG_PT_VIEW_DIRECTION, ipos, vec4(direction, 0));
 		imageStore(IMG_PT_SHADING_POSITION, ipos, vec4(global_ubo.cam_pos.xyz + direction * PRIMARY_RAY_T_MAX, 0));
 		imageStore(IMG_PT_MOTION, ipos, vec4(motion, 0, 0));
+		imageStore(IMG_TEMPORAL_RR_MOTION, image_position,
+			vec4(motion, 0, 0));
 		imageStore(IMG_PT_VISBUF_PRIM_A, ipos, uvec4(0));
 		imageStore(IMG_PT_VISBUF_BARY_A, ipos, vec4(0));
 		imageStore(IMG_PT_BASE_COLOR_A, ipos, vec4(0));
@@ -302,6 +304,12 @@ main()
 	imageStore(IMG_TEMPORAL_DEVICE_DEPTH, image_position,
 		vec4(view_z_to_device_depth(view_pos_curr.z)));
 	imageStore(IMG_PT_MOTION, ipos, vec4(motion, fwidth_depth));
+	/* RR needs depth delta in signed linear view-Z space. PT_MOTION retains
+	 * Q2RTX's radial-depth convention for ASVGF/reflection handling, so expose
+	 * a dedicated primary-surface resource instead of relabelling it. */
+	imageStore(IMG_TEMPORAL_RR_MOTION, image_position,
+		vec4(motion.xy, (global_ubo.V_prev * vec4(pos_ws_prev, 1)).z -
+			view_pos_curr.z, fwidth_depth));
 
 	vec3 primary_base_color = vec3(1);
 	float primary_metallic = 0;

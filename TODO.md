@@ -520,7 +520,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   of the four radiance partitions or dominant light remains required by a real
   provider. Q2RTX currently exports the four radiance partitions plus dominant
   light, not separate AO/specular occlusion. It does not certify pixel contents
-  or implement a provider.
+  or implement a provider. Contract v3 corrects the provider-facing motion
+  conventions: a three-component UV/depth scale and previous-minus-current
+  camera delta. Q2RTX contract v11 exports dense primary-surface
+  `TEMPORAL_RR_MOTION` (PreviousUV-CurrentUV plus previous-minus-current
+  signed-linear view-Z) rather than reusing `FLAT_MOTION`'s incompatible
+  radial/reflection-denoiser Z channel. A provider dispatch remains outstanding.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model.  Official
   support is RX9000+/Windows 11/DX12; RDNA2 viability is unknown.
 - [ ] Reuse the analytical-FG presentation system if an ML kernel becomes

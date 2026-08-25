@@ -139,11 +139,16 @@ Q2RTX signal conventions currently exposed by the contract:
   substitute for dominant-visibility inputs.
 - `ffx-vulkan::rayregeneration-contract` validates a reusable Vulkan host's
   RR-style image, alpha, camera, jitter, and motion metadata before a provider
-  is attached. Contract v2 represents all seven independently selectable
+  is attached. Contract v3 represents all seven independently selectable
   signal inputs: four radiance partitions, dominant-light visibility, ambient
   occlusion, and specular occlusion. The latter two are R8_UNORM [0,1] optional
   additions; one primary radiance or dominant-light signal remains required.
   Q2RTX currently exports the first five, not separate AO/specular occlusion.
+  It also requires a three-component RR motion scale and previous-minus-current
+  camera delta. Q2RTX contract v11 exports dense `TEMPORAL_RR_MOTION`: XY is
+  `PreviousUV-CurrentUV` and Z is previous-minus-current signed linear view-Z.
+  Never feed `FLAT_MOTION` to an RR provider: its Z is radial/reflection-
+  denoiser metadata, not an RR linear depth delta.
   The validator does not inspect GPU pixels, record commands, or supply a
   neural provider. Do not use a superficial Q2RTX call to it as evidence that
   the renderer meets official RR input requirements; the dominant-light bridge
