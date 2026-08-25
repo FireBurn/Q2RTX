@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Console screenshot readback now respects WSI ownership.  It no longer
+  transitions `current_swap_chain_image_index` after its normal present;
+  `IMG_ReadPixels[_HDR]_RTX` locally acquires an image, initializes it if
+  needed, copies it to the existing host-readable target, and presents it with
+  dedicated semaphores without mutating the renderer's current image index.
+  The same 960x540 RX 6800M FSR4 Quality + RCAS invocation that previously
+  reported an unacquired-present-image validation error now produced a
+  full-frame coherent capture without VUID/error output:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_state_contract_20260825_validated.png`.
+
 - The reusable FSR4-v07 provider now owns an explicit external-image state
   contract instead of silently assuming `GENERAL`. Before dispatch, the host
   registers each view's `VkImage`, current layout/stage/access, and requested
@@ -111,8 +121,8 @@ Current truth:
   backends. The current presenter composes the same uploaded stretch-pic queue
   once into a reusable alpha texture and composites it over each generated and
   real swapchain image. The remaining architectural work is extending that
-  contract to externally presented/non-Q2 UI and safe screenshot readback—not
-  creating another HUDless scene target.
+  contract to externally presented/non-Q2 UI—not creating another HUDless scene
+  target.  Screenshot readback now has its own safe acquire/copy/present cycle.
 
 - The reusable public FSR3.1.6 FI/OF dispatch API now exposes the SDK's
   optional external distortion field as a sampled `R16G16_SFLOAT` image whose
@@ -925,9 +935,9 @@ return.
 After this proof run, the independent startup swapchain error was fixed by
 removing create-time transitions of unacquired images and tracking each image's
 first acquired use.  A separate 1280x720 fallback run with validation enabled
-then rendered/presented for ten seconds with zero validation messages.  In-game
-screenshot readback still accesses the last presented swapchain image outside
-the acquired-frame lifecycle and needs its own offscreen/readback redesign.
+then rendered/presented for ten seconds with zero validation messages.  The
+separate screenshot readback issue was subsequently fixed with a local WSI
+acquire/copy/present cycle rather than a stale last-presented-image transition.
 
 ## Immediate next actions
 

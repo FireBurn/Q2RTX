@@ -51,6 +51,12 @@ acquisition.  `swap_chain_image_initialized` tracks first use so the initial
 `UNDEFINED -> PRESENT_SRC_KHR` transition is recorded in the acquired frame
 submission that waits on `image_available`.
 
+Console screenshot readback happens after the frame's normal present.  It must
+acquire its own local WSI image, wait on that acquire semaphore, copy it, and
+present it again with a separate completion semaphore; never reuse
+`current_swap_chain_image_index` after presentation or alter that renderer
+state for a screenshot.
+
 Q2RTX signal conventions currently exposed by the contract:
 
 - `FLAT_COLOR`: dense render-resolution RGBA16F linear HDR, stored at 128x

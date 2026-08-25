@@ -3920,6 +3920,45 @@ present_swapchain_image(uint32_t image_index, VkSemaphore render_finished)
 	return vkQueuePresentKHR(qvk.queue_graphics, &present_info);
 }
 
+/* Console screenshots run after R_EndFrame_RTX has presented the renderer's
+ * current swapchain image.  Do not transition that stale image: WSI owns it
+ * until it is acquired again.  Instead acquire a local image for the copy and
+ * release it with a local presentation semaphore. */
+static VkResult
+acquire_screenshot_swapchain_image(VkSemaphore image_available,
+	uint32_t *image_index)
+{
+#ifdef VKPT_DEVICE_GROUPS
+	VkAcquireNextImageInfoKHR acquire_info = {
+		.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR,
+		.swapchain = qvk.swap_chain,
+		.timeout = ~((uint64_t)0),
+		.semaphore = image_available,
+		.fence = VK_NULL_HANDLE,
+		.deviceMask = (1 << qvk.device_count) - 1,
+	};
+	return vkAcquireNextImage2KHR(qvk.device, &acquire_info, image_index);
+#else
+	return vkAcquireNextImageKHR(qvk.device, qvk.swap_chain, ~((uint64_t)0),
+		image_available, VK_NULL_HANDLE, image_index);
+#endif
+}
+
+static VkResult
+submit_screenshot_swapchain_copy(VkCommandBuffer cmd_buf,
+	VkSemaphore image_available, VkSemaphore copy_finished, uint32_t image_index)
+{
+	/* The optional first-use initialization barrier occurs before the transfer
+	 * copy, so the acquire must make the image available from the start of the
+	 * command buffer rather than only at the transfer stage. */
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	uint32_t device_index = 0;
+	vkpt_submit_command_buffer(cmd_buf, qvk.queue_graphics, 1,
+		1, &image_available, &wait_stage, &device_index,
+		1, &copy_finished, &device_index, VK_NULL_HANDLE);
+	return present_swapchain_image(image_index, copy_finished);
+}
+
 void
 R_EndFrame_RTX(void)
 {
@@ -4454,9 +4493,38 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 		return;
 	}
 
-	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+	VkSemaphoreCreateInfo semaphore_info = {
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+	VkSemaphore image_available = VK_NULL_HANDLE;
+	VkSemaphore copy_finished = VK_NULL_HANDLE;
+	VkResult result = vkCreateSemaphore(qvk.device, &semaphore_info, NULL,
+		&image_available);
+	if (result == VK_SUCCESS)
+		result = vkCreateSemaphore(qvk.device, &semaphore_info, NULL,
+			&copy_finished);
+	if (result != VK_SUCCESS) {
+		Com_EPrintf("IMG_ReadPixels: could not create screenshot semaphores (%d)!\n", result);
+		if (image_available != VK_NULL_HANDLE)
+			vkDestroySemaphore(qvk.device, image_available, NULL);
+		return;
+	}
 
-	VkImage swap_chain_image = qvk.swap_chain_images[qvk.current_swap_chain_image_index];
+	uint32_t swap_chain_image_index;
+	result = acquire_screenshot_swapchain_image(image_available,
+		&swap_chain_image_index);
+	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		Com_EPrintf("IMG_ReadPixels: could not acquire a swapchain image (%d)!\n", result);
+		vkDestroySemaphore(qvk.device, copy_finished, NULL);
+		vkDestroySemaphore(qvk.device, image_available, NULL);
+		return;
+	}
+	bool acquire_suboptimal = result == VK_SUBOPTIMAL_KHR;
+
+	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+	ensure_acquired_swapchain_image_initialized(cmd_buf, swap_chain_image_index);
+
+	VkImage swap_chain_image = qvk.swap_chain_images[swap_chain_image_index];
 
 	VkImageSubresourceRange subresource_range = {
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -4517,8 +4585,16 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 		.newLayout = VK_IMAGE_LAYOUT_GENERAL
 	);
 
-	vkpt_submit_command_buffer_simple(cmd_buf, qvk.queue_graphics, false);
+	VkResult present_result = submit_screenshot_swapchain_copy(cmd_buf,
+		image_available, copy_finished, swap_chain_image_index);
 	vkpt_wait_idle(qvk.queue_graphics, &qvk.cmd_buffers_graphics);
+	vkDestroySemaphore(qvk.device, copy_finished, NULL);
+	vkDestroySemaphore(qvk.device, image_available, NULL);
+	if (acquire_suboptimal || present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+		present_result == VK_SUBOPTIMAL_KHR)
+		qvk.wait_for_idle_frames = MAX_FRAMES_IN_FLIGHT * 2;
+	else if (present_result != VK_SUCCESS)
+		Com_EPrintf("IMG_ReadPixels: could not present screenshot image (%d)!\n", present_result);
 
 	VkImageSubresource subresource = {
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -4582,9 +4658,38 @@ IMG_ReadPixelsHDR_RTX(screenshot_t *s)
 		return;
 	}
 
-	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+	VkSemaphoreCreateInfo semaphore_info = {
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+	VkSemaphore image_available = VK_NULL_HANDLE;
+	VkSemaphore copy_finished = VK_NULL_HANDLE;
+	VkResult result = vkCreateSemaphore(qvk.device, &semaphore_info, NULL,
+		&image_available);
+	if (result == VK_SUCCESS)
+		result = vkCreateSemaphore(qvk.device, &semaphore_info, NULL,
+			&copy_finished);
+	if (result != VK_SUCCESS) {
+		Com_EPrintf("IMG_ReadPixelsHDR: could not create screenshot semaphores (%d)!\n", result);
+		if (image_available != VK_NULL_HANDLE)
+			vkDestroySemaphore(qvk.device, image_available, NULL);
+		return;
+	}
 
-	VkImage swap_chain_image = qvk.swap_chain_images[qvk.current_swap_chain_image_index];
+	uint32_t swap_chain_image_index;
+	result = acquire_screenshot_swapchain_image(image_available,
+		&swap_chain_image_index);
+	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		Com_EPrintf("IMG_ReadPixelsHDR: could not acquire a swapchain image (%d)!\n", result);
+		vkDestroySemaphore(qvk.device, copy_finished, NULL);
+		vkDestroySemaphore(qvk.device, image_available, NULL);
+		return;
+	}
+	bool acquire_suboptimal = result == VK_SUBOPTIMAL_KHR;
+
+	VkCommandBuffer cmd_buf = vkpt_begin_command_buffer(&qvk.cmd_buffers_graphics);
+	ensure_acquired_swapchain_image_initialized(cmd_buf, swap_chain_image_index);
+
+	VkImage swap_chain_image = qvk.swap_chain_images[swap_chain_image_index];
 
 	VkImageSubresourceRange subresource_range = {
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -4641,8 +4746,16 @@ IMG_ReadPixelsHDR_RTX(screenshot_t *s)
 		.newLayout = VK_IMAGE_LAYOUT_GENERAL
 	);
 
-	vkpt_submit_command_buffer_simple(cmd_buf, qvk.queue_graphics, false);
+	VkResult present_result = submit_screenshot_swapchain_copy(cmd_buf,
+		image_available, copy_finished, swap_chain_image_index);
 	vkpt_wait_idle(qvk.queue_graphics, &qvk.cmd_buffers_graphics);
+	vkDestroySemaphore(qvk.device, copy_finished, NULL);
+	vkDestroySemaphore(qvk.device, image_available, NULL);
+	if (acquire_suboptimal || present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+		present_result == VK_SUBOPTIMAL_KHR)
+		qvk.wait_for_idle_frames = MAX_FRAMES_IN_FLIGHT * 2;
+	else if (present_result != VK_SUCCESS)
+		Com_EPrintf("IMG_ReadPixelsHDR: could not present screenshot image (%d)!\n", present_result);
 
 	VkImageSubresource subresource = {
 		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,

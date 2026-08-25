@@ -78,7 +78,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The menu-to-game 640x480 -> 960x540 extent recreation also selected a new
   644x361 -> 960x540 context with no validation error and coherent output:
   `/home/fireburn/Screenshot_FSR4_v07_resize_20260820.png`. Arbitrary live
-  resize, reset, emissive, and disocclusion coverage remains outstanding.
+  resize, reset, emissive, and disocclusion coverage remains outstanding. The
+  console screenshot path itself now freshly acquires a local WSI image, copies
+  it, and presents it again instead of transitioning the last presented image;
+  the 960x540 Quality + RCAS capture is coherent and emitted no VUID/error:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_state_contract_20260825_validated.png`.
 - [x] Implement and validate RCAS as a real separate pass; expose the separate
   `flt_fsr4_sharpening` [0,1] control only after it works.  A 0.50 live
   640x360 -> 1280x720 Performance run passed Vulkan validation on RX 6800M.
