@@ -443,8 +443,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   exact path. The policy now turns that retained outcome into a concrete
   ordered one- or two-slot presentation plan, including the reset/interpolation
   real-scene guard and the exact acquire semaphore for each slot; Q2RTX uses
-  that plan at EndFrame. Generic command-recording, queue-submit, and present
-  callbacks remain application-owned.
+  that plan at EndFrame. A fresh RX 6800M `vk_validation=1` FSR3.1.5 plus
+  SDK-3.1.6 FI/OF forced-camera-cut smoke reached history-valid frame 1179
+  with active FIFO paired presentation and no VUID, FSR, or presenter error;
+  its full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  Generic command-recording, queue-submit, and present callbacks remain
+  application-owned.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
   stayed active with no VUIDs. It marks the presenter active only after an

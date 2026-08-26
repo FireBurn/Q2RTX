@@ -18,9 +18,12 @@ Current truth:
   `EndFrame` and consumes that plan for both final-blit selection and the real
   slot's WSI wait. The presenter-policy unit coverage exercises paired,
   reset, fallback, and malformed-pair cases; the root build and standalone
-  suite are clean (36/36). This is build/test evidence only: the next live
-  RX 6800M FI/OF smoke must cover this wiring before treating it as a new
-  visual-validation milestone.
+  suite are clean (36/36). A fresh RX 6800M `vk_validation=1` FSR3.1.5 plus
+  SDK-3.1.6 FI/OF smoke exercised the wiring through the controlled
+  camera-cut reset: it reached active/history-valid contract-v11 frame 1179,
+  wrote no VUID, FSR, or presentation-plan error, and exited normally. The
+  full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
 
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
   An isolated copy with no Q2RTX parent configured, built, and passed all 35
