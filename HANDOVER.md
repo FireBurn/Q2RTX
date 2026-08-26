@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The reusable presenter now carries acquisition through to an immutable
+  ordered present plan. `ffxVkFrameGenerationBuildPresentPlan` produces either
+  the normal one-slot fallback or generated-then-real two-slot order, retaining
+  each slot's acquire semaphore and selecting the real scene for a reset or
+  rejected interpolation slot. Q2RTX preserves the exact acquired pair through
+  `EndFrame` and consumes that plan for both final-blit selection and the real
+  slot's WSI wait. The presenter-policy unit coverage exercises paired,
+  reset, fallback, and malformed-pair cases; the root build and standalone
+  suite are clean (36/36). This is build/test evidence only: the next live
+  RX 6800M FI/OF smoke must cover this wiring before treating it as a new
+  visual-validation milestone.
+
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
   An isolated copy with no Q2RTX parent configured, built, and passed all 35
   redistributable CTests; it then installed and built/ran the independent

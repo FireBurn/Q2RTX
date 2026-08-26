@@ -48,6 +48,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shader/global_textures.h"
 #include "shader/vertex_buffer.h"
 #include "temporal_contract.h"
+#include "ffx_vk_framegeneration_presenter.h"
 
 #define LENGTH(a) ((sizeof (a)) / (sizeof(*(a))))
 
@@ -212,7 +213,10 @@ typedef struct QVK_s {
 	/* A second acquired image is required for analytical frame generation: one
 	 * generated image then the real image are presented in display order. */
 	VkSemaphore                  framegen_image_available[MAX_FRAMES_IN_FLIGHT];
-	uint32_t                     framegen_generated_swap_chain_image_index;
+	/* Keep the reusable acquire outcome intact until EndFrame builds the final
+	 * generated/real submission plan after FI has reported whether its output
+	 * is valid for presentation. */
+	FfxVkFrameGenerationAcquiredPair framegen_acquired_pair;
 	bool                         framegen_present_active;
 	bool                         framegen_generated_frame_ready;
 	

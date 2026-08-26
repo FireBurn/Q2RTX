@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-08-25 (Europe/London)
+Last updated: 2026-08-26 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -440,8 +440,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   suite pass. It now also exports callback-based two-image acquisition: a
   failed second acquire leaves the first image explicitly available for the
   correct one-image fallback, and Q2RTX's core/device-group adapter uses that
-  exact path. Generic render-submit/present callback extraction remains
-  pending.
+  exact path. The policy now turns that retained outcome into a concrete
+  ordered one- or two-slot presentation plan, including the reset/interpolation
+  real-scene guard and the exact acquire semaphore for each slot; Q2RTX uses
+  that plan at EndFrame. Generic command-recording, queue-submit, and present
+  callbacks remain application-owned.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
   Prepare and Dispatch per real frame; a 36-second RX 6800M validation run
   stayed active with no VUIDs. It marks the presenter active only after an

@@ -3854,6 +3854,7 @@ R_BeginFrame_RTX(void)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"fallback: upscaler/frame-generation temporal contract unavailable");
 	qvk.framegen_generated_frame_ready = false;
+	qvk.framegen_acquired_pair = (FfxVkFrameGenerationAcquiredPair) { 0 };
 	if (qvk.framegen_present_active) {
 		/* The shared callback helper preserves the first acquired image for a
 		 * one-image fallback if WSI cannot immediately reserve the real target. */
@@ -3887,7 +3888,7 @@ R_BeginFrame_RTX(void)
 			vkpt_fsr_frame_generation_publish_status(false,
 				"fallback: no second swapchain image available");
 		} else {
-			qvk.framegen_generated_swap_chain_image_index = pair.generatedImageIndex;
+			qvk.framegen_acquired_pair = pair;
 			qvk.current_swap_chain_image_index = pair.realImageIndex;
 		}
 	} else {
@@ -4026,6 +4027,7 @@ R_EndFrame_RTX(void)
 	bool framegen_generated_presented = false;
 	bool framegen_alpha_ui_composited = false;
 	bool temporal_debug_active = false;
+	FfxVkFrameGenerationPresentPlan framegen_present_plan = { 0 };
 	unsigned int temporal_debug_image = VKPT_IMG_CLEAR;
 	VkImageView temporal_debug_image_view = VK_NULL_HANDLE;
 	VkExtent2D temporal_debug_extent = { 0, 0 };
@@ -4055,8 +4057,18 @@ R_EndFrame_RTX(void)
 	}
 
 	if (qvk.framegen_present_active) {
-		const uint32_t generated_index = qvk.framegen_generated_swap_chain_image_index;
-		const uint32_t real_index = qvk.current_swap_chain_image_index;
+		/* The portable plan deliberately retains the acquired WSI semaphore with
+		 * each slot. It also substitutes the real scene on an FI reset/rejection
+		 * without ever abandoning the acquired generated image. */
+		if (!ffxVkFrameGenerationBuildPresentPlan(&qvk.framegen_acquired_pair,
+			qvk.framegen_generated_frame_ready, !qvk.framegen_generated_frame_ready,
+			&framegen_present_plan) || framegen_present_plan.slotCount != 2u) {
+			Com_EPrintf("FSR3 FG: invalid acquired-image presentation plan.\n");
+			recreate_swapchain();
+			return;
+		}
+		const uint32_t generated_index = framegen_present_plan.slots[0].imageIndex;
+		const uint32_t real_index = framegen_present_plan.slots[1].imageIndex;
 		const bool alpha_ui_ready = vkpt_draw_prepare_alpha_ui_texture() == VK_SUCCESS;
 		if (!alpha_ui_ready) {
 			Com_WPrintf("FSR3 FG: alpha UI target unavailable; using direct UI replay.\n");
@@ -4088,7 +4100,8 @@ R_EndFrame_RTX(void)
 		}
 		if (frame_ready) {
 			vkpt_final_blit_with_descriptor_slot(generated_cmd,
-				qvk.framegen_generated_frame_ready ? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_TAA_OUTPUT,
+				framegen_present_plan.slots[0].useInterpolatedScene
+					? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_TAA_OUTPUT,
 				qvk.extent_taa_output, false,
 				vkpt_refdef.fd && (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) &&
 				cvar_pt_waterwarp->integer, 1, framegen_alpha_ui_composited);
@@ -4169,7 +4182,7 @@ R_EndFrame_RTX(void)
 
 	VkSemaphore wait_semaphores[] = {
 		qvk.framegen_present_active
-			? qvk.framegen_image_available[qvk.current_frame_index]
+			? framegen_present_plan.slots[1].imageAvailableSemaphore
 			: qvk.semaphores[qvk.current_frame_index][0].image_available
 	};
 	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
