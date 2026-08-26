@@ -24,6 +24,9 @@ Current truth:
   wrote no VUID, FSR, or presentation-plan error, and exited normally. The
   full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  Both redistributable consumers also now execute this API: the small C
+  FSR4/presenter consumer and C++ full FSR3/FSR4 stack configured, linked, and
+  ran against an isolated freshly installed prefix.
 
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
   An isolated copy with no Q2RTX parent configured, built, and passed all 35

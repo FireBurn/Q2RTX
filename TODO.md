@@ -448,6 +448,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   with active FIFO paired presentation and no VUID, FSR, or presenter error;
   its full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  Both installed-package consumers now invoke the plan API: the small C
+  FSR4/presenter consumer and the C++ full FSR3/FSR4 stack configured, linked,
+  and ran against a fresh prefix.
   Generic command-recording, queue-submit, and present callbacks remain
   application-owned.
   FFX dynamic-view ring now retains eight effect calls because FI performs both
