@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-08-25, Europe/London.  Update this file at every meaningful
+Last updated: 2026-08-26, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,18 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
+  An isolated copy with no Q2RTX parent configured, built, and passed all 35
+  redistributable CTests; it then installed and built/ran the independent
+  `installed-full-stack` consumer. The source-v07 FSR4 shader/model bundle is
+  deliberately absent from that archive. Its one payload-dependent layout test
+  runs only when an explicit compatible external asset directory is supplied
+  (Q2RTX supplies its local bundle automatically, producing 36/36). The
+  subtree now has standalone CI, notices, and `PUBLISHING.md` with the exact
+  `git subtree split --prefix=extern/ffx-vulkan` procedure. Review the
+  provenance boundary before any public push: it must never include v07 model
+  payloads, AMD DLLs, extracted binary content, screenshots, or Q2RTX data.
 
 - The development config's `flt_temporal_debug_view` is reset to `0` (Off).
   It had been left at view 22 while capturing the grayscale dominant-light
