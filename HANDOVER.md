@@ -124,6 +124,13 @@ Current truth:
   1579 with no VUID/error and a coherent `base2` capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_map_transition.png`.
 
+- The equivalent public FSR3.1.5 plus SDK-3.1.6 FI/OF `base1 -> base2` run is
+  now covered too. It retained the expected map reset `0x840`, resumed at
+  temporal-contract v11/history-valid frame 1532 with analytical generated→real
+  presentation active, emitted no VUID, FSR, dispatch, or presenter error, and
+  produced the coherent full-colour capture
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
+
 - A live windowed `vid_geometry` transition from 960x540 to 800x600 and back
   rebuilt the FSR4 Quality context at 536x402 -> 800x600 and again at
   644x361 -> 960x540. SDK-3.1.6 FI/OF performed its expected fallback/reseed

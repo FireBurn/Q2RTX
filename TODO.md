@@ -415,6 +415,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   v11/frame-1193 generated presentation without VUID/error, and captured a
   coherent scene at
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  On 2026-08-31, a second `base1 -> base2` run kept public FSR3.1.5 plus
+  SDK-3.1.6 FI/OF active after the expected map reset (`0x840`), returned to
+  history-valid frame 1532, and recorded no VUID, FSR, dispatch, or presenter
+  error; the full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
   Weapon/emissive, physical-input, and broader image-quality coverage remain.
 - [x] Expose shared FSR3/FSR4 Native AA, Quality, Balanced, Performance, and
   Ultra Performance discrete render-ratio presets. FSR4 v07 selects a matching
