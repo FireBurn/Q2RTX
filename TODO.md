@@ -83,6 +83,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   it, and presents it again instead of transitioning the last presented image;
   the 960x540 Quality + RCAS capture is coherent and emitted no VUID/error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_state_contract_20260825_validated.png`.
+  A 120-frame held-blaster script under active SDK-3.1.6 FI/OF now captures
+  moving weapon/projectile emissions at 125 logical FPS, with no VUID, FSR,
+  dispatch, or presenter error and a coherent full-colour frame:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_weapon_emissive_fiog.png`.
+  Arbitrary live resize, reset, and disocclusion coverage remains outstanding.
 - [x] Implement and validate RCAS as a real separate pass; expose the separate
   `flt_fsr4_sharpening` [0,1] control only after it works.  A 0.50 live
   640x360 -> 1280x720 Performance run passed Vulkan validation on RX 6800M.
@@ -420,7 +425,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   history-valid frame 1532, and recorded no VUID, FSR, dispatch, or presenter
   error; the full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
-  Weapon/emissive, physical-input, and broader image-quality coverage remain.
+  The same held-blaster/emissive script also passed under FSR3.1.5 + SDK-3.1.6
+  FI/OF at 66.7 logical FPS, with no VUID, FSR, dispatch, or presenter error
+  and a coherent capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_weapon_emissive_fiog.png`.
+  Physical-input and broader image-quality coverage remain.
 - [x] Expose shared FSR3/FSR4 Native AA, Quality, Balanced, Performance, and
   Ultra Performance discrete render-ratio presets. FSR4 v07 selects a matching
   separately compiled model, rather than one graph at arbitrary scale.

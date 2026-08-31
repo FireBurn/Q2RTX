@@ -131,6 +131,16 @@ Current truth:
   produced the coherent full-colour capture
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
 
+- Weapon and emissive motion now have comparable live evidence for both native
+  upscalers. A 120-frame held-blaster input exercised projectile/muzzle
+  movement while SDK-3.1.6 FI/OF was actively presenting generated→real pairs:
+  source-v07 FSR4 was clean at 125 logical FPS and public FSR3.1.5 was clean
+  at 66.7. Both runs had no VUID, FSR, dispatch, or presenter error; the
+  full-colour captures are
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_weapon_emissive_fiog.png`
+  and
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_weapon_emissive_fiog.png`.
+
 - A live windowed `vid_geometry` transition from 960x540 to 800x600 and back
   rebuilt the FSR4 Quality context at 536x402 -> 800x600 and again at
   644x361 -> 960x540. SDK-3.1.6 FI/OF performed its expected fallback/reseed
