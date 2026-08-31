@@ -220,7 +220,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   CTest suite also installs the package, copies that self-contained consumer
   outside the source tree, then configures/builds/runs the copy against the
   fresh prefix (36/36 without the external v07 asset bundle; 37/37 with the
-  Q2RTX-local layout asset check).
+  Q2RTX-local layout asset check).  On 2026-08-31 the full Q2RTX tree also
+  rebuilt successfully after this package test was added; its root CTest
+  checks passed 2/2 (`fsr4_schedule`, `fsr4_v07_assets`).
   A distributor can now opt into a complete, validated v07 asset installation
   with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
   The package installs only the notice and six model-prefixed, manifest-backed

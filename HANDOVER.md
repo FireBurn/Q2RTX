@@ -44,6 +44,9 @@ Current truth:
   `git subtree split --prefix=extern/ffx-vulkan` procedure. Review the
   provenance boundary before any public push: it must never include v07 model
   payloads, AMD DLLs, extracted binary content, screenshots, or Q2RTX data.
+  The parent Q2RTX tree was rebuilt after the installed-consumer test was
+  added, and its root CTest checks passed 2/2 (`fsr4_schedule` and
+  `fsr4_v07_assets`) on 2026-08-31.
 
 - The development config's `flt_temporal_debug_view` is reset to `0` (Off).
   It had been left at view 22 while capturing the grayscale dominant-light
