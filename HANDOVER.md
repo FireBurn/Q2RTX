@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-08-26, Europe/London.  Update this file at every meaningful
+Last updated: 2026-08-31, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -32,13 +32,15 @@ Current truth:
   a source file from its sibling vendored example as it previously did.
 
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
-  An isolated copy with no Q2RTX parent configured, built, and passed all 35
-  redistributable CTests; it then installed and built/ran the independent
-  `installed-full-stack` consumer. The source-v07 FSR4 shader/model bundle is
-  deliberately absent from that archive. Its one payload-dependent layout test
-  runs only when an explicit compatible external asset directory is supplied
-  (Q2RTX supplies its local bundle automatically, producing 36/36). The
-  subtree now has standalone CI, notices, and `PUBLISHING.md` with the exact
+  Its top-level CTest suite now installs the just-built package, copies the
+  self-contained `installed-full-stack` example outside the source tree, then
+  configures, links, and runs that copy against only the fresh prefix. An
+  isolated copy with no Q2RTX parent configured, built, and passed all 36
+  redistributable CTests, including that package test. The source-v07 FSR4
+  shader/model bundle is deliberately absent from that archive. Its one
+  payload-dependent layout test runs only when an explicit compatible external
+  asset directory is supplied (the Q2RTX-local source build passes 37/37).
+  The subtree now has standalone CI, notices, and `PUBLISHING.md` with the exact
   `git subtree split --prefix=extern/ffx-vulkan` procedure. Review the
   provenance boundary before any public push: it must never include v07 model
   payloads, AMD DLLs, extracted binary content, screenshots, or Q2RTX data.
@@ -191,16 +193,20 @@ Current truth:
   full-colour coherent capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_v07_colour_after_rr.png`.
 
-- Official-source feasibility was rechecked on 2026-08-25 without altering the
-  user's SDK trees. The current AMD FSR SDK 2.3.0 repository lists FSR4.1.1,
-  ML Frame Generation 4.0.1, and Ray Regeneration 1.2, but its own known-issue
-  table says Vulkan is currently unsupported. The locally retained FSR4 fork is
+- Official-source feasibility was rechecked on 2026-08-31 without altering the
+  user's SDK trees. AMD's current FSR SDK 2.3.0 lists FSR4.1.1, ML Frame
+  Generation 4.0.1, and Ray Regeneration 1.2.0; it also adds official FSR4
+  support for RDNA3/RX 7000 discrete GPUs. However, the SDK's own known-issue
+  table still says Vulkan is unsupported, while its FSR4 page requires the
+  signed HLSL/CS_6_6 provider and RX 7000/RX 9000 or later. AMD's RR sample
+  requires RX 9000+, Windows 11, and DX12. The locally retained FSR4 fork is
   SDK 2.0.0 and contains only DX12 signed DLLs (`upscaler`, `framegeneration`,
-  and loader), no RR module. Combined with the existing RX 6800M DX12 probe
+  and loader), no RR module. Combined with the RX 6800M/RDNA2 DX12 probe
   selecting only analytical FSR3.1.5/2.3.4, there is no honest native-Vulkan
-  neural RR/MLFG provider to attach on this machine. Keep the working native
-  FSR3 FI/OF and source-v07 FSR4 paths distinct from that unavailable binary
-  feature set.
+  neural FSR4/RR/MLFG provider to attach on this machine. Keep the working
+  native FSR3 FI/OF and source-v07 FSR4 paths distinct from that unavailable
+  binary feature set. Sources: https://github.com/GPUOpen-LibrariesAndSDKs/
+  FidelityFX-SDK and https://gpuopen.com/amd-fsr-sdk/.
 
 - The menu revision now exposes all provider-neutral RR input views through
   view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the

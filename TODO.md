@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-08-26 (Europe/London)
+Last updated: 2026-08-31 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -216,7 +216,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   CMake package. `ffx-vulkan::effects` now brings in the compiled private
   FSR3.1.4, 3.1.5, and 3.1.6 FI/OF closures alongside FSR4 and presentation
   policy without exposing source-tree include paths. A clean installed C++
-  consumer links and runs `examples/installed-full-stack`.
+  consumer links and runs `examples/installed-full-stack`. The top-level
+  CTest suite also installs the package, copies that self-contained consumer
+  outside the source tree, then configures/builds/runs the copy against the
+  fresh prefix (36/36 without the external v07 asset bundle; 37/37 with the
+  Q2RTX-local layout asset check).
   A distributor can now opt into a complete, validated v07 asset installation
   with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
   The package installs only the notice and six model-prefixed, manifest-backed
