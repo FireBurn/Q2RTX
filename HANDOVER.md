@@ -316,7 +316,12 @@ Current truth:
   notice plus each of the six model-specific initializer, pre-weight, and
   manifest files before generating install rules; it no longer treats a merely
   present `fsr4_shaders` directory as proof of a runnable installation. A
-  fresh ebuild-equivalent system-dependency CMake configuration passed.
+  fresh ebuild-equivalent system-dependency CMake configuration passed.  On
+  2026-08-31, that exact system-dependency configuration also rebuilt the
+  client and began staging its installation: client, menu/shader archives, and
+  all FSR4-v07 contents were staged. It then correctly stopped only at the
+  raw source checkout's deliberately absent `blue_noise.pkz`; the ebuild's
+  `src_prepare` copies that release asset before it calls CMake install.
 
 - The standalone reusable `ffx-vulkan` package now offers the corresponding
   explicit opt-in asset delivery path. A package builder supplies

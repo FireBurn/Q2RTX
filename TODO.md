@@ -623,7 +623,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   missing model payload before an incomplete install can be created. The
   runtime still publishes a specific missing v07 asset through
   `flt_upscaler_reason` instead of an ambiguous context failure. FSR3 and
-  analytical FSR3 frame generation remain built in.
+  analytical FSR3 frame generation remain built in. On 2026-08-31, the exact
+  ebuild system-dependency CMake flags cleanly configured and built the client;
+  its install staged the client, menu/shader archives, and full FSR4-v07
+  directory before correctly stopping at the raw checkout's intentionally
+  absent `blue_noise.pkz`. `src_prepare` copies that required release asset
+  before the ebuild invokes the install step.
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
