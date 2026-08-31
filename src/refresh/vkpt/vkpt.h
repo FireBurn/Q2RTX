@@ -841,6 +841,8 @@ extern cvar_t *cvar_flt_frame_generation_generated_fps;
 /* Developer-only screenshot selector: captures the most recent FI output
  * without changing the live presenter or invalidating its history. */
 extern cvar_t *cvar_flt_frame_generation_debug_capture;
+/* Temporary repair-only escape hatch for the quarantined SDK-3.1.6 bridge. */
+extern cvar_t *cvar_flt_frame_generation_allow_unverified_316;
 extern cvar_t *cvar_flt_temporal_debug_view;
 extern cvar_t *cvar_flt_upscaler_active;
 extern cvar_t *cvar_flt_upscaler_reason;

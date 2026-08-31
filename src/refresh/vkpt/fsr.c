@@ -225,6 +225,7 @@ cvar_t *cvar_flt_frame_generation_reason = NULL;
 cvar_t *cvar_flt_frame_generation_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
 cvar_t *cvar_flt_frame_generation_debug_capture = NULL;
+cvar_t *cvar_flt_frame_generation_allow_unverified_316 = NULL;
 cvar_t *cvar_flt_temporal_debug_view = NULL;
 static unsigned fsr3_fg_low_rate_frames;
 static unsigned fsr3_fg_recovery_frames;
@@ -995,7 +996,9 @@ static VkResult fsr3_create_frame_generation_context(void)
      * saved experimental selections to the visually verified 1.1.4 Vulkan
      * FI implementation until the 3.1.6 resource bridge is fixed. */
     if (cvar_flt_frame_generation_backend &&
-        cvar_flt_frame_generation_backend->integer == 1) {
+        cvar_flt_frame_generation_backend->integer == 1 &&
+        (!cvar_flt_frame_generation_allow_unverified_316 ||
+            cvar_flt_frame_generation_allow_unverified_316->integer == 0)) {
         Com_WPrintf("FSR3 FG: SDK 3.1.6 FI/OF disabled: generated output is "
             "black on Vulkan; using verified 1.1.4 compatibility backend.\n");
         Cvar_SetByVar(cvar_flt_frame_generation_backend, "0", FROM_CODE);
@@ -1551,6 +1554,8 @@ void vkpt_fsr_init_cvars(void)
         "flt_frame_generation_generated_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_frame_generation_debug_capture = Cvar_Get(
         "flt_frame_generation_debug_capture", "0", CVAR_NOARCHIVE);
+    cvar_flt_frame_generation_allow_unverified_316 = Cvar_Get(
+        "flt_frame_generation_allow_unverified_316", "0", CVAR_NOARCHIVE);
     /* Presentation-only input inspection. A nonzero view temporarily takes
      * ownership of the real-frame final blit, so analytical frame generation
      * is explicitly suspended rather than mixing a generated scene with a
