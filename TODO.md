@@ -450,7 +450,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
   Both installed-package consumers now invoke the plan API: the small C
   FSR4/presenter consumer and the C++ full FSR3/FSR4 stack configured, linked,
-  and ran against a fresh prefix.
+  and ran against a fresh prefix. The installed full-stack example no longer
+  reaches into its sibling vendored example for its source: a copied standalone
+  directory built and ran using only that installed prefix.
   Generic command-recording, queue-submit, and present callbacks remain
   application-owned.
   FFX dynamic-view ring now retains eight effect calls because FI performs both

@@ -26,7 +26,10 @@ Current truth:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
   Both redistributable consumers also now execute this API: the small C
   FSR4/presenter consumer and C++ full FSR3/FSR4 stack configured, linked, and
-  ran against an isolated freshly installed prefix.
+  ran against an isolated freshly installed prefix. The latter is now actually
+  self-contained: copying only `examples/installed-full-stack` to a temporary
+  directory and building it against the prefix succeeds, rather than compiling
+  a source file from its sibling vendored example as it previously did.
 
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
   An isolated copy with no Q2RTX parent configured, built, and passed all 35
