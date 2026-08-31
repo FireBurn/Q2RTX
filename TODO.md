@@ -5,6 +5,25 @@ Last updated: 2026-08-31 (Europe/London)
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
 
+## Immediate visual-correctness follow-up
+
+- [x] Reproduce the user's generated/real strobing with a capture of the
+  generated target itself, rather than inferring correctness from a real-slot
+  screenshot. `flt_frame_generation_debug_capture` leaves the live presenter
+  untouched and captures the current FI target. It proved SDK-3.1.6 FI/OF was
+  writing a fully black output on RX 6800M, whereas the native FSR3.1.4 Vulkan
+  FI output was full-colour on identical inputs. Add the missing
+  compute-write→fragment-read barrier and force a saved SDK-3.1.6 choice to
+  the working native 1.1.4 backend. The post-fallback generated-target capture
+  is `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_generated_output_probe.png`;
+  it is full-colour and the log is validation-clean.
+- [-] Repair SDK-3.1.6 FI/OF's custom Vulkan resource/job bridge. It still
+  records without errors but produces black `FSR_RCAS_OUTPUT` on RX 6800M;
+  do not expose backend 1 again until the capture-only generated-target probe
+  is non-black over a history-valid multi-frame run and normal generated/real
+  presentation is visually checked. Older successful 3.1.6 stills captured
+  only the real path and are not proof of this item.
+
 ## P0 — make the current FSR4 INT8 path correct and observable
 
 - [x] Correlate screenshot corruption with exact render-resolution boundary.

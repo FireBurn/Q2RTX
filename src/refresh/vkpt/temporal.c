@@ -730,7 +730,7 @@ vkpt_temporal_debug_select(unsigned int *image_index, VkExtent2D *extent,
 		cvar_flt_temporal_debug_view->integer <= VKPT_TEMPORAL_DEBUG_OFF)
 		return false;
 	if (cvar_flt_temporal_debug_view->integer >
-		VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY)
+		VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT)
 		return temporal_validation_fail(reason, reason_size,
 			"unknown temporal debug view %d",
 			cvar_flt_temporal_debug_view->integer);

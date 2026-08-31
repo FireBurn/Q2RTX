@@ -224,6 +224,7 @@ cvar_t *cvar_flt_frame_generation_active = NULL;
 cvar_t *cvar_flt_frame_generation_reason = NULL;
 cvar_t *cvar_flt_frame_generation_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
+cvar_t *cvar_flt_frame_generation_debug_capture = NULL;
 cvar_t *cvar_flt_temporal_debug_view = NULL;
 static unsigned fsr3_fg_low_rate_frames;
 static unsigned fsr3_fg_recovery_frames;
@@ -987,6 +988,19 @@ static VkResult fsr3_create_frame_generation_context(void)
     if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
         return VK_ERROR_INITIALIZATION_FAILED;
 
+    /* The SDK-3.1.6 FI/OF bridge currently records successfully but its
+     * generated output is black on the RX 6800M Vulkan path.  That made the
+     * generated/real presenter visibly strobe.  Do not expose a known-bad
+     * producer just because validation accepts its command stream: migrate
+     * saved experimental selections to the visually verified 1.1.4 Vulkan
+     * FI implementation until the 3.1.6 resource bridge is fixed. */
+    if (cvar_flt_frame_generation_backend &&
+        cvar_flt_frame_generation_backend->integer == 1) {
+        Com_WPrintf("FSR3 FG: SDK 3.1.6 FI/OF disabled: generated output is "
+            "black on Vulkan; using verified 1.1.4 compatibility backend.\n");
+        Cvar_SetByVar(cvar_flt_frame_generation_backend, "0", FROM_CODE);
+    }
+
     if (cvar_flt_frame_generation_backend &&
         cvar_flt_frame_generation_backend->integer == 1) {
         FfxVkFsr3_3_1_6FrameGenerationCreateInfo create_316;
@@ -1517,10 +1531,10 @@ void vkpt_fsr_init_cvars(void)
      * normal present path until that presenter has acquired two images. */
     cvar_flt_frame_generation = Cvar_Get("flt_frame_generation", "0",
                                          CVAR_ARCHIVE);
-    /* Prefer the newer public SDK 3.1.6 FI/OF provider for fresh configs. Its
-     * explicit Vulkan presenter and resource-retirement path has current
-     * validation coverage; archived user choices are deliberately preserved. */
-    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "1",
+    /* The verified native 1.1.4 FI implementation is the safe default. The
+     * 3.1.6 bridge remains in the source tree for repair but is migrated here
+     * until it produces non-black generated frames on Vulkan. */
+    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "0",
                                                  CVAR_ARCHIVE);
     /* Analytical interpolation is most convincing at a sustained high input
      * rate. Thirty is a conservative default safety floor; set zero to
@@ -1535,6 +1549,8 @@ void vkpt_fsr_init_cvars(void)
         "flt_frame_generation_rendered_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_frame_generation_generated_fps = Cvar_Get(
         "flt_frame_generation_generated_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
+    cvar_flt_frame_generation_debug_capture = Cvar_Get(
+        "flt_frame_generation_debug_capture", "0", CVAR_NOARCHIVE);
     /* Presentation-only input inspection. A nonzero view temporarily takes
      * ownership of the real-frame final blit, so analytical frame generation
      * is explicitly suspended rather than mixing a generated scene with a
@@ -1700,6 +1716,23 @@ vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
     if (!image_view || !extent || !view || !cvar_flt_temporal_debug_view)
         return false;
     *view = (VkptTemporalDebugView)cvar_flt_temporal_debug_view->integer;
+    if (*view == VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT) {
+        /* A debug view deliberately suspends new FI dispatches.  Keep the
+         * most recently generated image inspectable while that cvar is set,
+         * rather than using vkpt_fsr_frame_generation_is_ready(), which is
+         * necessarily false in that mode. */
+        if ((!fsr3_frame_generation_context_ok || !fsr3_frame_generation_context) &&
+            (!fsr3_316_frame_generation_context_ok ||
+                !fsr3_316_frame_generation_context)) {
+            if (reason && reason_size)
+                Q_snprintf(reason, reason_size,
+                    "analytical frame-generation output is unavailable");
+            return false;
+        }
+        *image_view = qvk.images_views[VKPT_IMG_FSR_RCAS_OUTPUT];
+        *extent = qvk.extent_unscaled;
+        return *image_view && extent->width && extent->height;
+    }
     if (*view == VKPT_TEMPORAL_DEBUG_FSR_RECONSTRUCTED) {
         if (!vkpt_fsr_is_enabled()) {
             if (reason && reason_size)
@@ -2344,8 +2377,24 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
     if (cvar_flt_frame_generation_backend &&
         cvar_flt_frame_generation_backend->integer == 1) {
         framegen_result = fsr3_316_frame_generation_record_after_inputs(cmd_buf, frame);
-        if (framegen_result == VK_SUCCESS && out_generated_frame_safe)
-            *out_generated_frame_safe = !reset;
+        if (framegen_result == VK_SUCCESS) {
+            /* The generated scene is sampled by final_blit in the following
+             * graphics command buffer. Queue order alone does not make this
+             * compute shader write visible to that fragment shader read.
+             * Without this dependency some drivers can present a previous or
+             * incompletely-visible FI image on every generated slot. */
+            IMAGE_BARRIER_STAGES(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .image = qvk.images[VKPT_IMG_FSR_RCAS_OUTPUT],
+                .subresourceRange = color_range,
+                .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+            );
+            if (out_generated_frame_safe)
+                *out_generated_frame_safe = !reset;
+        }
         return framegen_result;
     }
 
@@ -2429,6 +2478,17 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
         return VK_ERROR_UNKNOWN;
     }
     fsr3_frame_generation_reset_next = false;
+    /* See the corresponding SDK 3.1.6 path above. The portable FSR3 1.1.4
+     * bridge has the same compute-output/final-blit boundary. */
+    IMAGE_BARRIER_STAGES(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        .image = qvk.images[VKPT_IMG_FSR_RCAS_OUTPUT],
+        .subresourceRange = color_range,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+    );
     if (out_generated_frame_safe)
         *out_generated_frame_safe = !reset;
     return VK_SUCCESS;

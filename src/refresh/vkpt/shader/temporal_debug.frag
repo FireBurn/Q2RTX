@@ -97,6 +97,9 @@ void main()
         color = sample_value.r < 0.0 ? vec3(0.0) : vec3(
             log2(min(sample_value.r, 65504.0) + 1.0) / log2(65505.0));
         break;
+    case 23u: /* FSR3 frame-interpolation output, already display-linear. */
+        color = sample_value.rgb;
+        break;
     default:
         color = vec3(1.0, 0.0, 1.0);
         break;

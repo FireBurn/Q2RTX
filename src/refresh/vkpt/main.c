@@ -4607,8 +4607,10 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 	/* R_EndFrame_RTX clears frame_ready after presenting, but the temporal
 	 * contract still owns the completed frame's diagnostic resources until the
 	 * next render begins. Let the selector validate that persisted contract. */
-	if (cvar_flt_temporal_debug_view &&
-		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) {
+	if ((cvar_flt_temporal_debug_view &&
+		cvar_flt_temporal_debug_view->integer != VKPT_TEMPORAL_DEBUG_OFF) ||
+		(cvar_flt_frame_generation_debug_capture &&
+		 cvar_flt_frame_generation_debug_capture->integer != 0)) {
 		bool debug_active;
 		unsigned int debug_image = VKPT_IMG_CLEAR;
 		VkImageView debug_image_view = VK_NULL_HANDLE;
@@ -4616,13 +4618,26 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 		VkptTemporalDebugView debug_view = VKPT_TEMPORAL_DEBUG_OFF;
 		uint32_t rendered_image_index = qvk.current_swap_chain_image_index;
 
-		debug_active = vkpt_temporal_debug_select(&debug_image, &debug_extent,
-			&debug_view, NULL, 0);
-		if (debug_active)
-			debug_image_view = qvk.images_views[debug_image];
-		else
-			debug_active = vkpt_fsr_debug_select(&debug_image_view, &debug_extent,
+		if (cvar_flt_frame_generation_debug_capture &&
+			cvar_flt_frame_generation_debug_capture->integer != 0) {
+			/* Do not use flt_temporal_debug_view here: that cvar correctly
+			 * suspends FI and recreates the presentation state. This capture-only
+			 * selector leaves the live generated/real pair untouched. */
+			debug_image_view = qvk.images_views[VKPT_IMG_FSR_RCAS_OUTPUT];
+			debug_extent = qvk.extent_unscaled;
+			debug_view = VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT;
+			debug_active = debug_image_view && debug_extent.width &&
+				debug_extent.height && cvar_flt_frame_generation_active &&
+				cvar_flt_frame_generation_active->integer != 0;
+		} else {
+			debug_active = vkpt_temporal_debug_select(&debug_image, &debug_extent,
 				&debug_view, NULL, 0);
+			if (debug_active)
+				debug_image_view = qvk.images_views[debug_image];
+			else
+				debug_active = vkpt_fsr_debug_select(&debug_image_view, &debug_extent,
+					&debug_view, NULL, 0);
+		}
 		if (debug_active) {
 			qvk.current_swap_chain_image_index = swap_chain_image_index;
 			vkpt_temporal_debug_blit_for_screenshot(cmd_buf, debug_image_view,

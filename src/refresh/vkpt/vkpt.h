@@ -684,7 +684,10 @@ typedef enum VkptTemporalDebugView_e {
 	VKPT_TEMPORAL_DEBUG_RR_INDIRECT_SPECULAR_HIT_DISTANCE,
 	/* Primary direct-sun blocker distance. It is paired with exact resolved
 	 * emission metadata in the RR preflight when that signal is available. */
-	VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY
+	VKPT_TEMPORAL_DEBUG_RR_DOMINANT_LIGHT_VISIBILITY,
+	/* Last analytical FI output. This is a presentation-only diagnostic for
+	 * comparing generated and real display-domain images. */
+	VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT
 } VkptTemporalDebugView;
 VkResult vkpt_temporal_debug_blit(VkCommandBuffer cmd_buf,
 	unsigned int image_index, VkExtent2D extent, VkptTemporalDebugView view);
@@ -835,6 +838,9 @@ extern cvar_t *cvar_flt_frame_generation_active;
 extern cvar_t *cvar_flt_frame_generation_reason;
 extern cvar_t *cvar_flt_frame_generation_rendered_fps;
 extern cvar_t *cvar_flt_frame_generation_generated_fps;
+/* Developer-only screenshot selector: captures the most recent FI output
+ * without changing the live presenter or invalidating its history. */
+extern cvar_t *cvar_flt_frame_generation_debug_capture;
 extern cvar_t *cvar_flt_temporal_debug_view;
 extern cvar_t *cvar_flt_upscaler_active;
 extern cvar_t *cvar_flt_upscaler_reason;
