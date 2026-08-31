@@ -367,7 +367,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Vulkan validation. It is now selected experimentally in Q2RTX as
   `flt_upscaler 3`, with its SDK-3.1.5 source closure privately namespaced to
   avoid the otherwise identical 1.1.4 exported C symbols. Fence-driven
-  descriptor/constant recycling and broad visual-quality coverage remain. The
+  Per-dispatch descriptor and constant-buffer storage is now explicitly tagged
+  with the caller's monotonic frame ID and reclaimed when Q2RTX's matching
+  frame-slot fence retires. This fixes the former unbounded 3.1.5 transient
+  storage growth that made a long live run spend excessive time in RADV/libdrm
+  during context destruction. The reusable suite passes 37/37 after the API
+  addition. Broad visual-quality coverage remains. The
   reset and temporal-sharpened
   test enables Khronos validation and is clean after the generated HLSL
   explicitly annotates every storage image with the matching public

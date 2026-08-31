@@ -137,6 +137,7 @@ static bool fsr3_315_context_ok = false;
 static bool fsr3_315_reset_next = true;
 static uint32_t fsr3_315_ctx_dw = 0;
 static uint32_t fsr3_315_ctx_dh = 0;
+static uint64_t fsr3_315_frame_ids[MAX_FRAMES_IN_FLIGHT];
 static FfxVkFsr3_3_1_5Resource fsr3_315_color;
 static FfxVkFsr3_3_1_5Resource fsr3_315_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_motion;
@@ -789,6 +790,7 @@ static void fsr3_315_destroy_context(void)
     fsr3_315_context = NULL;
     fsr3_315_context_ok = false;
     fsr3_315_ctx_dw = fsr3_315_ctx_dh = 0;
+    memset(fsr3_315_frame_ids, 0, sizeof(fsr3_315_frame_ids));
     fsr3_315_reset_next = true;
 }
 
@@ -2678,6 +2680,8 @@ static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
     dispatch.cameraFar = frame->camera.far_plane;
     dispatch.cameraVerticalFovRadians = frame->camera.vertical_fov_radians;
     dispatch.viewSpaceToMeters = frame->camera.view_space_to_meters;
+    dispatch.frameId = frame->frame_id;
+    fsr3_315_frame_ids[qvk.current_frame_index] = frame->frame_id;
     result = ffxVkFsr3_3_1_5UpscalerContextRecordDispatch(fsr3_315_context, &dispatch);
     if (result != FFX_VK_FSR3_3_1_5_OK) {
         END_PERF_MARKER(cmd_buf, PROFILER_FSR);
@@ -2695,6 +2699,11 @@ static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
 void vkpt_fsr_retire(uint32_t frame_slot)
 {
 #ifdef VKPT_FSR3
+    if (frame_slot < MAX_FRAMES_IN_FLIGHT && fsr3_315_frame_ids[frame_slot] && fsr3_315_context) {
+        ffxVkFsr3_3_1_5UpscalerContextRetireFrame(fsr3_315_context,
+            fsr3_315_frame_ids[frame_slot]);
+        fsr3_315_frame_ids[frame_slot] = 0u;
+    }
     vkpt_fsr_frame_generation_retire(frame_slot);
 #endif
     if (frame_slot < MAX_FRAMES_IN_FLIGHT && fsr4_frame_ids[frame_slot] &&

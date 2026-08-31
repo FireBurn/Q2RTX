@@ -10,6 +10,19 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
+  the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
+  and exposes `RetireFrame`; Q2RTX calls it only after the existing frame-slot
+  fence has completed. This reclaims the bridge's per-dispatch descriptor sets
+  and uniform buffers instead of retaining an unbounded run until shutdown. A
+  3,900-frame live gate test exposed the old teardown path spinning in
+  RADV/libdrm from `ffxVkFsr3_3_1_5DestroyBridge`; the corrected package builds
+  and passes all 37 standalone tests. The user has reported visible flashing
+  while FI/OF is active. Treat that as an unresolved visual correctness issue:
+  do not claim analytical frame generation is production-ready merely because
+  validation is clean, and isolate generated-vs-real presentation before any
+  further release claim.
+
 - The reusable presenter now carries acquisition through to an immutable
   ordered present plan. `ffxVkFrameGenerationBuildPresentPlan` produces either
   the normal one-slot fallback or generated-then-real two-slot order, retaining
