@@ -45,6 +45,12 @@ Current truth:
   FI/OF FIFO presentation without an error. Its full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_drs_switch_fiog.png`.
 
+- A validation-enabled in-process 960x540 -> 800x600 -> 960x540 resize rebuilt
+  FSR4 Quality at each exact extent and resumed SDK-3.1.6 FI/OF after each
+  expected temporal reset. No VUID, FSR, dispatch, or presenter error was
+  logged; the post-resize full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_resize_fiog.png`.
+
 - FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
   the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
   and exposes `RetireFrame`; Q2RTX calls it only after the existing frame-slot
