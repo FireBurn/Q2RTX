@@ -40,6 +40,11 @@ Current truth:
   there was no VUID, FSR, dispatch, or presenter error. The HDR test helper now
   correctly uses `screenshothdr` rather than the unsupported PNG command.
 
+- A fresh FSR4 Performance -> bounded-DRS transition also rebuilt the v07
+  graph at 960x540, selected the DRS model at 100%, and resumed SDK-3.1.6
+  FI/OF FIFO presentation without an error. Its full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_drs_switch_fiog.png`.
+
 - FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
   the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
   and exposes `RetireFrame`; Q2RTX calls it only after the existing frame-slot
