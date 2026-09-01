@@ -59,6 +59,11 @@ other Vulkan applications.
   use `ffxVkFrameGenerationTransitionNeedsQuiescence` and wait for the present
   queue once before reusing its presentation semaphores; never add that stall to
   either steady presentation path.
+- A map/menu transition may skip a logical trace while advancing a frame slot.
+  Before a slot's trace semaphore is signalled again, the transfer handoff must
+  consume both the normal previous trace signal and any stale current-slot
+  trace signal. Do not assume the preceding-slot wait alone proves current
+  trace-semaphore reuse is safe.
 
 ## Ground truth architecture
 

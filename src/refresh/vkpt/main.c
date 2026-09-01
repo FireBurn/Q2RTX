@@ -3259,8 +3259,11 @@ R_RenderFrame_RTX(refdef_t *fd)
 	VkSemaphore transfer_semaphores[VKPT_MAX_GPUS];
 	VkSemaphore trace_semaphores[VKPT_MAX_GPUS];
 	VkSemaphore prev_trace_semaphores[VKPT_MAX_GPUS];
+	VkSemaphore trace_wait_semaphores[VKPT_MAX_GPUS * 2];
 	VkPipelineStageFlags wait_stages[VKPT_MAX_GPUS];
+	VkPipelineStageFlags trace_wait_stages[VKPT_MAX_GPUS * 2];
 	uint32_t device_indices[VKPT_MAX_GPUS];
+	uint32_t trace_wait_device_indices[VKPT_MAX_GPUS * 2];
 	uint32_t all_device_mask = (1 << qvk.device_count) - 1;
 	bool* prev_trace_signaled = &qvk.semaphores[(qvk.current_frame_index - 1) % MAX_FRAMES_IN_FLIGHT][0].trace_signaled;
 	bool* curr_trace_signaled = &qvk.semaphores[qvk.current_frame_index][0].trace_signaled;
@@ -3282,16 +3285,39 @@ R_RenderFrame_RTX(refdef_t *fd)
 			prev_trace_semaphores[gpu] = qvk.semaphores[(qvk.current_frame_index - 1) % MAX_FRAMES_IN_FLIGHT][gpu].trace_finished;
 			wait_stages[gpu] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		}
+		/* Most frames consume the preceding slot's trace semaphore before that
+		 * slot is reused. A map/menu transition can skip a logical render while
+		 * still advancing its frame slot, leaving this slot's old trace signal
+		 * pending. Consume either (or both) explicitly before this frame signals
+		 * its trace semaphore again. This is independent of presentation, but FG
+		 * makes the skipped-slot cadence easy to trigger. */
+		int trace_wait_count = 0;
+		if (*prev_trace_signaled) {
+			for (int gpu = 0; gpu < qvk.device_count; gpu++) {
+				trace_wait_semaphores[trace_wait_count] = prev_trace_semaphores[gpu];
+				trace_wait_stages[trace_wait_count] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				trace_wait_device_indices[trace_wait_count++] = gpu;
+			}
+		}
+		if (*curr_trace_signaled) {
+			for (int gpu = 0; gpu < qvk.device_count; gpu++) {
+				trace_wait_semaphores[trace_wait_count] = trace_semaphores[gpu];
+				trace_wait_stages[trace_wait_count] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				trace_wait_device_indices[trace_wait_count++] = gpu;
+			}
+		}
 
 		vkpt_submit_command_buffer(
 			transfer_cmd_buf, 
 			qvk.queue_transfer, 
 			all_device_mask, 
-			(*prev_trace_signaled) ? qvk.device_count : 0, prev_trace_semaphores, wait_stages, device_indices, 
+			trace_wait_count, trace_wait_semaphores, trace_wait_stages,
+			trace_wait_device_indices,
 			qvk.device_count, transfer_semaphores, device_indices, 
 			VK_NULL_HANDLE);
 
 		*prev_trace_signaled = false;
+		*curr_trace_signaled = false;
 	}
 
 	{
@@ -3833,10 +3859,13 @@ R_BeginFrame_RTX(void)
 	/* A frame-slot fence proves the render submissions completed, but a WSI
 	 * present wait can still own the previous mode's binary semaphore. On the
 	 * one ordinary↔generated transition (menu, rate gate, or user toggle), wait
-	 * for the queue to consume it before reusing presentation semaphores. Do not
-	 * put this in either steady presentation path. */
+	 * for the queue to consume it before reusing presentation semaphores. A
+	 * reset still records a paired real-scene present to seed FI/OF history, so
+	 * it likewise needs one drain before acquiring that pair. */
 	if (ffxVkFrameGenerationTransitionNeedsQuiescence(
-		framegen_present_was_active, qvk.framegen_present_active)) {
+		framegen_present_was_active, qvk.framegen_present_active) ||
+		(qvk.framegen_present_active &&
+		 vkpt_fsr_frame_generation_reset_pending())) {
 		_VK(vkQueueWaitIdle(qvk.queue_graphics));
 	}
 	if (!cvar_flt_frame_generation || cvar_flt_frame_generation->integer == 0)
@@ -4197,7 +4226,6 @@ R_EndFrame_RTX(void)
 				qvk.current_swap_chain_image_index, gpu, qvk.device_count)];
 		signal_device_indices[gpu] = gpu;
 	}
-
 	vkpt_submit_command_buffer(
 		cmd_buf,
 		qvk.queue_graphics,
@@ -4622,8 +4650,13 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 			cvar_flt_frame_generation_debug_capture->integer != 0) {
 			/* Do not use flt_temporal_debug_view here: that cvar correctly
 			 * suspends FI and recreates the presentation state. This capture-only
-			 * selector leaves the live generated/real pair untouched. */
-			debug_image_view = qvk.images_views[VKPT_IMG_FSR_RCAS_OUTPUT];
+			 * selector leaves the live generated/real pair untouched. Value 1
+			 * captures the FI target; value 2 captures its display-linear source
+			 * for a direct black-output comparison. */
+			const unsigned int capture_image =
+				cvar_flt_frame_generation_debug_capture->integer == 2
+					? VKPT_IMG_TAA_OUTPUT : VKPT_IMG_FSR_RCAS_OUTPUT;
+			debug_image_view = qvk.images_views[capture_image];
 			debug_extent = qvk.extent_unscaled;
 			debug_view = VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT;
 			debug_active = debug_image_view && debug_extent.width &&

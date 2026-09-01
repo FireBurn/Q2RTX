@@ -838,11 +838,9 @@ extern cvar_t *cvar_flt_frame_generation_active;
 extern cvar_t *cvar_flt_frame_generation_reason;
 extern cvar_t *cvar_flt_frame_generation_rendered_fps;
 extern cvar_t *cvar_flt_frame_generation_generated_fps;
-/* Developer-only screenshot selector: captures the most recent FI output
- * without changing the live presenter or invalidating its history. */
+/* Developer-only screenshot selector: 1 captures the most recent FI output,
+ * 2 its TAA display-linear source, without altering presenter history. */
 extern cvar_t *cvar_flt_frame_generation_debug_capture;
-/* Temporary repair-only escape hatch for the quarantined SDK-3.1.6 bridge. */
-extern cvar_t *cvar_flt_frame_generation_allow_unverified_316;
 extern cvar_t *cvar_flt_temporal_debug_view;
 extern cvar_t *cvar_flt_upscaler_active;
 extern cvar_t *cvar_flt_upscaler_reason;
@@ -870,6 +868,9 @@ void vkpt_fsr_retire(uint32_t frame_slot);
  * presenter owns acquire/submit/present; this function only records OF/FI. */
 bool vkpt_fsr_frame_generation_is_ready(void);
 bool vkpt_fsr_frame_generation_prepare_present(void);
+/* A reset dispatch seeds FI/OF history but must not inherit outstanding WSI
+ * present waits from a preceding generated/real pair. */
+bool vkpt_fsr_frame_generation_reset_pending(void);
 void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason);
 VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
 	bool *out_generated_frame_safe);

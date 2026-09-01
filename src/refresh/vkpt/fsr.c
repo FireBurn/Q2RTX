@@ -225,7 +225,7 @@ cvar_t *cvar_flt_frame_generation_reason = NULL;
 cvar_t *cvar_flt_frame_generation_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
 cvar_t *cvar_flt_frame_generation_debug_capture = NULL;
-cvar_t *cvar_flt_frame_generation_allow_unverified_316 = NULL;
+static cvar_t *fsr3_frame_generation_backend_revision = NULL;
 cvar_t *cvar_flt_temporal_debug_view = NULL;
 static unsigned fsr3_fg_low_rate_frames;
 static unsigned fsr3_fg_recovery_frames;
@@ -989,21 +989,6 @@ static VkResult fsr3_create_frame_generation_context(void)
     if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
         return VK_ERROR_INITIALIZATION_FAILED;
 
-    /* The SDK-3.1.6 FI/OF bridge currently records successfully but its
-     * generated output is black on the RX 6800M Vulkan path.  That made the
-     * generated/real presenter visibly strobe.  Do not expose a known-bad
-     * producer just because validation accepts its command stream: migrate
-     * saved experimental selections to the visually verified 1.1.4 Vulkan
-     * FI implementation until the 3.1.6 resource bridge is fixed. */
-    if (cvar_flt_frame_generation_backend &&
-        cvar_flt_frame_generation_backend->integer == 1 &&
-        (!cvar_flt_frame_generation_allow_unverified_316 ||
-            cvar_flt_frame_generation_allow_unverified_316->integer == 0)) {
-        Com_WPrintf("FSR3 FG: SDK 3.1.6 FI/OF disabled: generated output is "
-            "black on Vulkan; using verified 1.1.4 compatibility backend.\n");
-        Cvar_SetByVar(cvar_flt_frame_generation_backend, "0", FROM_CODE);
-    }
-
     if (cvar_flt_frame_generation_backend &&
         cvar_flt_frame_generation_backend->integer == 1) {
         FfxVkFsr3_3_1_6FrameGenerationCreateInfo create_316;
@@ -1534,11 +1519,18 @@ void vkpt_fsr_init_cvars(void)
      * normal present path until that presenter has acquired two images. */
     cvar_flt_frame_generation = Cvar_Get("flt_frame_generation", "0",
                                          CVAR_ARCHIVE);
-    /* The verified native 1.1.4 FI implementation is the safe default. The
-     * 3.1.6 bridge remains in the source tree for repair but is migrated here
-     * until it produces non-black generated frames on Vulkan. */
-    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "0",
+    /* The current public-SDK Vulkan FI/OF bridge is the preferred scheduler;
+     * retain the older native implementation as an explicit compatibility
+     * choice. Revision 2 promotes archived values written by the temporary
+     * black-output quarantine without overwriting a later user choice. */
+    cvar_flt_frame_generation_backend = Cvar_Get("flt_frame_generation_backend", "1",
                                                  CVAR_ARCHIVE);
+    fsr3_frame_generation_backend_revision = Cvar_Get(
+        "flt_frame_generation_backend_revision", "0", CVAR_ARCHIVE);
+    if (fsr3_frame_generation_backend_revision->integer < 2) {
+        Cvar_SetByVar(cvar_flt_frame_generation_backend, "1", FROM_CODE);
+        Cvar_SetByVar(fsr3_frame_generation_backend_revision, "2", FROM_CODE);
+    }
     /* Analytical interpolation is most convincing at a sustained high input
      * rate. Thirty is a conservative default safety floor; set zero to
      * explicitly disable the gate, or sixty for AMD's recommended target. */
@@ -1554,8 +1546,6 @@ void vkpt_fsr_init_cvars(void)
         "flt_frame_generation_generated_fps", "0", CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_frame_generation_debug_capture = Cvar_Get(
         "flt_frame_generation_debug_capture", "0", CVAR_NOARCHIVE);
-    cvar_flt_frame_generation_allow_unverified_316 = Cvar_Get(
-        "flt_frame_generation_allow_unverified_316", "0", CVAR_NOARCHIVE);
     /* Presentation-only input inspection. A nonzero view temporarily takes
      * ownership of the real-frame final blit, so analytical frame generation
      * is explicitly suspended rather than mixing a generated scene with a
@@ -2186,6 +2176,17 @@ bool vkpt_fsr_frame_generation_prepare_present(void)
         fsr3_create_frame_generation_context() != VK_SUCCESS)
         return false;
     return vkpt_fsr_frame_generation_is_ready();
+}
+
+bool vkpt_fsr_frame_generation_reset_pending(void)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+
+    /* The reset job is intentionally recorded so the next history-valid
+     * frame can interpolate, but its paired WSI presentation must start from
+     * a drained queue. A missing temporal frame is conservative: this is
+     * called before the render work that will populate it. */
+    return fsr3_frame_generation_reset_next || !frame || !frame->history_valid;
 }
 
 static FfxVkFsr3_3_1_6FrameGenerationImage fsr3_316_image(

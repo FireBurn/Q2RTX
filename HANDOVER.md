@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-08-31, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-01, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -10,23 +10,21 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
-- The user-reported generated/real strobing has been reproduced and isolated.
-  A capture-only selector (`flt_frame_generation_debug_capture 1`) reads the
-  most recent interpolation target without changing the live presenter. On
-  the RX 6800M, SDK-3.1.6 FI/OF's target was completely black after a
-  history-valid 300-frame FSR3.1.5 run, while the native FSR3.1.4 Vulkan FI
-  target was a normal full-colour scene on the same inputs. This is the direct
-  cause of alternating black/real presentation; clean Vulkan validation and a
-  normal real-frame screenshot were insufficient evidence. A precise
-  compute-write -> final-blit fragment-read barrier is now recorded for both
-  FI backends. More importantly, Q2RTX migrates any saved backend `1`
-  (SDK-3.1.6) selection to backend `0` and defaults to the visually verified
-  native 1.1.4 FI implementation, preventing the strobe. The validation-clean
-  fallback capture is
+- The user-reported generated/real strobing has been reproduced and repaired.
+  The direct FI-target probe proved that SDK-3.1.6 was alternating a black
+  generated image with a real image on RX 6800M. The bridge had silently
+  discarded GPU-job failures: it rejected SDK zero-size-as-remaining counter
+  buffers, could not copy its previous interpolation source, used DX12-style
+  storage-image formats in Vulkan SPIR-V, and rejected inactive static SPD
+  mip declarations beyond a small image's real mip count. The bridge now
+  handles those contracts, propagates failures, and the pinned shader overlay
+  regenerates exact Vulkan formats. The current direct capture is full colour:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_generated_output_probe.png`.
-  Do not re-enable or claim SDK-3.1.6 FI/OF usable until that direct generated
-  output is non-black under this probe. This supersedes older handover claims
-  that SDK-3.1.6 was visually coherent; those observed only real-slot stills.
+  A weapon/emissive run, camera cut, map transition, and sustained 30-FPS-gated
+  run all kept SDK-3.1.6 FI/OF active with no FI/OF or presentation VUID.
+  Backend `1` is therefore the default; revision 2 migrates only the archived
+  quarantine value once, while backend `0` remains an explicit 1.1.4
+  compatibility choice.
 
 - FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
   the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
@@ -35,9 +33,15 @@ Current truth:
   and uniform buffers instead of retaining an unbounded run until shutdown. A
   3,900-frame live gate test exposed the old teardown path spinning in
   RADV/libdrm from `ffxVkFsr3_3_1_5DestroyBridge`; the corrected package builds
-  and passes all 37 standalone tests. The user-reported flashing is resolved
-  for the default native 1.1.4 FI path, but SDK-3.1.6 remains quarantined as
-  described above.
+  and passes all 37 standalone tests.
+
+- A frame-generation map transition exposed a separate Q2RTX trace-semaphore
+  ownership bug: a skipped logical render could leave the current slot's trace
+  signal pending, then re-signal it. The transfer handoff now consumes both
+  the ordinary previous slot and any stale current slot before reuse. The
+  repeat 3.1.5 + SDK-3.1.6 `base1 -> base2` run was validation-clean and its
+  full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
 
 - The reusable presenter now carries acquisition through to an immutable
   ordered present plan. `ffxVkFrameGenerationBuildPresentPlan` produces either

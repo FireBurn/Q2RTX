@@ -1,28 +1,21 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-08-31 (Europe/London)
+Last updated: 2026-09-01 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
 
 ## Immediate visual-correctness follow-up
 
-- [x] Reproduce the user's generated/real strobing with a capture of the
-  generated target itself, rather than inferring correctness from a real-slot
-  screenshot. `flt_frame_generation_debug_capture` leaves the live presenter
-  untouched and captures the current FI target. It proved SDK-3.1.6 FI/OF was
-  writing a fully black output on RX 6800M, whereas the native FSR3.1.4 Vulkan
-  FI output was full-colour on identical inputs. Add the missing
-  compute-write→fragment-read barrier and force a saved SDK-3.1.6 choice to
-  the working native 1.1.4 backend. The post-fallback generated-target capture
-  is `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_generated_output_probe.png`;
-  it is full-colour and the log is validation-clean.
-- [-] Repair SDK-3.1.6 FI/OF's custom Vulkan resource/job bridge. It still
-  records without errors but produces black `FSR_RCAS_OUTPUT` on RX 6800M;
-  do not expose backend 1 again until the capture-only generated-target probe
-  is non-black over a history-valid multi-frame run and normal generated/real
-  presentation is visually checked. Older successful 3.1.6 stills captured
-  only the real path and are not proof of this item.
+- [x] Reproduce and repair generated/real strobing from the generated target
+  itself, rather than inferring correctness from a real-slot screenshot.
+  `flt_frame_generation_debug_capture` proved that SDK-3.1.6 FI/OF produced a
+  black target on RX 6800M. The repaired bridge accepts zero-size remaining
+  buffer ranges, performs image copies, propagates SDK job failures, supports
+  inactive tail SPD mips, and uses regenerated exact Vulkan storage-image
+  formats. The direct target, held weapon/emissive, camera cut, map transition,
+  and sustained 30-FPS-gated runs are full-colour and validation-clean. Backend
+  `1` is the default; `0` remains 1.1.4 compatibility.
 
 ## P0 — make the current FSR4 INT8 path correct and observable
 
