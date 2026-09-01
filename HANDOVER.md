@@ -26,6 +26,13 @@ Current truth:
   quarantine value once, while backend `0` remains an explicit 1.1.4
   compatibility choice.
 
+- The FPS safety gate no longer visibly oscillates while learning FI cost. A
+  fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
+  guarded SDK-3.1.6 attempt, entered the correct fallback, then stayed blocked
+  at its conservative 240-FPS recovery requirement with no VUID/FSR error.
+  The full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_perf_fg_60fps_sustained.png`.
+
 - FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
   the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
   and exposes `RetireFrame`; Q2RTX calls it only after the existing frame-slot

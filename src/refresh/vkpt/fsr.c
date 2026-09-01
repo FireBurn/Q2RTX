@@ -234,6 +234,9 @@ static bool fsr3_fg_rate_blocked;
  * Hysteresis is defined in completed logical frames, never WSI operations. */
 static uint64_t fsr3_fg_last_rate_frame_id;
 static bool fsr3_fg_rate_frame_seen;
+/* The rate gate runs before WSI. This records whether the previous logical
+ * frame was admitted for FG, independent of delayed presentation status. */
+static bool fsr3_fg_rate_admitted_previous_frame;
 /* A threshold can feed back on itself: disabling FI makes an otherwise
  * borderline scene render more quickly. Keep a small per-enable cost model so
  * the gate only retries when the ungenerated logical rate has enough headroom
@@ -1583,6 +1586,7 @@ void vkpt_fsr_request_reset(void)
     fsr3_fg_recovery_frames = 0;
     fsr3_fg_rate_blocked = false;
     fsr3_fg_rate_frame_seen = false;
+    fsr3_fg_rate_admitted_previous_frame = false;
     fsr3_fg_enable_baseline_fps = 0.0f;
     fsr3_fg_active_input_fps = 0.0f;
     fsr3_fg_recovery_required_fps = 0.0f;
@@ -2046,6 +2050,7 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
         fsr3_fg_recovery_frames = 0;
         fsr3_fg_rate_blocked = false;
         fsr3_fg_rate_frame_seen = false;
+        fsr3_fg_rate_admitted_previous_frame = false;
         fsr3_fg_enable_baseline_fps = 0.0f;
         fsr3_fg_active_input_fps = 0.0f;
         fsr3_fg_recovery_required_fps = 0.0f;
@@ -2066,8 +2071,11 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
     fsr3_fg_rate_frame_seen = true;
 
     input_fps = 1000.0f / frame->frame_time_ms;
-    was_active = cvar_flt_frame_generation_active &&
-        cvar_flt_frame_generation_active->integer != 0;
+    /* The public status becomes active only after the generated/real pair has
+     * reached WSI, whereas this gate is evaluated while preparing the next
+     * logical frame. Its own admission state is therefore the stable way to
+     * distinguish a no-FI baseline from the first FI-costed sample. */
+    was_active = fsr3_fg_rate_admitted_previous_frame;
     fsr3_frame_generation_publish_logical_rate(input_fps, was_active);
     if (!fsr3_fg_rate_blocked) {
         if (was_active) {
@@ -2085,15 +2093,25 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
             if (++fsr3_fg_low_rate_frames >= 4u) {
                 fsr3_fg_rate_blocked = true;
                 fsr3_fg_recovery_input_fps = 0.0f;
-                fsr3_fg_recovery_required_fps = minimum_fps + 2.0f;
+                /* A visible generated/real toggle is worse than a temporary
+                 * conservative fallback.  Keep the measured FI-cost estimate
+                 * below, but never retry a nonzero safety floor until the
+                 * no-FI rate has substantial headroom.  This prevents the
+                 * estimate itself from converging through repeated strobing
+                 * probes on a borderline scene. */
+                fsr3_fg_recovery_required_fps = Q_clipf(minimum_fps * 4.0f,
+                    minimum_fps + 2.0f, 240.0f);
                 if (fsr3_fg_enable_baseline_fps > 0.0f &&
                     fsr3_fg_active_input_fps > 0.0f) {
                     const float active_fraction = fsr3_fg_active_input_fps /
                         fsr3_fg_enable_baseline_fps;
-                    if (active_fraction > 0.1f && active_fraction < 1.0f)
-                        fsr3_fg_recovery_required_fps = Q_clipf(
+                    if (active_fraction > 0.1f && active_fraction < 1.0f) {
+                        const float measured_recovery_fps = Q_clipf(
                             minimum_fps / active_fraction + 2.0f,
                             minimum_fps + 2.0f, 240.0f);
+                        if (measured_recovery_fps > fsr3_fg_recovery_required_fps)
+                            fsr3_fg_recovery_required_fps = measured_recovery_fps;
+                    }
                 }
             }
         } else {
@@ -2156,6 +2174,7 @@ bool vkpt_fsr_frame_generation_prepare_present(void)
 		return false;
     if (!fsr3_frame_generation_rate_is_eligible()) {
         char reason[128];
+        fsr3_fg_rate_admitted_previous_frame = false;
         Q_snprintf(reason, sizeof(reason),
             "fallback: rendered input below %.0f FPS threshold",
             cvar_flt_frame_generation_min_rendered_fps->value);
@@ -2173,9 +2192,12 @@ bool vkpt_fsr_frame_generation_prepare_present(void)
         ? fsr3_316_frame_generation_context_ok && fsr3_316_frame_generation_context
         : fsr3_frame_generation_context_ok && fsr3_frame_generation_context;
     if (!selected_context_ok &&
-        fsr3_create_frame_generation_context() != VK_SUCCESS)
+        fsr3_create_frame_generation_context() != VK_SUCCESS) {
+        fsr3_fg_rate_admitted_previous_frame = false;
         return false;
-    return vkpt_fsr_frame_generation_is_ready();
+    }
+    fsr3_fg_rate_admitted_previous_frame = vkpt_fsr_frame_generation_is_ready();
+    return fsr3_fg_rate_admitted_previous_frame;
 }
 
 bool vkpt_fsr_frame_generation_reset_pending(void)

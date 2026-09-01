@@ -536,7 +536,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   stayed active at a 30-FPS floor (76.9 logical FPS), while the same scene at a
   60-FPS floor settled in safe fallback after one probe rather than oscillating
   (166.7 logical FPS versus a learned 181.6-FPS re-enable floor). Both runs
-  used validation with coherent screenshots and no VUID. The legacy FSR3 1.1.4
+  used validation with coherent screenshots and no VUID. On 2026-09-01, the
+  current SDK-3.1.6 implementation repeated the 60-FPS-floor 3,900-frame
+  check after the black-target repair: it made one guarded attempt, then held
+  fallback at the conservative 240-FPS recovery requirement rather than
+  toggling presentation while learning. The capture is
+  `baseq2/screenshots/FSR315_perf_fg_60fps_sustained.png`. The legacy FSR3 1.1.4
   FI backend also stayed active through the shared 30-FPS gate (83.3 logical
   FPS) with a coherent validation-clean capture. A controlled camera-cut
   regression now proves that FSR4 itself recovers cleanly and that the paired

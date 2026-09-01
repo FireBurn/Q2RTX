@@ -41,6 +41,10 @@ other Vulkan applications.
   A rate-gated fallback learns FI cost and requires that headroom on recovery;
   do not replace it with a simple threshold +2 loop, which oscillates when
   disabling FI itself raises the frame rate.
+- A nonzero FG safety floor may make one guarded attempt, but must never
+  visibly calibrate itself through repeated generated/real mode toggles. Keep
+  the measured FI-cost estimate and conservative recovery headroom; zero is
+  the explicit unrestricted diagnostic setting.
 - Camera-cut classification is shared through
   `ffx-vulkan::temporal-lifecycle`, not duplicated per provider. It resets
   history for a teleport over 256 world units, a turn over 90 degrees, a lens
