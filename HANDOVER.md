@@ -10,6 +10,12 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Vulkan device-group enumeration now correctly accepts `VK_INCOMPLETE` when
+  Q2RTX asks for only its selected first group. A fresh SLI-enabled startup
+  reported `using device group 0 with 1 device(s)` without the former false
+  Vulkan error. This is enumeration correctness only; device-group temporal
+  input gathering remains an explicitly unsupported follow-up.
+
 - The user-reported generated/real strobing has been reproduced and repaired.
   The direct FI-target probe proved that SDK-3.1.6 was alternating a black
   generated image with a real image on RX 6800M. The bridge had silently

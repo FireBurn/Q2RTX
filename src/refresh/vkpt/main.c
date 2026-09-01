@@ -1077,39 +1077,58 @@ init_vulkan(void)
 
 #ifdef VKPT_DEVICE_GROUPS
 	uint32_t num_device_groups = 0;
+	bool device_group_ready = false;
 
-	if (cvar_sli->integer)
-		_VK(vkEnumeratePhysicalDeviceGroups(qvk.instance, &num_device_groups, NULL));
+	if (cvar_sli->integer) {
+		VkResult device_group_result = vkEnumeratePhysicalDeviceGroups(
+			qvk.instance, &num_device_groups, NULL);
+		if (device_group_result != VK_SUCCESS) {
+			Com_WPrintf("SLI: could not enumerate Vulkan device groups (%s); using a single device.\n",
+				qvk_result_to_string(device_group_result));
+			num_device_groups = 0;
+		}
+	}
 
 	VkDeviceGroupDeviceCreateInfo device_group_create_info;
-	VkPhysicalDeviceGroupProperties device_group_info;
-	device_group_info.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES;
-	device_group_info.pNext = NULL;
+	VkPhysicalDeviceGroupProperties device_group_info = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES,
+		.pNext = NULL,
+	};
 
 	if(num_device_groups > 0) {
-		// we always use the first group
+		/* We only need the first group. Vulkan returns VK_INCOMPLETE when
+		 * more groups exist than the one requested here; that first group is
+		 * nevertheless valid and must not be reported as a renderer error. */
 		num_device_groups = 1;
-		_VK(vkEnumeratePhysicalDeviceGroups(qvk.instance, &num_device_groups, &device_group_info));
+		VkResult device_group_result = vkEnumeratePhysicalDeviceGroups(
+			qvk.instance, &num_device_groups, &device_group_info);
+		if (device_group_result == VK_SUCCESS || device_group_result == VK_INCOMPLETE)
+			device_group_ready = num_device_groups == 1;
+		else
+			Com_WPrintf("SLI: could not query Vulkan device group 0 (%s); using a single device.\n",
+				qvk_result_to_string(device_group_result));
 
-		if (device_group_info.physicalDeviceCount > VKPT_MAX_GPUS)
-		{
-			Com_EPrintf("SLI: device group 0 has %d devices, which is more than maximum supported count (%d).\n",
-				device_group_info.physicalDeviceCount, VKPT_MAX_GPUS);
-			return false;
+		if (device_group_ready) {
+			if (device_group_info.physicalDeviceCount > VKPT_MAX_GPUS)
+			{
+				Com_EPrintf("SLI: device group 0 has %d devices, which is more than maximum supported count (%d).\n",
+					device_group_info.physicalDeviceCount, VKPT_MAX_GPUS);
+				return false;
+			}
+
+			device_group_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO;
+			device_group_create_info.pNext = NULL;
+			device_group_create_info.physicalDeviceCount = device_group_info.physicalDeviceCount;
+			device_group_create_info.pPhysicalDevices = device_group_info.physicalDevices;
+
+			qvk.device_count = device_group_create_info.physicalDeviceCount;
+			for(int i = 0; i < qvk.device_count; i++) {
+				qvk.device_group_physical_devices[i] = device_group_create_info.pPhysicalDevices[i];
+			}
+			Com_Printf("SLI: using device group 0 with %d device(s).\n", qvk.device_count);
 		}
-
-		device_group_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO;
-		device_group_create_info.pNext = NULL;
-		device_group_create_info.physicalDeviceCount = device_group_info.physicalDeviceCount;
-		device_group_create_info.pPhysicalDevices = device_group_info.physicalDevices;
-
-		qvk.device_count = device_group_create_info.physicalDeviceCount;
-		for(int i = 0; i < qvk.device_count; i++) {
-			qvk.device_group_physical_devices[i] = device_group_create_info.pPhysicalDevices[i];
-		}
-		Com_Printf("SLI: using device group 0 with %d device(s).\n", qvk.device_count);
 	}
-	else
+	if (!device_group_ready)
 	{
 		qvk.device_count = 1;
 		if (!cvar_sli->integer)
