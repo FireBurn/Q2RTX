@@ -85,6 +85,9 @@ Current truth:
   `git subtree split --prefix=extern/ffx-vulkan` procedure. Review the
   provenance boundary before any public push: it must never include v07 model
   payloads, AMD DLLs, extracted binary content, screenshots, or Q2RTX data.
+  The reviewed release split was published to
+  `https://github.com/FireBurn/FSR-Vulkan` `main` at `0411b8d8` on
+  2026-09-01; it built cleanly and passed all 36 redistributable CTests.
   The parent Q2RTX tree was rebuilt after the installed-consumer test was
   added, and its root CTest checks passed 2/2 (`fsr4_schedule` and
   `fsr4_v07_assets`) on 2026-08-31.

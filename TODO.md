@@ -244,6 +244,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   declaration, so the same installed API is valid for both RGBA8 and RGBA16F
   presentation images; compact internal storage images remain typed. A fresh
   Q2RTX-local standalone build passes all 37 CTests, including both formats.
+  The clean redistributable subtree was split, audited to exclude binary/model
+  payloads and Q2RTX data, and published to `FireBurn/FSR-Vulkan` `main` at
+  `0411b8d8`; its clean release build passes 36/36 applicable CTests.
   A distributor can now opt into a complete, validated v07 asset installation
   with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
   The package installs only the notice and six model-prefixed, manifest-backed
