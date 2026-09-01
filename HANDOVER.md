@@ -935,8 +935,10 @@ Current truth:
   repackaged. On this development machine the installed user archive was still
   stale, so the verified source `baseq2/q2rtx.menu` is also deployed as the
   higher-priority loose `/home/fireburn/.local/share/quake2rtx/baseq2/q2rtx.menu`
-  override (revision `2026-08-fsr3-fsr4-v07-rr`, SHA-256
-  `24f08bb266982349008453ca2d8137d2928ca88628bf095031b0311c876297fb`).
+  override (revision `2026-09-fsr3-fsr4-v07-rr-fg-gate`, SHA-256
+  `8c50a86b1c277aa3ffbb05f834d5aab6d4aa7d7ef22f2ec485c616580af61279`).
+  Its FG safety-floor help now accurately describes the conservative
+  no-strobe recovery behavior.
 - Both FSR3 and FSR4 v07 expose Native AA (100%), Quality (67%), Balanced
   (59%), Performance (50%), and Ultra Performance (33%) through
   `flt_fsr_quality`. FSR4 selects a complete matching model/initializer/weight

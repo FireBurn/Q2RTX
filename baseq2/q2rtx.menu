@@ -123,7 +123,7 @@ begin photomode
 end
 
 begin video
-// Q2RTX menu revision: 2026-08-fsr3-fsr4-v07-rr
+// Q2RTX menu revision: 2026-09-fsr3-fsr4-v07-rr-fg-gate
 //title "Video Setup"
     background #212F3CD0
     style --compact
@@ -167,7 +167,7 @@ begin video
 		pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port and the default for fresh configs; it is validated for RGBA16F, sRGB/scRGB transfer handling, fence-token view retirement, and current RX 6800M FIFO presentation. Legacy 1.1.4 remains available for comparison." \
 			"FSR3 FG scheduler" flt_frame_generation_backend \
 			"Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
-		range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation and eight samples at threshold plus 2 FPS resume it." \
+		range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation; recovery needs eight high samples plus conservative FI headroom to prevent visible on/off toggling." \
 			"FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
 		action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
 			"temporal diagnostics..." pushmenu temporal_diagnostics

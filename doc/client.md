@@ -882,8 +882,10 @@ acquires its generated/real image pair. The default is 30 FPS as a conservative
 safety floor; 60 FPS is AMD's recommended target for analytical FSR3 frame
 generation. Set 0 to disable this guard while testing. The presenter pauses
 after four consecutive below-threshold completed frames and resumes after eight
-frames at least 2 FPS above the threshold, avoiding rapid on/off oscillation.
-Any pause resets FI/OF history before generation resumes.
+high-rate frames only after conservative headroom for both the requested floor
+and measured FI cost is available. This prevents the recovery estimator from
+visibly toggling generated/real presentation while it converges. Any pause
+resets FI/OF history before generation resumes.
 
 `flt_frame_generation_active` and `flt_frame_generation_reason` are read-only
 diagnostics. `active` becomes 1 only after an interpolated generated image and

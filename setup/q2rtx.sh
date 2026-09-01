@@ -31,7 +31,7 @@ fi
 # add new renderer cvar values (notably FSR3.1.5) without requiring users to
 # delete their local media archive.  Preserve an older custom menu once; set
 # Q2RTX_SKIP_MENU_UPDATE=1 to keep managing a custom menu manually.
-MENU_REVISION="Q2RTX menu revision: 2026-08-fsr3-fsr4-v07-rr"
+MENU_REVISION="Q2RTX menu revision: 2026-09-fsr3-fsr4-v07-rr-fg-gate"
 MENU_SOURCE="${DATA_PREFIX:+${DATA_PREFIX}/baseq2/q2rtx.menu}"
 MENU_DEST="${XDG_DATA_HOME}/quake2rtx/baseq2/q2rtx.menu"
 if [[ "${Q2RTX_SKIP_MENU_UPDATE:-0}" != "1" && -n "${MENU_SOURCE}" && -f "${MENU_SOURCE}" ]]; then
