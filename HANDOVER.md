@@ -33,6 +33,13 @@ Current truth:
   The full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_perf_fg_60fps_sustained.png`.
 
+- Source-v07 FSR4 Quality plus SDK-3.1.6 FI/OF also survived a fresh HDR
+  context recreation on RX 6800M with `vk_validation=1`. Diagnostics reported
+  both providers active and the HDR capture was written to
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_hdr_fiog.hdr`;
+  there was no VUID, FSR, dispatch, or presenter error. The HDR test helper now
+  correctly uses `screenshothdr` rather than the unsupported PNG command.
+
 - FSR3.1.5 now has the same explicit transient-resource lifetime discipline as
   the newer FI/OF path. Its reusable dispatch API accepts a monotonic frame ID
   and exposes `RetireFrame`; Q2RTX calls it only after the existing frame-slot
