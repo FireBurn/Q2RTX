@@ -35,6 +35,14 @@ Current truth:
   RADV/libdrm from `ffxVkFsr3_3_1_5DestroyBridge`; the corrected package builds
   and passes all 37 standalone tests.
 
+- The reusable SDK-3.1.6 FI/OF API is now format-correct for both supported
+  public presentation outputs: its output UAV is intentionally formatless,
+  while compact internal images retain their exact Vulkan formats. This avoids
+  invalidly imposing Q2RTX's RGBA16F target on an RGBA8 host. A clean standalone
+  build passes all 37 CTests (including both RGBA8 and RGBA16F GPU smokes), and
+  the Q2RTX RX 6800M `vk_validation=1` live run remains full-colour with active
+  FIFO frame generation and no VUID or FSR errors.
+
 - A frame-generation map transition exposed a separate Q2RTX trace-semaphore
   ownership bug: a skipped logical render could leave the current slot's trace
   signal pending, then re-signal it. The transfer handoff now consumes both

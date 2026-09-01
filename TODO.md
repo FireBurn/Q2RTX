@@ -240,6 +240,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Q2RTX-local layout asset check).  On 2026-08-31 the full Q2RTX tree also
   rebuilt successfully after this package test was added; its root CTest
   checks passed 2/2 (`fsr4_schedule`, `fsr4_v07_assets`).
+  The 3.1.6 FI public output deliberately uses a formatless storage-image
+  declaration, so the same installed API is valid for both RGBA8 and RGBA16F
+  presentation images; compact internal storage images remain typed. A fresh
+  Q2RTX-local standalone build passes all 37 CTests, including both formats.
   A distributor can now opt into a complete, validated v07 asset installation
   with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
   The package installs only the notice and six model-prefixed, manifest-backed

@@ -50,6 +50,11 @@ other Vulkan applications.
   valid intermediate image. The paired presenter must use the real scene for
   that one slot, including resets caused internally when the rate gate resumes;
   use `ffxVkFrameGenerationShouldPresentGenerated` and retain its policy test.
+- The FSR3.1.6 FI output is a public presentation image and may be either
+  RGBA8 or RGBA16F. Its `rw_output` declaration must therefore use the Vulkan
+  formatless (`unknown`) storage-image form, while internal compact FI images
+  remain exactly typed. Do not enable DXC's global unknown-image-format switch:
+  it also makes image-texel-pointer resources invalid Vulkan SPIR-V.
 - A source-v07 FSR4 model cvar change must rebuild before availability is
   resolved. Do not leave graph recreation solely in the dispatch path: the
   resolver otherwise rejects the mismatched old graph forever as a pending
