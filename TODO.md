@@ -106,7 +106,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   dispatch, or presenter error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_odd_resize_1133x717.png`
   and `FSR4_odd_resize_restored.png`. Arbitrary reset and disocclusion coverage
-  remains outstanding.
+  remains outstanding. A later fresh 960x540 revalidation selected the
+  source-v07 Quality 16-pass INT8/DOT4 graph at 644x361 -> 960x540 and the
+  analytical SDK-3.1.6 FI/OF presenter; FSR diagnostics reported active and
+  eligible with no VUID/FSR/dispatch/presenter error. The resulting coherent,
+  full-colour motion/emissive capture is
+  /home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_native_fiog_revalidation.png.
 - [x] Implement and validate RCAS as a real separate pass; expose the separate
   `flt_fsr4_sharpening` [0,1] control only after it works.  A 0.50 live
   640x360 -> 1280x720 Performance run passed Vulkan validation on RX 6800M.

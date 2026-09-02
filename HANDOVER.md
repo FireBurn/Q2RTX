@@ -23,6 +23,16 @@ Current truth:
   and not a portable Vulkan replacement. The native Vulkan source-v07 path in
   Q2RTX remains the runnable experimental FSR4 route on this machine.
 
+- A fresh native-Q2RTX 960x540 validation-enabled source-v07 FSR4 Quality
+  revalidation selected the exact 644x361 -> 960x540 INT8/DOT4 16-pass graph,
+  automatic exposure, and the SDK-3.1.6 FI/OF presentation path. Diagnostics
+  reported FSR4 active and dispatch eligible; no VUID, FSR, dispatch, or
+  presenter error appeared. The new in-world motion/emissive capture is
+  /home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_native_fiog_revalidation.png;
+  visual inspection found coherent full-colour output with no strobe,
+  monochrome image, or extent corruption. The initial inactive-window
+  suspension was intentional and cleared before the active diagnostic state.
+
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
   and player tree agree with the live ebuild's paths; it enables and checks all
