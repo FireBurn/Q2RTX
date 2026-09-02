@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-01, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-02, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -81,6 +81,11 @@ Current truth:
   repeat 3.1.5 + SDK-3.1.6 `base1 -> base2` run was validation-clean and its
   full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_map_transition_fiog.png`.
+  A repeat on 2026-09-02, after the non-oscillating rate-gate repair, again
+  reached active FI/OF on `base2`: the contract recorded reset `0x844`, then
+  history-valid v11/frame 1489, logical cadence 55.6 FPS with the explicit
+  zero-FPS test threshold, and no VUID, FSR, dispatch, or presenter error.
+  The same capture is visibly full-colour and coherent at 62 FPS.
 
 - The reusable presenter now carries acquisition through to an immutable
   ordered present plan. `ffxVkFrameGenerationBuildPresentPlan` produces either
