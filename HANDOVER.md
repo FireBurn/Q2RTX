@@ -976,11 +976,12 @@ Current truth:
   selected RDNA2 adapter `1002:73df` listed analytical upscaler providers
   3.1.5 and 2.3.4, one 3.1.6 frame-generation provider, and no
   denoiser/Ray-Regeneration provider. Creating a 4.1.1 API context selected
-  3.1.5 and one 640x360 -> 1280x720 dispatch succeeded. It generated 11 paired
-  DXIL/SPIR-V capture artifacts and recorded 25 provider-owned D3D12 resource
-  allocations outside the repo. This is direct evidence that the current
-  official path falls back to analytical FSR3 on RDNA2; it is not neural FSR4.
-  See tools/ffx_dxil/reference_harness/.
+  3.1.5 and one 640x360 -> 1280x720 auto-exposure-enabled metadata dispatch
+  succeeded without an FFX warning. It generated 11 paired DXIL/SPIR-V capture
+  artifacts and recorded 25 provider-owned D3D12 resource allocations outside
+  the repo. This is direct evidence that the current official path falls back
+  to analytical FSR3 on RDNA2; it is not neural FSR4. See
+  tools/ffx_dxil/reference_harness/.
 - Following that measured resource query, Q2RTX's FSR3 context now enables its
   internal auto-exposure graph rather than passing a null external exposure
   image. A fresh 28-second 1280x720 RX 6800M Vulkan-validation run recreated

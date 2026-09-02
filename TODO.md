@@ -589,7 +589,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   a missing denoiser header rather than guessing a private ABI value. A fresh
   full-SDK 2.3.0/Wine-vkd3d run on selected RDNA2 adapter `1002:73df` listed
   3.1.5/2.3.4 upscalers, 3.1.6 frame generation, and no denoiser/RR provider;
-  the 4.1.1 context selected analytical 3.1.5.
+  the 4.1.1 context selected analytical 3.1.5 and its auto-exposure-enabled
+  metadata dispatch completed without an FFX warning, producing 11 paired
+  DXIL/SPIR-V captures outside the tree.
 - [-] Capture PSO/root signatures, resources/views, constants, uploads, pass
   order, dispatch dimensions, barriers, provider version, and feature queries.
   The controlled RX 6800M capture has the selected provider, a successful
