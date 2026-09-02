@@ -20,6 +20,15 @@ Current truth:
   Both full-SDK and deliberately reduced source-closure MinGW builds pass with
   warnings promoted to errors.
 
+- Official sources were rechecked on 2026-09-02: FSR SDK 2.3 remains the
+  current release, still marks SDK Vulkan support as unsupported, lists FSR
+  Upscaling 4.1.1 for RX 7000-series discrete/RX 9000+ GPUs, and documents
+  analytical FSR Frame Generation 3.1.6 as the automatic fallback on other
+  hardware. There is therefore no newer official native-Vulkan/RDNA2 neural
+  provider to integrate. Sources:
+  https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK and
+  https://gpuopen.com/amd-fsr-sdk/.
+
 - Vulkan device-group enumeration now correctly accepts `VK_INCOMPLETE` when
   Q2RTX asks for only its selected first group. A fresh SLI-enabled startup
   reported `using device group 0 with 1 device(s)` without the former false
