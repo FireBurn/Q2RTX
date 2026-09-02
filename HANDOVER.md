@@ -35,6 +35,16 @@ Current truth:
   no VUID/FSR/dispatch/presenter error, and a coherent full-colour capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR3_FG_colour_after_rr.png`.
 
+- Frame generation now consumes real SDL/Wayland focus changes rather than
+  retaining a compositor-deferred generated/real pair. It suspends paired
+  presentation while inactive and requests the new temporal reset bit
+  `VKPT_TEMPORAL_RESET_FOCUS_CHANGED` (`0x1000`) on both focus edges. A
+  2026-09-02 KWin virtual-desktop round-trip on RX 6800M logged the inactive
+  suspension, reset at frame 1080, then active history-valid SDK-3.1.6 FI/OF
+  at frame 1209 with no VUID, FSR, dispatch, or presenter error. The recovered
+  capture is full-colour and coherent:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_focus_loss_recovery.png`.
+
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
   guarded SDK-3.1.6 attempt, entered the correct fallback, then stayed blocked

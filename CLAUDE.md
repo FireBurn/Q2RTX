@@ -208,6 +208,10 @@ Q2RTX signal conventions currently exposed by the contract:
   `VKPT_TEMPORAL_RESET_CAMERA_CUT` for conservative teleport, >90-degree
   transform, or substantial lens discontinuities. Do not turn ordinary
   motion-vector reprojection into a reset.
+- A Wayland/SDL focus transition must suspend paired analytical presentation
+  and request `VKPT_TEMPORAL_RESET_FOCUS_CHANGED` on both edges. The first
+  recovered pair uses the real scene to seed fresh FI/OF history; never
+  interpolate across a compositor-deferred presentation gap.
 - A dedicated alpha UI texture is available for analytical frame generation;
   the full Ray Regeneration signal set is not.
 - Non-rectilinear projections must fall back to the existing renderer.

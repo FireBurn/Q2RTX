@@ -522,8 +522,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   active generated presentation with a coherent base2 frame and no validation
   or dispatch error. A paused Video menu now prevents two-image acquisition,
   publishes an inactive/zero-cadence status, resets history, and resumes a
-  clean active presenter on return. Camera-cut, alt-tab/loading, low-FPS, and
-  pacing coverage remain.
+  clean active presenter on return. A real KWin Wayland virtual-desktop
+  focus-loss/recovery test now suspends paired presentation, records reset
+  `0x1000`, and returns to active FI/OF with a coherent capture. Loading,
+  low-FPS, and VRR/pacing coverage remain.
 - [-] Validate frame interpolation at >=60 rendered FPS, including camera
   cuts, alt-tab, loading, and low-FPS hysteresis.
   The presenter's HDR mode now matches its post-tone-map HUDless source, and

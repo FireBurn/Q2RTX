@@ -860,6 +860,13 @@ once to let WSI consume the old mode's binary present wait. This happens only
 on transitions such as opening/closing a menu, rate-gate fallback/recovery, or
 toggling frame generation—not during steady gameplay.
 
+Losing window focus (including an alt-tab or virtual-desktop switch) also
+suspends paired presentation and uses the ordinary single-image path. Q2RTX
+resets the temporal and FI/OF histories on both focus edges; when focus returns,
+the first eligible pair presents the real scene to seed fresh history before
+interpolation resumes. The read-only reason reports `suspended: window inactive`
+while this safeguard is in effect.
+
 #### `flt_frame_generation_backend`
 
 Selects the FI/OF scheduler while leaving the presentation policy and temporal

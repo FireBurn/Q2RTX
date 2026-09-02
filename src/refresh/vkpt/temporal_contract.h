@@ -63,7 +63,11 @@ typedef enum VkptTemporalResetReasonBits_e {
 	VKPT_TEMPORAL_RESET_PROVIDER_CHANGED     = 1u << 10,
 	/* A discontinuous camera transform, rather than ordinary motion-vector
 	 * reprojection. Consumers must discard temporal/optical-flow history. */
-	VKPT_TEMPORAL_RESET_CAMERA_CUT           = 1u << 11
+	VKPT_TEMPORAL_RESET_CAMERA_CUT           = 1u << 11,
+	/* The application lost or regained input focus.  WSI may have deferred
+	 * presentation while inactive, so neither temporal reconstruction nor
+	 * optical-flow interpolation may reuse the old generated/real pair. */
+	VKPT_TEMPORAL_RESET_FOCUS_CHANGED        = 1u << 12
 } VkptTemporalResetReasonBits;
 
 typedef enum VkptTemporalFrameFlagBits_e {

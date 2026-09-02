@@ -3785,6 +3785,18 @@ R_BeginFrame_RTX(void)
 	 * temporal history.  R_RenderFrame_RTX refines the flag with render_world
 	 * for its post-processing decisions. */
 	qvk.frame_menu_mode = cl_paused->integer == 1 && uis.menuDepth > 0;
+	/* SDL's Wayland backend reports focus transitions through CL_Activate(),
+	 * but an inactive window can retain an old WSI image while the compositor
+	 * throttles it.  Never interpolate across that presentation gap.  A reset
+	 * is requested on both edges so the first restored frame is a real scene
+	 * and FI/OF only resumes after fresh temporal history exists. */
+	const bool framegen_window_active = cls.active == ACT_ACTIVATED;
+	static bool framegen_previous_window_active = true;
+	if (framegen_window_active != framegen_previous_window_active) {
+		framegen_previous_window_active = framegen_window_active;
+		vkpt_temporal_request_reset(VKPT_TEMPORAL_RESET_FOCUS_CHANGED);
+		vkpt_fsr_request_reset();
+	}
 
 	qvk.current_frame_index = qvk.frame_counter % MAX_FRAMES_IN_FLIGHT;
 
@@ -3872,7 +3884,7 @@ R_BeginFrame_RTX(void)
 	 * prerequisites are not met. Three images avoid blocking a two-acquire frame
 	 * behind the presentation engine on minimum-double-buffer swapchains. */
 	const bool framegen_present_was_active = qvk.framegen_present_active;
-	qvk.framegen_present_active = framegen_present_requested && !qvk.frame_menu_mode &&
+	qvk.framegen_present_active = framegen_present_requested && framegen_window_active && !qvk.frame_menu_mode &&
 		qvk.num_swap_chain_images >= qvk.framegen_required_swap_chain_images &&
 		vkpt_fsr_frame_generation_prepare_present();
 	/* A frame-slot fence proves the render submissions completed, but a WSI
@@ -3895,6 +3907,9 @@ R_BeginFrame_RTX(void)
 	else if (qvk.frame_menu_mode)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"paused/menu frame: analytical frame generation suspended");
+	else if (!framegen_window_active)
+		vkpt_fsr_frame_generation_publish_status(false,
+			"suspended: window inactive");
 	else if (qvk.num_swap_chain_images < qvk.framegen_required_swap_chain_images)
 		vkpt_fsr_frame_generation_publish_status(false,
 			"fallback: surface did not provide minImageCount+2 swapchain images");
