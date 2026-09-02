@@ -142,7 +142,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `q2rtx_media.pkz` still contained the obsolete FSR 1.0 controls. Linux
   packaging now preserves NVIDIA's release media archive and updates its
   source-controlled menu/config entries, so it does not silently omit the
-  released texture/model/audio tree.
+  released texture/model/audio tree. A fresh 960x540 Vulkan-validation menu
+  capture with source-v07 FSR4 plus SDK-3.1.6 FI/OF selected is readable and
+  truth-labelled: `FSR4 v07 (experimental)`, separate FSR4 DRS/sharpening,
+  analytical frame generation, 3.1.6 scheduler, and the independent FPS gate
+  are all visible at `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_video_menu_audit.png`.
 - [x] Version and package the complete older source-v07 FSR4 model set: six
   manifest-checked 89,216-byte initializers and six 1,024-byte pre-pass
   weights. The retained `LICENSE-FSR4-v07.txt` records its upstream revision

@@ -65,6 +65,16 @@ Current truth:
   it only as lifecycle evidence; it is not a new in-world image-quality
   comparison.
 
+- The packaged Video menu was re-rendered at 960x540 with source-v07 FSR4 and
+  SDK-3.1.6 FI/OF selected. It visibly labels the active upscaler as `FSR4 v07
+  (experimental)`, keeps DRS and sharpening as distinct FSR4 controls, and
+  identifies the presentation path as analytical frame generation with the
+  3.1.6 scheduler and independent FPS gate. The capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_video_menu_audit.png`.
+  Before opening the menu the log recorded FSR4 at 644x361 -> 960x540 and
+  active FI/OF FIFO presentation; opening the menu correctly suspended paired
+  presentation, with no VUID, FSR, dispatch, or presenter error.
+
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
   guarded SDK-3.1.6 attempt, entered the correct fallback, then stayed blocked
