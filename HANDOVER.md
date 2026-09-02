@@ -107,6 +107,12 @@ Current truth:
   self-contained: copying only `examples/installed-full-stack` to a temporary
   directory and building it against the prefix succeeds, rather than compiling
   a source file from its sibling vendored example as it previously did.
+  A repeat of the FSR3.1.5 + SDK-3.1.6 menu-resume smoke on 2026-09-02 also
+  logged the deliberate `paused/menu frame` suspension, reset at frame 1194,
+  and resumed active FI/OF through history-valid frame 1958 at 71.4 logical
+  FPS.  It emitted no VUID, FSR, dispatch, or presenter error and captured a
+  full-colour coherent scene at
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_framegen_menu_resume.png`.
 
 - `extern/ffx-vulkan` is now publication-ready as a standalone Git subtree.
   Its top-level CTest suite now installs the just-built package, copies the
