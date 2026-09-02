@@ -353,6 +353,14 @@ it official FSR4.1.1.
   source closure is compiled with a private `ffxVk315...` prefix because its
   public C symbols otherwise collide with the simultaneously linked 1.1.4
   runtime. The portable ABI intentionally remains versioned and opaque.
+
+  `ffx-vulkan::radiancecache-contract` is intentionally only a public
+  host-buffer contract: it validates the five application-owned buffer roles,
+  their Vulkan access states, finite hyperparameters, and the two 32-bit atomic
+  counters. It must not be presented as Radiance Caching inference, training,
+  sample generation, or an official provider. Q2RTX has no producer for those
+  buffers and must keep the current official-provider diagnostic unavailable
+  on the RX 6800M.
   The fixed Q2-compatible 3.1.5 SPIR-V set is now
   generated under `generated/ffx-2.3.0/vk/fsr3upscaler-q2-v2` (ten pass
   wrappers plus AccumulateSharpen) with a pinned DXC,

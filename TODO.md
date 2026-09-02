@@ -833,5 +833,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The reusable Vulkan subtree now has explicit upstream
   notices, a standalone-CI workflow, and a subtree-split publishing checklist;
   an isolated source copy passed 37/37 redistributable tests plus its installed
-  external consumer. Release packaging and final screenshots remain.
+  external consumer. It also exports `ffx-vulkan::radiancecache-contract`, a
+  strict provider-neutral validation API for application-owned public
+  inference/training buffers and atomic counters; the standalone suite passed
+  38/38 locally and in GitHub Actions run `33665262969`. It does not add an
+  unsupported neural implementation. Release packaging and final screenshots
+  remain.
 - [x] Add `CLAUDE.md`, `TODO.md`, and a live `HANDOVER.md` maintenance rule.

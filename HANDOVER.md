@@ -57,13 +57,14 @@ Current truth:
   change was needed.
 
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
-  `a3480b3f14e493d11387980fe4628feabde87f08` (parent Q2RTX commit
-  `e67626c1`). Its README now correctly describes the implemented,
-  callback-based acquire plus immutable generated-then-real present-plan API;
-  it no longer calls that API pending. The source-tree and installed-consumer
-  CTest suite passed 37/37 immediately before publication. The resulting
-  `portable-vulkan` GitHub Actions run `33613959003` then independently
-  completed configure, build, and test successfully on Ubuntu 24.04.
+  `0725754c39b9e7187d07b9620e4131e2d9bad3d5` (parent Q2RTX commit
+  `1b80d558`). It adds `ffx-vulkan::radiancecache-contract`: a deliberately
+  provider-neutral validator for application-owned inference, training, and
+  two-counter buffers. It neither generates samples nor supplies neural
+  inference/training. The source-tree and installed-consumer CTest suite passed
+  38/38 immediately before publication. GitHub Actions run `33665262969` then
+  independently completed configure, build, and test successfully on Ubuntu
+  24.04.
 
 - A new validation-enabled odd-size FSR4-v07 Quality + RCAS/SPD-auto-exposure
   + SDK-3.1.6 FI/OF lifecycle capture completed 960x540 -> 1133x717 ->
