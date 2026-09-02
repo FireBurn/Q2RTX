@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
+  archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
+  and player tree agree with the live ebuild's paths; it enables and checks all
+  six source-v07 FSR4 model initializer/pre-weight/manifest/SPIR-V sets before
+  and after installation. `bash -n` passed and `pkgcheck` reported only the
+  expected `VisibleVcsPkg` notice for an unkeyworded live ebuild. No ebuild
+  change was needed.
+
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
   `a3480b3f14e493d11387980fe4628feabde87f08` (parent Q2RTX commit
   `e67626c1`). Its README now correctly describes the implemented,

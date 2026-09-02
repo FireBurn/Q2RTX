@@ -712,7 +712,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   its install staged the client, menu/shader archives, and full FSR4-v07
   directory before correctly stopping at the raw checkout's intentionally
   absent `blue_noise.pkz`. `src_prepare` copies that required release asset
-  before the ebuild invokes the install step.
+  before the ebuild invokes the install step. A 2026-09-02 static ebuild audit
+  confirmed the pinned 1.8.0 release archive has the expected `q2rtx/` root
+  and all four imported release-data paths; the ebuild syntax check passed and
+  `pkgcheck` reported only the expected `VisibleVcsPkg` notice for a live
+  `9999` package.
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
