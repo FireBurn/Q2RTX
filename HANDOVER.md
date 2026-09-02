@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
+  `a3480b3f14e493d11387980fe4628feabde87f08` (parent Q2RTX commit
+  `e67626c1`). Its README now correctly describes the implemented,
+  callback-based acquire plus immutable generated-then-real present-plan API;
+  it no longer calls that API pending. The source-tree and installed-consumer
+  CTest suite passed 37/37 immediately before publication. Check the resulting
+  `portable-vulkan` GitHub Actions run before treating the remote update as
+  independently CI-verified.
+
 - A new validation-enabled odd-size FSR4-v07 Quality + RCAS/SPD-auto-exposure
   + SDK-3.1.6 FI/OF lifecycle capture completed 960x540 -> 1133x717 ->
   960x540. The middle recreation selected the exact 760x480 -> 1133x717 graph;
