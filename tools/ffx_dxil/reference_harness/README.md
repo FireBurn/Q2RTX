@@ -41,7 +41,8 @@ its sibling provider DLLs:
       "$PWD/amd_fidelityfx_loader_dx12.dll" --dispatch
 
 The --dispatch option records and waits for one 640x360 -> 1280x720 reset
-frame. It intentionally uses throwaway, undefined input pixels: this is a
+frame. It intentionally uses throwaway, undefined input pixels and enables the
+provider's internal auto-exposure path: this is a validation-clean
 provider-schedule capture, not an image-quality test. Use --provider-index N
 only after recording the enumeration output. It is
 intentional that the probe does not claim FSR 4.1.1 runs on RDNA2: it records

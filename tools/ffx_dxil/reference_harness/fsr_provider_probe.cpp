@@ -428,7 +428,11 @@ bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
 
     create.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE;
     create.header.pNext = &backend.header;
+    /* The synthetic dispatch intentionally has no application exposure image.
+     * Request the provider's documented internal auto-exposure path so the
+     * capture records a clean valid dispatch instead of an avoidable warning. */
     create.flags = FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE |
+        FFX_UPSCALE_ENABLE_AUTO_EXPOSURE |
         FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
     create.maxRenderSize = {640, 360};
     create.maxUpscaleSize = {1280, 720};
