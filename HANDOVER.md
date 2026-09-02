@@ -60,6 +60,10 @@ Current truth:
   RR complete-binding preflight as valid (`issues=0x0`). Root CTest now has a
   target-isolation gate and passed 4/4; no VUID, FSR, dispatch, or presenter
   error was logged.
+  The same output target was then exercised with the public-SDK FSR3.1.5
+  Vulkan upscaler plus SDK-3.1.6 FI/OF. Both paths became active, the RR
+  binding preflight stayed valid, and the independent clean capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_framegen_target_isolation_control.png`.
 
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
