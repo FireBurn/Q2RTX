@@ -449,6 +449,32 @@ IF(IS_64_BIT)
 
     add_custom_target(shaders DEPENDS ${shader_bytecode})
 
+    # The global image table is an ABI: inserting an image shifts all sampled
+    # TEX_* bindings. Validate the generated binary modules before any package
+    # script archives them, so an old shader cache/archive cannot be shipped
+    # with the new host descriptor layout.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_custom_target(shader_global_texture_abi
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_global_texture_shader_abi.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/shader/global_textures.h
+                ${CMAKE_SOURCE_DIR}/baseq2/shader_vkpt
+            DEPENDS ${shader_bytecode}
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_global_texture_shader_abi.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/shader/global_textures.h
+            COMMENT "Verifying global texture bindings in compiled SPIR-V"
+            VERBATIM)
+        add_dependencies(shaders shader_global_texture_abi)
+        if(BUILD_TESTING)
+            add_test(NAME global_texture_shader_abi
+                COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_global_texture_shader_abi.py
+                    ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/shader/global_textures.h
+                    ${CMAKE_SOURCE_DIR}/baseq2/shader_vkpt)
+        endif()
+    endif()
+
     if(TARGET glslang-standalone)
         add_dependencies(shaders glslang-standalone)
     endif()

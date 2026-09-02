@@ -510,3 +510,15 @@ The primary test GPU is an RX 6800M (NAVI22/RDNA2) using RADV.  It exposes
 FP16, INT8, signed integer dot product, timeline semaphore, synchronization2,
 and the required compute-derivative feature.  Capability presence does not
 imply official AMD support or image correctness.
+
+## Generated Q2RTX shader-table ABI
+
+`global_textures.h` is a host/SPIR-V ABI, not merely a shared include.  The
+sampled `TEX_*` bindings begin immediately after the global `IMG_*` storage
+image table, so adding or reordering an image changes every sampled framebuffer
+binding.  `shader_global_texture_abi` reflects the generated `shader_vkpt/*.spv`
+modules and rejects an old table.  Keep `compileShaders.cmake`'s output-clean
+stamp and `setup/package_shaders.cmake`'s fresh-archive behavior: incremental
+`7z a` archives and loose user shader caches can otherwise retain modules built
+against a previous table.  Bump the launcher shader-layout marker whenever this
+table changes; it preserves the old loose cache as a recoverable backup.

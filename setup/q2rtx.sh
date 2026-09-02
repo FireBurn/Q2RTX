@@ -50,16 +50,16 @@ fi
 # a recoverable backup, then let the packaged archive supply the matching
 # shaders. Set Q2RTX_SKIP_SHADER_CACHE_MIGRATION=1 only when maintaining a
 # matching custom shader set manually.
-SHADER_LAYOUT_REVISION="Q2RTX shader layout revision: 2026-08-rr-motion-v2"
+SHADER_LAYOUT_REVISION="Q2RTX shader layout revision: 2026-09-framegen-output-v3"
 SHADER_LAYOUT_MARKER="${XDG_DATA_HOME}/quake2rtx/baseq2/.q2rtx_shader_layout_revision"
 SHADER_DEST="${XDG_DATA_HOME}/quake2rtx/baseq2/shader_vkpt"
 if [[ "${Q2RTX_SKIP_SHADER_CACHE_MIGRATION:-0}" != "1" ]] && \
 	{ [[ ! -f "${SHADER_LAYOUT_MARKER}" ]] ||
 	  ! grep -Fqx "${SHADER_LAYOUT_REVISION}" "${SHADER_LAYOUT_MARKER}"; }; then
 	if [[ -d "${SHADER_DEST}" ]]; then
-		SHADER_BACKUP="${SHADER_DEST}.pre-2026-08-rr-motion-v2"
+		SHADER_BACKUP="${SHADER_DEST}.pre-2026-09-framegen-output-v3"
 		if [[ -e "${SHADER_BACKUP}" ]]; then
-			SHADER_BACKUP="${SHADER_DEST}.pre-2026-08-rr-motion-v2-$(date +%s)"
+			SHADER_BACKUP="${SHADER_DEST}.pre-2026-09-framegen-output-v3-$(date +%s)"
 		fi
 		mv "${SHADER_DEST}" "${SHADER_BACKUP}"
 	fi

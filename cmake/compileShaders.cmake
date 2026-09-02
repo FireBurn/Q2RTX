@@ -45,6 +45,21 @@ endif()
 set(COMPILE_ARGS_DEP "${CMAKE_BINARY_DIR}/compile_shader.dep")
 file(CONFIGURE OUTPUT "${COMPILE_ARGS_DEP}" CONTENT "@GLSLANG_ARGS@")
 
+# All framebuffer sampler bindings live after the global storage-image table.
+# A change to a shared shader header can therefore alter the ABI of every
+# generated module.  Keep the output directory as a generated unit whenever a
+# common dependency changes; otherwise obsolete modules from an older table can
+# survive and be picked up by the package archive.
+set(SHADER_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/baseq2/shader_vkpt")
+set(SHADER_OUTPUT_CLEAN_STAMP "${CMAKE_BINARY_DIR}/shader_output_clean.stamp")
+add_custom_command(
+    OUTPUT "${SHADER_OUTPUT_CLEAN_STAMP}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${SHADER_OUTPUT_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADER_OUTPUT_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E touch "${SHADER_OUTPUT_CLEAN_STAMP}"
+    DEPENDS ${SHADER_SOURCE_DEPENDENCIES} "${COMPILE_ARGS_DEP}"
+    COMMENT "Refreshing generated Q2RTX shader ABI output")
+
 function(compile_shader)
     set(options "")
     set(oneValueArgs SOURCE_FILE OUTPUT_FILE_NAME OUTPUT_FILE_LIST STAGE)
@@ -75,7 +90,7 @@ function(compile_shader)
     
     set_source_files_properties(${src_file} PROPERTIES VS_TOOL_OVERRIDE "None")
 
-    set (out_dir "${CMAKE_SOURCE_DIR}/baseq2/shader_vkpt")
+    set (out_dir "${SHADER_OUTPUT_DIR}")
     set (out_file "${out_dir}/${output_file_name}.spv")
     
     set(glslang_command_line
@@ -94,6 +109,7 @@ function(compile_shader)
                        DEPENDS ${src_file}
                        DEPENDS ${SHADER_SOURCE_DEPENDENCIES}
                        DEPENDS ${COMPILE_ARGS_DEP}
+                       DEPENDS ${SHADER_OUTPUT_CLEAN_STAMP}
                        MAIN_DEPENDENCY ${src_file}
                        COMMAND ${CMAKE_COMMAND} -E make_directory ${out_dir}
                        COMMAND ${GLSLANG_COMPILER} ${glslang_command_line})
