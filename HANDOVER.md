@@ -75,6 +75,13 @@ Current truth:
   active FI/OF FIFO presentation; opening the menu correctly suspended paired
   presentation, with no VUID, FSR, dispatch, or presenter error.
 
+- The standalone `FSR-Vulkan` README now opens with a feature-availability
+  matrix: runnable FSR3 upscaling/FI-OF, experimental source-v07 FSR4,
+  provider-neutral RR validation, and the explicit absence of official
+  FSR4.1.1/MLFG/RR DX12 binaries. This makes the reusable project's boundary
+  clear before integration. The current standalone build and full CTest suite
+  pass 37/37 before publication.
+
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
   guarded SDK-3.1.6 attempt, entered the correct fallback, then stayed blocked
