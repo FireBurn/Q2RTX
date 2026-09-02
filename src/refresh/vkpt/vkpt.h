@@ -849,6 +849,7 @@ extern cvar_t *cvar_flt_upscaler_reason;
 extern cvar_t *cvar_flt_fsr4_official_provider_reason;
 extern cvar_t *cvar_flt_ray_regeneration_provider_reason;
 extern cvar_t *cvar_flt_ml_frame_generation_provider_reason;
+extern cvar_t *cvar_flt_radiance_caching_provider_reason;
 void vkpt_fsr_request_reset(void);
 VkResult vkpt_fsr_initialize(void);
 VkResult vkpt_fsr_destroy(void);

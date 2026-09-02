@@ -234,6 +234,8 @@ begin temporal_diagnostics
         "official Ray Regeneration" flt_ray_regeneration_provider_reason
     static --width 52 --status "official neural ML Frame Generation availability; the active FSR3 FI/OF option is analytical, not MLFG" \
         "official ML Frame Generation" flt_ml_frame_generation_provider_reason
+    static --width 52 --status "official Radiance Caching availability; the SDK provider is signed DX12 and no native Vulkan path is supplied" \
+        "official Radiance Caching" flt_radiance_caching_provider_reason
     static --width 12 "rendered FPS" flt_frame_generation_rendered_fps
     static --width 12 "generated FPS" flt_frame_generation_generated_fps
     action "back" popmenu

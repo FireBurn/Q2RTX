@@ -15,6 +15,8 @@ REQUIRED_ROWS = (
      "unavailable: signed DX12 provider (RX 9000+)"),
     ("official ML Frame Generation", "flt_ml_frame_generation_provider_reason",
      "unavailable: signed DX12 provider (RX 9000+)"),
+    ("official Radiance Caching", "flt_radiance_caching_provider_reason",
+     "unavailable: signed DX12 provider (RX 9000+)"),
 )
 
 
@@ -56,7 +58,7 @@ def main() -> int:
     except (OSError, ValueError) as error:
         print(f"Temporal provider-status verification failed: {error}", file=sys.stderr)
         return 1
-    print("Temporal provider-status verification passed: 3 official-provider rows")
+    print("Temporal provider-status verification passed: 4 official-provider rows")
     return 0
 
 

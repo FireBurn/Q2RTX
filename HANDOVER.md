@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- AMD's current official SDK 2.3 page was rechecked after the native runtime
+  validation. It lists FSR Upscaling 4.1.1, Frame Generation 4.0.1, Ray
+  Regeneration 1.2.0, and Radiance Caching 0.9.0; only the analytical FSR3
+  paths cover RDNA2. The first three new effects remain signed DX12 binaries,
+  and Radiance Caching also requires an RX 9000-class GPU. Q2RTX now exposes a
+  fourth read-only temporal-diagnostics row for official Radiance Caching,
+  alongside FSR4.1.1, RR, and MLFG, so the menu covers the full current SDK
+  feature list without implying an unsupported native Vulkan implementation.
+
 - The community RDNA2 FSR4 route has now been isolated and tested without
   touching the game, SDK, or Proton cache. A new source-only legacy API probe
   is required because that source-v07 SDK is ABI-incompatible with the SDK
