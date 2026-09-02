@@ -160,6 +160,9 @@ Current truth:
   The reviewed release split was published to
   `https://github.com/FireBurn/FSR-Vulkan` `main` at `0411b8d8` on
   2026-09-01; it built cleanly and passed all 36 redistributable CTests.
+  The current reviewed split was pushed on 2026-09-02 at `132a44d7`; it adds
+  the platform-neutral presentation-availability lifecycle helper and its
+  direct plus installed-consumer coverage, without adding any payloads.
   The parent Q2RTX tree was rebuilt after the installed-consumer test was
   added, and its root CTest checks passed 2/2 (`fsr4_schedule` and
   `fsr4_v07_assets`) on 2026-08-31. A fresh 2026-09-02 verification of the
