@@ -64,6 +64,12 @@ Current truth:
   Vulkan upscaler plus SDK-3.1.6 FI/OF. Both paths became active, the RR
   binding preflight stayed valid, and the independent clean capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_framegen_target_isolation_control.png`.
+  A local KWin one-shot activation then exercised the focused-to-inactive
+  reset boundary on source-v07 FSR4; the resulting clean capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_focus_transition_clean.png`.
+  The headless test terminal immediately reclaimed focus, so this is evidence
+  for the safe transition only, not a replacement for an interactive sustained
+  focused-present soak.
 
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
