@@ -101,6 +101,10 @@ Current truth:
   wrote no VUID, FSR, or presentation-plan error, and exited normally. The
   full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_camera_cut_fiog.png`.
+  A post-rate-gate repeat on 2026-09-02 consumed the simulated camera-cut reset
+  `0x800` at frame 402 and returned to active, history-valid FI/OF by frame
+  1167 at 71.4 logical FPS.  Vulkan validation remained clean and its 74-FPS
+  capture is likewise full-colour and coherent.
   Both redistributable consumers also now execute this API: the small C
   FSR4/presenter consumer and C++ full FSR3/FSR4 stack configured, linked, and
   ran against an isolated freshly installed prefix. The latter is now actually
