@@ -65,3 +65,13 @@ and report its selected provider. With the full SDK headers,
 These creation probes record allocation metadata but intentionally do not
 dispatch a synthetic neural frame or denoising workload. They are provider
 availability tests, not image-quality tests.
+
+Every invocation ends with one stable `FFX_PROVIDER_PROBE_RESULT` line for
+each of `upscaler`, `frame-generation`, and `ray-regeneration`.  The fields
+record whether that effect was requested, its create/query return values, and
+the provider actually selected.  `4294967295` means no query was possible
+(for example, creation returned `FFX_API_RETURN_NO_PROVIDER`); it is not a
+provider version.  These records are intended for future compatible-adapter
+revalidation scripts: require a successful create and query, then inspect the
+selected name/ID rather than treating a successful request for a 4.x API as
+proof that its neural provider was used.

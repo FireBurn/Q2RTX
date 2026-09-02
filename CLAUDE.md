@@ -293,7 +293,10 @@ creates a Frame Generation 4 context and, with the full SDK's
 `ffx_denoiser.h`, a Ray Regeneration 1.2 context independently before querying
 the selected provider. The deliberately reduced vendored source closure omits
 that header, and its build must report the omission rather than manufacture an
-internal provider type.
+internal provider type. Every run ends with stable
+`FFX_PROVIDER_PROBE_RESULT` records; future hardware/driver revalidation must
+use their actual selected names/IDs and return codes, not only a successful 4.x
+API-context creation.
 
 FSR3 analytical upscaling/frame interpolation has public source and is the
 highest-confidence native-Vulkan path for RDNA2.  The old AMD Vulkan

@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The source-only official-provider probe now ends every run with stable
+  `FFX_PROVIDER_PROBE_RESULT` records for upscaling, frame generation, and
+  Ray Regeneration. A freshly cross-compiled full-SDK 2.3 run on RDNA2 recorded
+  successful 4.1.1/4.0.1 context creation but selected analytical `3.1.5` and
+  `3.1.6`; RR creation returned `4` with no queryable provider. Future
+  compatible-hardware revalidation must preserve these records and compare the
+  selected name/ID, rather than equating 4.x API creation with neural support.
+  Both full-SDK and deliberately reduced source-closure MinGW builds pass with
+  warnings promoted to errors.
+
 - Vulkan device-group enumeration now correctly accepts `VK_INCOMPLETE` when
   Q2RTX asks for only its selected first group. A fresh SLI-enabled startup
   reported `using device group 0 with 1 device(s)` without the former false

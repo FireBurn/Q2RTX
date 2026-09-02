@@ -43,6 +43,17 @@ struct FfxFunctions {
     PfnFfxDispatch dispatch = nullptr;
 };
 
+/* Keep a deliberately small, machine-readable record of a create operation.
+ * This is more useful than inferring feature support from the requested API
+ * version: the loader is permitted to select an older analytical provider. */
+struct ProviderSelection {
+    bool attempted = false;
+    uint32_t create_result = UINT32_MAX;
+    uint32_t query_result = UINT32_MAX;
+    uint64_t version_id = 0;
+    char version_name[128] = {};
+};
+
 ID3D12Device* g_provider_allocation_device = nullptr;
 
 void print_hr(const char* operation, HRESULT hr)
@@ -417,7 +428,7 @@ cleanup:
 }
 
 bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
-    uint64_t version_id, bool dispatch)
+    uint64_t version_id, bool dispatch, ProviderSelection* selection)
 {
     ffxCreateContextDescUpscale create = {};
     ffxCreateBackendDX12Desc backend = {};
@@ -458,20 +469,32 @@ bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
         version.header.pNext = &override_version.header;
     }
 
+    if (selection)
+        selection->attempted = true;
     g_provider_allocation_device = device;
     const ffxReturnCode_t result = functions.createContext(
         &context, &create.header, nullptr);
+    if (selection)
+        selection->create_result = result;
     std::printf("ffxCreateContext(FSR API %u.%u.%u%s) returned %u\n",
         FFX_UPSCALER_VERSION_MAJOR, FFX_UPSCALER_VERSION_MINOR,
         FFX_UPSCALER_VERSION_PATCH, version_id ? ", explicit provider" : "",
         result);
-    if (result != FFX_API_RETURN_OK)
+    if (result != FFX_API_RETURN_OK) {
+        g_provider_allocation_device = nullptr;
         return false;
+    }
 
     ffxQueryGetProviderVersion provider_version = {};
     provider_version.header.type = FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION;
     const ffxReturnCode_t query_result = functions.query(&context,
         &provider_version.header);
+    if (selection) {
+        selection->query_result = query_result;
+        selection->version_id = provider_version.versionId;
+        std::snprintf(selection->version_name, sizeof(selection->version_name), "%s",
+            provider_version.versionName ? provider_version.versionName : "(unnamed)");
+    }
     std::printf("ffxQuery(GetProviderVersion) returned %u: id=0x%016" PRIx64
         " name=%s\n", query_result, provider_version.versionId,
         provider_version.versionName ? provider_version.versionName : "(unnamed)");
@@ -494,12 +517,18 @@ bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
 }
 
 bool report_selected_provider(const FfxFunctions& functions, ffxContext* context,
-    const char* effect_name)
+    const char* effect_name, ProviderSelection* selection)
 {
     ffxQueryGetProviderVersion provider_version = {};
     provider_version.header.type = FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION;
     const ffxReturnCode_t query_result = functions.query(context,
         &provider_version.header);
+    if (selection) {
+        selection->query_result = query_result;
+        selection->version_id = provider_version.versionId;
+        std::snprintf(selection->version_name, sizeof(selection->version_name), "%s",
+            provider_version.versionName ? provider_version.versionName : "(unnamed)");
+    }
     std::printf("ffxQuery(GetProviderVersion, %s) returned %u: id=0x%016" PRIx64
         " name=%s\n", effect_name, query_result, provider_version.versionId,
         provider_version.versionName ? provider_version.versionName : "(unnamed)");
@@ -507,7 +536,7 @@ bool report_selected_provider(const FfxFunctions& functions, ffxContext* context
 }
 
 bool create_framegeneration_context(const FfxFunctions& functions,
-    ID3D12Device* device)
+    ID3D12Device* device, ProviderSelection* selection)
 {
     ffxCreateContextDescFrameGeneration create = {};
     ffxCreateBackendDX12Desc backend = {};
@@ -531,9 +560,13 @@ bool create_framegeneration_context(const FfxFunctions& functions,
     allocation_callbacks.pfnFfxResourceAllocator = provider_resource_allocate;
     allocation_callbacks.pfnFfxResourceDeallocator = provider_resource_deallocate;
 
+    if (selection)
+        selection->attempted = true;
     g_provider_allocation_device = device;
     const ffxReturnCode_t result = functions.createContext(
         &context, &create.header, nullptr);
+    if (selection)
+        selection->create_result = result;
     std::printf("ffxCreateContext(Frame Generation API %u.%u.%u) returned %u\n",
         FFX_FRAMEGENERATION_VERSION_MAJOR, FFX_FRAMEGENERATION_VERSION_MINOR,
         FFX_FRAMEGENERATION_VERSION_PATCH, result);
@@ -542,7 +575,7 @@ bool create_framegeneration_context(const FfxFunctions& functions,
         return false;
     }
     const bool query_success = report_selected_provider(functions, &context,
-        "frame-generation");
+        "frame-generation", selection);
     const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
     g_provider_allocation_device = nullptr;
     std::printf("ffxDestroyContext(frame-generation) returned %u\n", destroy_result);
@@ -550,7 +583,8 @@ bool create_framegeneration_context(const FfxFunctions& functions,
 }
 
 #if FFX_PROVIDER_PROBE_HAS_DENOISER
-bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device)
+bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device,
+    ProviderSelection* selection)
 {
     ffxCreateContextDescDenoiser create = {};
     ffxCreateBackendDX12Desc backend = {};
@@ -570,9 +604,13 @@ bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device
     allocation_callbacks.pfnFfxResourceAllocator = provider_resource_allocate;
     allocation_callbacks.pfnFfxResourceDeallocator = provider_resource_deallocate;
 
+    if (selection)
+        selection->attempted = true;
     g_provider_allocation_device = device;
     const ffxReturnCode_t result = functions.createContext(
         &context, &create.header, nullptr);
+    if (selection)
+        selection->create_result = result;
     std::printf("ffxCreateContext(Ray Regeneration API %u.%u.%u) returned %u\n",
         FFX_DENOISER_VERSION_MAJOR, FFX_DENOISER_VERSION_MINOR,
         FFX_DENOISER_VERSION_PATCH, result);
@@ -581,7 +619,7 @@ bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device
         return false;
     }
     const bool query_success = report_selected_provider(functions, &context,
-        "denoiser/ray-regeneration");
+        "denoiser/ray-regeneration", selection);
     const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
     g_provider_allocation_device = nullptr;
     std::printf("ffxDestroyContext(denoiser/ray-regeneration) returned %u\n",
@@ -589,6 +627,25 @@ bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device
     return query_success && destroy_result == FFX_API_RETURN_OK;
 }
 #endif
+
+void print_selection_summary(const char* effect, const ProviderSelection& selection)
+{
+    char name[sizeof(selection.version_name)] = {};
+    for (size_t index = 0; index < sizeof(name) - 1 && selection.version_name[index];
+         ++index) {
+        const unsigned char c = static_cast<unsigned char>(selection.version_name[index]);
+        name[index] = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'
+            ? static_cast<char>(c)
+            : '_';
+    }
+    std::printf("FFX_PROVIDER_PROBE_RESULT effect=%s attempted=%u "
+                "create_return=%" PRIu32 " query_return=%" PRIu32
+                " selected_id=0x%016" PRIx64 " selected_name=%s\n",
+        effect, selection.attempted ? 1u : 0u, selection.create_result,
+        selection.query_result, selection.version_id,
+        name[0] ? name : "none");
+}
 
 void print_usage(const wchar_t* executable)
 {
@@ -675,6 +732,9 @@ int wmain(int argc, wchar_t** argv)
     std::printf("ray-regeneration providers: not queried (full SDK denoiser header unavailable)\n");
 #endif
 
+    ProviderSelection upscaler_selection;
+    ProviderSelection framegeneration_selection;
+    ProviderSelection denoiser_selection;
     bool success = true;
     if (create) {
         if (provider_index != UINT64_MAX && provider_index >= provider_ids.size()) {
@@ -684,20 +744,26 @@ int wmain(int argc, wchar_t** argv)
         } else {
             const uint64_t provider_id = provider_index == UINT64_MAX
                 ? 0 : provider_ids[static_cast<size_t>(provider_index)];
-            success = create_fsr411_context(functions, device, provider_id, dispatch);
+            success = create_fsr411_context(functions, device, provider_id, dispatch,
+                &upscaler_selection);
         }
     }
     if (create_framegeneration)
-        success = create_framegeneration_context(functions, device) && success;
+        success = create_framegeneration_context(functions, device,
+            &framegeneration_selection) && success;
     if (create_denoiser) {
 #if FFX_PROVIDER_PROBE_HAS_DENOISER
-        success = create_denoiser_context(functions, device) && success;
+        success = create_denoiser_context(functions, device, &denoiser_selection) && success;
 #else
         std::fprintf(stderr,
             "Cannot create Ray Regeneration context: full SDK denoiser header unavailable.\n");
         success = false;
 #endif
     }
+
+    print_selection_summary("upscaler", upscaler_selection);
+    print_selection_summary("frame-generation", framegeneration_selection);
+    print_selection_summary("ray-regeneration", denoiser_selection);
 
     FreeLibrary(module);
     device->Release();

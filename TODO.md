@@ -597,7 +597,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   metadata dispatch completed without an FFX warning, producing 11 paired
   DXIL/SPIR-V captures outside the tree. The explicit Frame Generation 4.0.1
   context likewise selected analytical 3.1.6, while the Ray Regeneration 1.2
-  context returned `FFX_API_RETURN_NO_PROVIDER` (4).
+  context returned `FFX_API_RETURN_NO_PROVIDER` (4). The probe now emits one
+  stable `FFX_PROVIDER_PROBE_RESULT` line per effect, recording attempted,
+  create/query return values, and selected name/ID. A fresh full-SDK run
+  recorded `3.1.5` for upscaling, `3.1.6` for frame generation, and no
+  queryable RR provider after return `4`; use this record format whenever a
+  compatible adapter/driver becomes available.
 - [-] Capture PSO/root signatures, resources/views, constants, uploads, pass
   order, dispatch dimensions, barriers, provider version, and feature queries.
   The controlled RX 6800M capture has the selected provider, a successful
