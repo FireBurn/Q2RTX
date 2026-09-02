@@ -453,7 +453,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FI/OF at 66.7 logical FPS, with no VUID, FSR, dispatch, or presenter error
   and a coherent capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_weapon_emissive_fiog.png`.
-  Physical-input and broader image-quality coverage remain.
+  A post-load KWin virtual-desktop focus-loss/recovery repeat on 2026-09-02
+  had SDK-3.1.6 FI/OF active before the switch and recorded the expected
+  focus reset `0x1000` at frame 879 with no Vulkan-validation, FSR, dispatch,
+  or presenter error. Its scripted final screenshot is the standard Q2 menu,
+  so it verifies lifecycle safety only rather than image quality. Physical
+  input and broader image-quality coverage remain.
 - [x] Expose shared FSR3/FSR4 Native AA, Quality, Balanced, Performance, and
   Ultra Performance discrete render-ratio presets. FSR4 v07 selects a matching
   separately compiled model, rather than one graph at arbitrary scale.

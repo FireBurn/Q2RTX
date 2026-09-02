@@ -57,6 +57,13 @@ Current truth:
   installed full-stack consumer both pass, so non-Q2 Vulkan hosts can reset
   all temporal providers on focus/visibility/WSI availability changes without
   importing SDL or KWin details.
+  A second post-load KWin virtual-desktop round-trip was performed after the
+  current standalone and Q2RTX suites passed (2026-09-02): SDK-3.1.6 was
+  active before the switch, the inactive/active edges produced reset `0x1000`
+  at frame 879, and no Vulkan-validation, FSR, dispatch, or presenter error
+  was logged. Its scripted final screenshot is the ordinary Q2 menu, so retain
+  it only as lifecycle evidence; it is not a new in-world image-quality
+  comparison.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
