@@ -303,6 +303,12 @@ IF(BUILD_TESTING)
                 ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_temporal_provider_status.py
                 ${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu
                 ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr.c)
+        add_test(NAME framegen_target_isolation
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_framegen_target_isolation.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/shader/global_textures.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/main.c)
     endif()
 ENDIF()
 

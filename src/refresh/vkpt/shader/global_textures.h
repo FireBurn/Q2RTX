@@ -115,8 +115,16 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	 * current signed linear view-Z delta. Kept separate from FLAT_MOTION,
 	 * whose Z channel is radial/reflective-denoiser metadata. */ \
 	IMG_DO(TEMPORAL_RR_MOTION, 60, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
+	/* RR takes the R16 blocker distance above as input but emits an R8
+	 * visibility result. Keep this distinct from reactive/composition masks so
+	 * a future provider has a valid output binding without overwriting an
+	 * unrelated temporal input. */ \
+	IMG_DO(TEMPORAL_RR_DOMINANT_LIGHT_DENOISED, 61, R8_UNORM, r8, IMG_WIDTH, IMG_HEIGHT ) \
+	/* Analytical FI/OF presentation output. This must never alias
+	 * FSR_RCAS_OUTPUT: source-v07 FSR4 owns that image as recurrent state. */ \
+	IMG_DO(FSR_FRAMEGEN_OUTPUT, 62, R16G16B16A16_SFLOAT, rgba16f, IMG_WIDTH, IMG_HEIGHT ) \
 
-#define NUM_IMAGES_BASE     61
+#define NUM_IMAGES_BASE     63
 
 #define LIST_IMAGES_A_B \
 	IMG_DO(PT_VISBUF_PRIM_A,          NUM_IMAGES_BASE + 0,  R32G32_UINT,         rg32ui,  IMG_WIDTH_MGPU,      IMG_HEIGHT     ) \

@@ -543,7 +543,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   active generated presentation with a coherent base2 frame and no validation
   or dispatch error. A paused Video menu now prevents two-image acquisition,
   publishes an inactive/zero-cadence status, resets history, and resumes a
-  clean active presenter on return. A real KWin Wayland virtual-desktop
+  clean active presenter on return. The generated presentation target is now
+  explicitly `FSR_FRAMEGEN_OUTPUT`, never `FSR_RCAS_OUTPUT`: FSR4-v07 owns the
+  latter as recurrent state. This fixed the observed FSR4+FI/OF green/white
+  temporal blobs in a fresh RX 6800M capture; root CTest has a static
+  target-isolation gate. A real KWin Wayland virtual-desktop
   focus-loss/recovery test now suspends paired presentation, records reset
   `0x1000`, and returns to active FI/OF with a coherent capture. Loading,
   low-FPS, and VRR/pacing coverage remain.

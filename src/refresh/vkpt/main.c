@@ -4166,7 +4166,7 @@ R_EndFrame_RTX(void)
 		if (frame_ready) {
 			vkpt_final_blit_with_descriptor_slot(generated_cmd,
 				framegen_present_plan.slots[0].useInterpolatedScene
-					? VKPT_IMG_FSR_RCAS_OUTPUT : VKPT_IMG_TAA_OUTPUT,
+					? VKPT_IMG_FSR_FRAMEGEN_OUTPUT : VKPT_IMG_TAA_OUTPUT,
 				qvk.extent_taa_output, false,
 				vkpt_refdef.fd && (vkpt_refdef.fd->rdflags & RDF_UNDERWATER) &&
 				cvar_pt_waterwarp->integer, 1, framegen_alpha_ui_composited);
@@ -4691,7 +4691,7 @@ IMG_ReadPixels_RTX(screenshot_t *s)
 			 * for a direct black-output comparison. */
 			const unsigned int capture_image =
 				cvar_flt_frame_generation_debug_capture->integer == 2
-					? VKPT_IMG_TAA_OUTPUT : VKPT_IMG_FSR_RCAS_OUTPUT;
+					? VKPT_IMG_TAA_OUTPUT : VKPT_IMG_FSR_FRAMEGEN_OUTPUT;
 			debug_image_view = qvk.images_views[capture_image];
 			debug_extent = qvk.extent_unscaled;
 			debug_view = VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT;

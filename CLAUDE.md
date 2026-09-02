@@ -342,6 +342,10 @@ it official FSR4.1.1.
   active; explicit WSI pacing and VRR/VSync policy are still required before
   performance claims. The application must ensure GPU completion before destroying either
   context.
+  `VKPT_IMG_FSR_RCAS_OUTPUT` is source-v07 FSR4 recurrent storage, never an
+  analytical-FI output target. FI/OF must use the dedicated
+  `VKPT_IMG_FSR_FRAMEGEN_OUTPUT` image for its generated presentation; the
+  root `framegen_target_isolation` test enforces this ownership boundary.
   It also contains the exact public SDK v2.3.0 FSR3.1.5 source closure under
   `upstream/ffx-2.3.0`. Its object-only `fsr3-host-3.1.5-scaffold` target and
   graph test remain host-port gates, but the dedicated SDK-2.3 Vulkan

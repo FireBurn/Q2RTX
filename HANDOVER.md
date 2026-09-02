@@ -48,6 +48,19 @@ Current truth:
   monochrome image, or extent corruption. The initial inactive-window
   suspension was intentional and cleared before the active diagnostic state.
 
+- A new FSR4 + SDK-3.1.6 FI/OF visual regression was found and fixed on the
+  RX 6800M. The initial generated capture showed large green/white temporal
+  blobs while the FSR4-only control capture was clean. FI/OF had incorrectly
+  written its generated presentation into `VKPT_IMG_FSR_RCAS_OUTPUT`, which
+  source-v07 FSR4 reserves for recurrent state. It now writes the dedicated
+  `VKPT_IMG_FSR_FRAMEGEN_OUTPUT` image; final blit and debug capture use that
+  same target. The replacement live capture
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_framegen_output_isolation_fix.png` is
+  coherent and full-colour with FSR4 plus FI/OF active. It also records the
+  RR complete-binding preflight as valid (`issues=0x0`). Root CTest now has a
+  target-isolation gate and passed 4/4; no VUID, FSR, dispatch, or presenter
+  error was logged.
+
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
   and player tree agree with the live ebuild's paths; it enables and checks all

@@ -46,8 +46,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
           → vkpt_final_blit()
           → swapchain
 
-    VKPT_IMG_FSR_RCAS_OUTPUT is repurposed as the FSR4 recurrent-state
-    ping-pong buffer managed internally by the FSR4 backend.
+    VKPT_IMG_FSR_RCAS_OUTPUT is reserved for source-v07 FSR4 recurrent state.
+    Analytical FI/OF writes its generated presentation image to the separate
+    VKPT_IMG_FSR_FRAMEGEN_OUTPUT target.
 
     Cvars
     -----
@@ -147,7 +148,7 @@ static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_dilated_motion;
 static FfxVkFsr3_3_1_5Resource fsr3_315_previous_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_output;
-static FfxVkPortableResult fsr3_validate_rayregeneration_inputs(
+static FfxVkPortableResult fsr3_validate_rayregeneration_bindings(
     const VkptTemporalFrame *frame, uint64_t *issues);
 #endif
 
@@ -1385,8 +1386,8 @@ void vkpt_fsr_print_diagnostics(void)
 		{
 			uint64_t rr_issues = 0;
 			const FfxVkPortableResult rr_result =
-				fsr3_validate_rayregeneration_inputs(frame, &rr_issues);
-			Com_Printf("  RR reusable Vulkan preflight: %s (issues=0x%llx%s)\n",
+				fsr3_validate_rayregeneration_bindings(frame, &rr_issues);
+			Com_Printf("  RR reusable Vulkan binding preflight: %s (issues=0x%llx%s)\n",
 				rr_result == FFX_VK_PORTABLE_OK ? "valid" : "rejected",
 				(unsigned long long)rr_issues,
 				(frame->inputs.available_inputs &
@@ -1753,7 +1754,7 @@ vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
                     "analytical frame-generation output is unavailable");
             return false;
         }
-        *image_view = qvk.images_views[VKPT_IMG_FSR_RCAS_OUTPUT];
+        *image_view = qvk.images_views[VKPT_IMG_FSR_FRAMEGEN_OUTPUT];
         *extent = qvk.extent_unscaled;
         return *image_view && extent->width && extent->height;
     }
@@ -1856,12 +1857,38 @@ static FfxVkPortableImage fsr3_temporal_image(
     return result;
 }
 
+/* A future RR provider writes its denoised dominant-light visibility into a
+ * distinct R8 image. It cannot alias Q2RTX's R16 primary-ray blocker distance
+ * input, and it must not borrow the reactive/composition masks. */
+static FfxVkPortableImage fsr3_rayregeneration_output_image(
+    unsigned int image_index, VkFormat format)
+{
+    FfxVkPortableImage result;
+
+    memset(&result, 0, sizeof(result));
+    result.structSize = sizeof(result);
+    result.image = qvk.images[image_index];
+    result.format = format;
+    result.extent.width = qvk.extent_screen_images.width;
+    result.extent.height = qvk.extent_screen_images.height;
+    result.mipCount = 1;
+    result.arrayLayers = 1;
+    result.usage = VK_IMAGE_USAGE_STORAGE_BIT |
+                   VK_IMAGE_USAGE_SAMPLED_BIT |
+                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                   VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    result.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    result.state = FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS;
+    return result;
+}
+
 /* Convert the Q2RTX temporal ABI to the standalone provider-neutral RR ABI.
  * This intentionally only validates metadata: no neural provider is selected,
  * and a future provider remains responsible for recording the read barriers
  * that make these GENERAL-layout producer images COMPUTE_READ. */
 static FfxVkPortableResult
-fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
+fsr3_validate_rayregeneration_bindings(const VkptTemporalFrame *frame,
     uint64_t *issues)
 {
     const uint32_t required_inputs =
@@ -1876,6 +1903,8 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
         VKPT_TEMPORAL_INPUT_RR_INDIRECT_DIFFUSE |
         VKPT_TEMPORAL_INPUT_RR_INDIRECT_SPECULAR;
     FfxVkRayRegenerationInputs inputs;
+    FfxVkRayRegenerationOutputs outputs;
+    FfxVkPortableResult result;
 
     if (!issues)
         return FFX_VK_PORTABLE_ERROR_INVALID_POINTER;
@@ -1960,7 +1989,31 @@ fsr3_validate_rayregeneration_inputs(const VkptTemporalFrame *frame,
         inputs.dominantLightEmission.z = dominant->emission[2];
         inputs.dominantLightAngularRadius = dominant->angular_radius_radians;
     }
-    return ffxVkRayRegenerationValidateInputs(&inputs, issues);
+    result = ffxVkRayRegenerationValidateInputs(&inputs, issues);
+    if (result != FFX_VK_PORTABLE_OK)
+        return result;
+
+    /* The current Q2RTX radiance partitions are storage images. A future
+     * provider may therefore legally denoise them in place, provided it owns
+     * the compute-read/write transition during its dispatch. Validate that
+     * full input/output hand-off now, rather than validating only inputs and
+     * discovering an output-ownership mismatch when such a provider exists.
+     * This records no neural work and does not select an AMD RR provider. */
+    memset(&outputs, 0, sizeof(outputs));
+    outputs.structSize = sizeof(outputs);
+    outputs.contractVersion = FFX_VK_RAYREGENERATION_CONTRACT_VERSION;
+    outputs.directDiffuse = inputs.directDiffuse;
+    outputs.directSpecular = inputs.directSpecular;
+    outputs.indirectDiffuse = inputs.indirectDiffuse;
+    outputs.indirectSpecular = inputs.indirectSpecular;
+    if (inputs.signalFlags & FFX_VK_RR_SIGNAL_AMBIENT_OCCLUSION)
+        outputs.ambientOcclusion = inputs.ambientOcclusion;
+    if (inputs.signalFlags & FFX_VK_RR_SIGNAL_SPECULAR_OCCLUSION)
+        outputs.specularOcclusion = inputs.specularOcclusion;
+    if (inputs.signalFlags & FFX_VK_RR_SIGNAL_DOMINANT_LIGHT_VISIBILITY)
+        outputs.dominantLightVisibility = fsr3_rayregeneration_output_image(
+            VKPT_IMG_TEMPORAL_RR_DOMINANT_LIGHT_DENOISED, VK_FORMAT_R8_UNORM);
+    return ffxVkRayRegenerationValidateOutputs(&inputs, &outputs, issues);
 }
 
 static FfxVkPortableImage fsr3_output_image(void)
@@ -2322,7 +2375,7 @@ static VkResult fsr3_316_frame_generation_record_after_inputs(
     memset(&dispatch, 0, sizeof(dispatch));
     dispatch.commandBuffer = cmd_buf;
     dispatch.color = prepare.color;
-    dispatch.output = fsr3_316_image(VKPT_IMG_FSR_RCAS_OUTPUT,
+    dispatch.output = fsr3_316_image(VKPT_IMG_FSR_FRAMEGEN_OUTPUT,
         qvk.extent_unscaled, VK_IMAGE_LAYOUT_GENERAL);
     /* Q2RTX's only full-screen displacement (underwater water warp) is
      * intentionally applied by final_blit after FI to both the generated and
@@ -2438,7 +2491,7 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
              * incompletely-visible FI image on every generated slot. */
             IMAGE_BARRIER_STAGES(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .image = qvk.images[VKPT_IMG_FSR_RCAS_OUTPUT],
+                .image = qvk.images[VKPT_IMG_FSR_FRAMEGEN_OUTPUT],
                 .subresourceRange = color_range,
                 .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
@@ -2505,7 +2558,7 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
     dispatch.currentColor = source;
     dispatch.hudlessColor.structSize = sizeof(dispatch.hudlessColor);
     dispatch.distortionField.structSize = sizeof(dispatch.distortionField);
-    dispatch.output = fsr3_screen_image(VKPT_IMG_FSR_RCAS_OUTPUT,
+    dispatch.output = fsr3_screen_image(VKPT_IMG_FSR_FRAMEGEN_OUTPUT,
         qvk.extent_unscaled, FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS);
     dispatch.displaySize.width = frame->display_size.width;
     dispatch.displaySize.height = frame->display_size.height;
@@ -2535,7 +2588,7 @@ VkResult vkpt_fsr_frame_generation_record(VkCommandBuffer cmd_buf,
      * bridge has the same compute-output/final-blit boundary. */
     IMAGE_BARRIER_STAGES(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        .image = qvk.images[VKPT_IMG_FSR_RCAS_OUTPUT],
+        .image = qvk.images[VKPT_IMG_FSR_FRAMEGEN_OUTPUT],
         .subresourceRange = color_range,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
