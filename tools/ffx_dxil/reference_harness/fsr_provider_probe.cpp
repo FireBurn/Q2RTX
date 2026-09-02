@@ -21,6 +21,7 @@
 
 #include "ffx_api.h"
 #include "ffx_api_dx12.h"
+#include "ffx_framegeneration.h"
 #include "ffx_upscale.h"
 
 namespace {
@@ -167,22 +168,24 @@ bool load_functions(const wchar_t* loader_path, HMODULE* out_module,
     return true;
 }
 
-bool enumerate_upscale_versions(const FfxFunctions& functions, ID3D12Device* device,
+bool enumerate_effect_versions(const FfxFunctions& functions, ID3D12Device* device,
+    uint32_t create_desc_type, const char* effect_name,
     std::vector<uint64_t>* out_ids)
 {
     ffxQueryDescGetVersions query = {};
     query.header.type = FFX_API_QUERY_DESC_TYPE_GET_VERSIONS;
-    query.createDescType = FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE;
+    query.createDescType = create_desc_type;
     query.device = device;
     uint64_t count = 0;
     query.outputCount = &count;
     ffxReturnCode_t result = functions.query(nullptr, &query.header);
     if (result != FFX_API_RETURN_OK) {
-        std::fprintf(stderr, "ffxQuery(GetVersions/count) returned %u\n", result);
+        std::fprintf(stderr, "ffxQuery(GetVersions/count, %s) returned %u\n",
+            effect_name, result);
         return false;
     }
     if (!count) {
-        std::fprintf(stderr, "The loader reported no upscaler providers.\n");
+        std::fprintf(stderr, "The loader reported no %s providers.\n", effect_name);
         return false;
     }
 
@@ -193,11 +196,12 @@ bool enumerate_upscale_versions(const FfxFunctions& functions, ID3D12Device* dev
     query.versionNames = names.data();
     result = functions.query(nullptr, &query.header);
     if (result != FFX_API_RETURN_OK) {
-        std::fprintf(stderr, "ffxQuery(GetVersions/list) returned %u\n", result);
+        std::fprintf(stderr, "ffxQuery(GetVersions/list, %s) returned %u\n",
+            effect_name, result);
         return false;
     }
     out_ids->resize(static_cast<size_t>(count));
-    std::printf("upscaler providers (%" PRIu64 "):\n", count);
+    std::printf("%s providers (%" PRIu64 "):\n", effect_name, count);
     for (uint64_t i = 0; i < count; ++i) {
         std::printf("  [%" PRIu64 "] id=0x%016" PRIx64 " name=%s\n", i,
             (*out_ids)[static_cast<size_t>(i)],
@@ -515,13 +519,33 @@ int wmain(int argc, wchar_t** argv)
     FfxFunctions functions;
     std::vector<uint64_t> provider_ids;
     if (!create_device(&device) || !load_functions(argv[1], &module, &functions) ||
-        !enumerate_upscale_versions(functions, device, &provider_ids)) {
+        !enumerate_effect_versions(functions, device,
+            FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE, "upscaler", &provider_ids)) {
         if (module)
             FreeLibrary(module);
         if (device)
             device->Release();
         return EXIT_FAILURE;
     }
+
+    /* Frame generation has a separately selectable provider family.  It is
+     * intentionally enumerated even when the caller only creates an
+     * upscaler context, so a later driver/SDK change cannot be mistaken for
+     * proof that a neural FG provider was selected.  Failure is reported but
+     * does not invalidate the required upscaler probe. */
+    std::vector<uint64_t> framegeneration_provider_ids;
+    if (!enumerate_effect_versions(functions, device,
+            FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION,
+            "frame-generation", &framegeneration_provider_ids)) {
+        std::fprintf(stderr,
+            "Frame-generation provider enumeration unavailable for this loader/adapter.\n");
+    }
+
+    /* SDK 2.3's public headers used by this harness do not expose a
+     * Ray-Regeneration-specific create descriptor. Do not guess an internal
+     * type value: an observed provider query must be compiled against the
+     * matching public header when AMD publishes one. */
+    std::printf("ray-regeneration providers: not queried (no public SDK 2.3 create descriptor)\n");
 
     bool success = true;
     if (create) {

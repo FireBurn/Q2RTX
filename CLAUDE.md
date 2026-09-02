@@ -280,7 +280,10 @@ tools/ffx_dxil/reference_harness/fsr_provider_probe.cpp is the controlled AMD
 SDK 2.3 DX12/Wine entry point for that research. On this RX 6800M it enumerated
 only analytical upscaler 3.1.5/2.3.4 providers, and a 4.1.1 API context selected
 3.1.5 for a successful dispatch. That is a measured current RDNA2 fallback
-result, not evidence that official neural FSR4 is available.
+result, not evidence that official neural FSR4 is available. The probe also
+enumerates frame-generation providers independently. SDK 2.3 headers do not
+publish a Ray-Regeneration create descriptor, so it must report that gap rather
+than manufacture an internal provider type.
 
 FSR3 analytical upscaling/frame interpolation has public source and is the
 highest-confidence native-Vulkan path for RDNA2.  The old AMD Vulkan

@@ -968,13 +968,16 @@ Current truth:
 - DXIL extraction/capture tooling is complete and tested; no extracted payload
   is checked into the repository.
 - The source-only official SDK 2.3 DX12 probe now cross-compiles under MinGW
-  and runs through Wine/vkd3d-proton. On the RX 6800M, the API advertised only
-  analytical upscaler providers 3.1.5 and 2.3.4; creating a 4.1.1 API context
-  selected 3.1.5 and one 640x360 -> 1280x720 dispatch succeeded. It generated
-  11 paired DXIL/SPIR-V capture artifacts and recorded 25 provider-owned D3D12
-  resource allocations outside the repo. This is direct evidence that the
-  current official path falls back to analytical FSR3 on RDNA2; it is not
-  neural FSR4. See tools/ffx_dxil/reference_harness/.
+  and runs through Wine/vkd3d-proton. It now independently enumerates public
+  frame-generation providers as well as upscaler providers; SDK 2.3 does not
+  publish a Ray-Regeneration create descriptor, so the probe reports that
+  limitation rather than guessing a private ABI. On the RX 6800M, the API
+  advertised only analytical upscaler providers 3.1.5 and 2.3.4; creating a
+  4.1.1 API context selected 3.1.5 and one 640x360 -> 1280x720 dispatch
+  succeeded. It generated 11 paired DXIL/SPIR-V capture artifacts and recorded
+  25 provider-owned D3D12 resource allocations outside the repo. This is direct
+  evidence that the current official path falls back to analytical FSR3 on
+  RDNA2; it is not neural FSR4. See tools/ffx_dxil/reference_harness/.
 - Following that measured resource query, Q2RTX's FSR3 context now enables its
   internal auto-exposure graph rather than passing a null external exposure
   image. A fresh 28-second 1280x720 RX 6800M Vulkan-validation run recreated
@@ -1288,11 +1291,13 @@ SPD auto-exposure graph is implemented behind `flt_fsr4_auto_exposure`.
 - Validated SDK 2.3: upscaler 1028/885, denoiser 630/630, frame generation
   487/486 occurrences/unique; Proton DLL 1294/1150; zero malformed containers.
 - tools/ffx_dxil/reference_harness/fsr_provider_probe.cpp: a source-only
-  MinGW/Wine probe that creates a DX12 device, enumerates SDK provider versions,
-  creates a 4.1.1 API context, and optionally records one controlled dispatch.
-  It registers public resource allocation callbacks. The RX 6800M result is
-  provider 3.1.5 fallback with 11 paired capture shaders and 25 logged
-  allocations; no provider/model/capture binary is tracked.
+  MinGW/Wine probe that creates a DX12 device, enumerates independent upscaler
+  and frame-generation provider versions, creates a 4.1.1 API context, and
+  optionally records one controlled dispatch. It explicitly reports that SDK
+  2.3 headers expose no Ray-Regeneration create descriptor. It registers public
+  resource allocation callbacks. The RX 6800M result is provider 3.1.5 fallback
+  with 11 paired capture shaders and 25 logged allocations; no
+  provider/model/capture binary is tracked.
 
 ## Current coordination
 
