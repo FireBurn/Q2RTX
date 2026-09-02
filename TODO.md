@@ -663,7 +663,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   is correctly `bindist`/`mirror` restricted. The complete v07 FSR4 SPIR-V
   graph, six model initializer/pre-weight pairs, manifests, and MIT notice are
   tracked; both the ebuild and CMake's Linux-packaging configuration reject a
-  missing model payload before an incomplete install can be created. The
+  missing model payload before an incomplete install can be created.  The
+  ebuild independently asserts each per-model manifest and at least one
+  model-prefixed SPIR-V module before and after installation. The
   runtime still publishes a specific missing v07 asset through
   `flt_upscaler_reason` instead of an ambiguous context failure. FSR3 and
   analytical FSR3 frame generation remain built in. On 2026-08-31, the exact

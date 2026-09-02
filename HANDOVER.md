@@ -1386,8 +1386,11 @@ smoke records and submits two consecutive frames through only the C ABI.
   staging install verified every path, media/shader archive, and current menu
   entry.
 - The ebuild now installs the complete FSR4 v07 graph and its six matching
-  model initializer/weight pairs. A package-style staging test must continue
-  to verify every model asset and the retained MIT notice. A fresh detached
+  model initializer/weight pairs. It independently requires each model's
+  JSON manifest and at least one model-prefixed SPIR-V module both before
+  building and after staging, in addition to CMake's complete-directory
+  install contract. A package-style staging test must continue to verify every
+  model asset and the retained MIT notice. A fresh detached
   `46144a8d` Release staging build (with the ebuild's declared submodules and
   release data) installed exactly the 12 tracked `.bin` model assets and
   `LICENSE-FSR4-v07.txt` under `usr/share/quake2rtx/baseq2/fsr4_shaders`.
