@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-09-01 (Europe/London)
+Last updated: 2026-09-02 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -610,6 +610,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   provider was offered by this RX 6800M/RADV/vkd3d-proton configuration.
   Re-test after relevant driver/provider changes; do not infer an INT8 path
   from embedded CS6.4 containers.
+- [x] Make the measured official-provider boundary visible in Q2RTX rather
+  than leaving source-v07 FSR4 or analytical FI/OF ambiguous. The read-only
+  temporal diagnostics page now labels official FSR4.1.1, Ray Regeneration,
+  and ML Frame Generation separately and reports concise signed-DX12 reasons;
+  the 960x540 Vulkan-validation capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
 - [ ] Reproduce one fixed 4.1.1 upscale frame through the portable Vulkan ABI.
 - [ ] Obtain legal/provenance review before redistributing any extracted model
   or shader payload; retain all required notices.
@@ -701,11 +707,15 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   rendered as `???`). A generic read-only `static` menu item can now bind a
   cvar safely without making ROM diagnostics editable; the Video menu exposes
   a compact `temporal diagnostics...` page for resolved upscaler/frame-
-  generation reasons and generated/rendered cadence. Root build/CTest and the
-  reusable Vulkan suite pass. A 2560x1440 Vulkan-validation run opened the
-  page and showed the live startup/fallback state, zero cadence, and safe
-  reason truncation without a VUID or parser error; capture:
-  `/home/fireburn/Screenshot_temporal_diagnostics_window_20260820.png`.
+  generation reasons and generated/rendered cadence. It also shows separate,
+  concise unavailable statuses for official FSR4.1.1, RR, and MLFG so those
+  features cannot be mistaken for the runnable experimental Vulkan paths.
+  Root build/CTest and the reusable Vulkan suite pass. A fresh 960x540
+  Vulkan-validation run selected source-v07 FSR4 plus SDK-3.1.6 FI/OF before
+  opening the page; it showed the active paths, all three official boundaries,
+  and the expected menu-frame suspension without a VUID, parser, FSR,
+  dispatch, or presenter error:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
   There is deliberately no selectable pacing mode: active analytical FG always
   recreates the swapchain for FIFO so every generated->real pair is presented
   in order; Mailbox can replace a generated image and Immediate can tear it.

@@ -82,6 +82,24 @@ Current truth:
   clear before integration. The current standalone build and full CTest suite
   pass 37/37 before publication.
 
+- The published standalone project initially failed on GitHub's Ubuntu 24.04
+  headers because `libvulkan-dev` 1.3.275 predates the public
+  `VK_KHR_compute_shader_derivatives` declarations. The isolated compatibility
+  header backports only those published data declarations and continues to
+  probe the real runtime extension. The portability commit is parent
+  `26b3cbd1` / published split `7afc7ee7`; the remote `portable-vulkan`
+  workflow then completed configure, build, and tests successfully.
+
+- The Q2RTX Temporal Diagnostics page now makes the provider boundary visible
+  without truncation at 960x540. It separates active `FSR4 v07 INT8/DOT4` and
+  analytical FSR3.1.6 FI/OF from read-only `official FSR4.1.1`, `official Ray
+  Regeneration`, and `official ML Frame Generation` rows. The concise values
+  identify the signed-DX12/no-native-Vulkan boundary (and RX 9000+ for RR and
+  MLFG). The fresh validation-enabled run logged active source-v07 FSR4 and
+  FI/OF before entering the expected menu-frame suspension, with no VUID, FSR,
+  dispatch, or presenter error; capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
+
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
   guarded SDK-3.1.6 attempt, entered the correct fallback, then stayed blocked

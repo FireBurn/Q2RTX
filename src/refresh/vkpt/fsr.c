@@ -247,6 +247,9 @@ static float fsr3_fg_recovery_required_fps;
 static float fsr3_fg_recovery_input_fps;
 cvar_t *cvar_flt_upscaler_active = NULL;
 cvar_t *cvar_flt_upscaler_reason = NULL;
+cvar_t *cvar_flt_fsr4_official_provider_reason = NULL;
+cvar_t *cvar_flt_ray_regeneration_provider_reason = NULL;
+cvar_t *cvar_flt_ml_frame_generation_provider_reason = NULL;
 cvar_t *cvar_flt_fsr_sharpness = NULL;
 /* Compatibility stubs - profiler.c externs these */
 cvar_t *cvar_flt_fsr_easu = NULL;
@@ -1558,6 +1561,22 @@ void vkpt_fsr_init_cvars(void)
     cvar_flt_upscaler_active = Cvar_Get("flt_upscaler_active", "0",
         CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_upscaler_reason = Cvar_Get("flt_upscaler_reason", "startup",
+        CVAR_ROM | CVAR_NOARCHIVE);
+    /* The native Vulkan project has runnable analytical FSR3 and source-v07
+     * FSR4 paths, but AMD's newer neural providers are signed DX12 binaries.
+     * Keep this observable in the UI instead of allowing a v07/analytical
+     * selection to be mistaken for official FSR4.1.1, RR, or MLFG. */
+    cvar_flt_fsr4_official_provider_reason = Cvar_Get(
+        "flt_fsr4_official_provider_reason",
+        "unavailable: signed DX12 provider (no native Vulkan)",
+        CVAR_ROM | CVAR_NOARCHIVE);
+    cvar_flt_ray_regeneration_provider_reason = Cvar_Get(
+        "flt_ray_regeneration_provider_reason",
+        "unavailable: signed DX12 provider (RX 9000+)",
+        CVAR_ROM | CVAR_NOARCHIVE);
+    cvar_flt_ml_frame_generation_provider_reason = Cvar_Get(
+        "flt_ml_frame_generation_provider_reason",
+        "unavailable: signed DX12 provider (RX 9000+)",
         CVAR_ROM | CVAR_NOARCHIVE);
     cvar_flt_fsr_enable    = Cvar_Get("flt_fsr_enable",    "0",   CVAR_ARCHIVE);
     cvar_flt_fsr_sharpness = Cvar_Get("flt_fsr_sharpness", "0.2", CVAR_ARCHIVE);

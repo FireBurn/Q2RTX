@@ -228,6 +228,12 @@ begin temporal_diagnostics
         "upscaler" flt_upscaler_reason
     static --width 52 --status "active analytical-frame-generation state or the exact suspension/fallback reason" \
         "frame generation" flt_frame_generation_reason
+    static --width 52 --status "official neural FSR4 provider availability; source-v07 FSR4 is a separate runnable Vulkan path" \
+        "official FSR4.1.1" flt_fsr4_official_provider_reason
+    static --width 52 --status "official neural Ray Regeneration provider availability; the RR debug views and contract are provider-neutral inputs" \
+        "official Ray Regeneration" flt_ray_regeneration_provider_reason
+    static --width 52 --status "official neural ML Frame Generation availability; the active FSR3 FI/OF option is analytical, not MLFG" \
+        "official ML Frame Generation" flt_ml_frame_generation_provider_reason
     static --width 12 "rendered FPS" flt_frame_generation_rendered_fps
     static --width 12 "generated FPS" flt_frame_generation_generated_fps
     action "back" popmenu

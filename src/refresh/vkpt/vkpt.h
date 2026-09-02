@@ -844,6 +844,11 @@ extern cvar_t *cvar_flt_frame_generation_debug_capture;
 extern cvar_t *cvar_flt_temporal_debug_view;
 extern cvar_t *cvar_flt_upscaler_active;
 extern cvar_t *cvar_flt_upscaler_reason;
+/* Read-only official-provider boundary. These deliberately remain distinct
+ * from the runnable source-v07 and analytical Vulkan paths. */
+extern cvar_t *cvar_flt_fsr4_official_provider_reason;
+extern cvar_t *cvar_flt_ray_regeneration_provider_reason;
+extern cvar_t *cvar_flt_ml_frame_generation_provider_reason;
 void vkpt_fsr_request_reset(void);
 VkResult vkpt_fsr_initialize(void);
 VkResult vkpt_fsr_destroy(void);

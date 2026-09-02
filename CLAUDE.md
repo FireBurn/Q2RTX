@@ -276,6 +276,14 @@ but shader blobs alone do not supply pass selection, resources, constants,
 weights, barriers, scheduling, or presentation.  Treat those ports as measured
 reverse-engineering research and keep an honest fallback.
 
+The `temporal_diagnostics` menu must retain the three read-only official-provider
+rows (`flt_fsr4_official_provider_reason`,
+`flt_ray_regeneration_provider_reason`, and
+`flt_ml_frame_generation_provider_reason`).  Their labels distinguish this
+status from the runnable source-v07 FSR4 and analytical FSR3 FI/OF choices;
+keep the values short enough to fit the 52-character static column rather than
+silently ellipsizing the DX12/native-Vulkan or RX 9000 boundary.
+
 tools/ffx_dxil/reference_harness/fsr_provider_probe.cpp is the controlled AMD
 SDK 2.3 DX12/Wine entry point for that research. On this RX 6800M it enumerated
 only analytical upscaler 3.1.5/2.3.4 providers, and a 4.1.1 API context selected
