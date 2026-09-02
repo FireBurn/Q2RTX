@@ -802,6 +802,6 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   fallback behavior, and the three read-only official-provider boundary cvars.
   The reusable Vulkan subtree now has explicit upstream
   notices, a standalone-CI workflow, and a subtree-split publishing checklist;
-  an isolated source copy passed 35/35 redistributable tests plus its installed
+  an isolated source copy passed 37/37 redistributable tests plus its installed
   external consumer. Release packaging and final screenshots remain.
 - [x] Add `CLAUDE.md`, `TODO.md`, and a live `HANDOVER.md` maintenance rule.
