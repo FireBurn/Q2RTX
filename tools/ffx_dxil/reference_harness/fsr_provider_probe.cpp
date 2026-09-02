@@ -21,6 +21,15 @@
 
 #include "ffx_api.h"
 #include "ffx_api_dx12.h"
+#if defined(__has_include)
+#if __has_include("ffx_denoiser.h")
+#include "ffx_denoiser.h"
+#define FFX_PROVIDER_PROBE_HAS_DENOISER 1
+#endif
+#endif
+#ifndef FFX_PROVIDER_PROBE_HAS_DENOISER
+#define FFX_PROVIDER_PROBE_HAS_DENOISER 0
+#endif
 #include "ffx_framegeneration.h"
 #include "ffx_upscale.h"
 
@@ -541,11 +550,23 @@ int wmain(int argc, wchar_t** argv)
             "Frame-generation provider enumeration unavailable for this loader/adapter.\n");
     }
 
-    /* SDK 2.3's public headers used by this harness do not expose a
-     * Ray-Regeneration-specific create descriptor. Do not guess an internal
-     * type value: an observed provider query must be compiled against the
-     * matching public header when AMD publishes one. */
-    std::printf("ray-regeneration providers: not queried (no public SDK 2.3 create descriptor)\n");
+#if FFX_PROVIDER_PROBE_HAS_DENOISER
+    /* FSR Ray Regeneration is supplied through the public denoiser API. It
+     * nevertheless has an independent provider list, so enumerate it rather
+     * than infer it from the upscaler or frame-generation result. */
+    std::vector<uint64_t> denoiser_provider_ids;
+    if (!enumerate_effect_versions(functions, device,
+            FFX_API_CREATE_CONTEXT_DESC_TYPE_DENOISER,
+            "denoiser/ray-regeneration", &denoiser_provider_ids)) {
+        std::fprintf(stderr,
+            "Denoiser/Ray-Regeneration provider enumeration unavailable for this loader/adapter.\n");
+    }
+#else
+    /* The Q2RTX-pinned FSR-only SDK source closure intentionally omits the
+     * denoiser kit. Do not guess a private type value when compiling only
+     * against that reduced closure; point the probe at the full SDK instead. */
+    std::printf("ray-regeneration providers: not queried (full SDK denoiser header unavailable)\n");
+#endif
 
     bool success = true;
     if (create) {

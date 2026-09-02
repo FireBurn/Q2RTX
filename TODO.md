@@ -582,11 +582,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Build a minimal AMD SDK 2.3 DX12 harness under Proton and dump only
   actually selected DXIL/SPIR-V with VKD3D_SHADER_DUMP_PATH. The source-only
   tools/ffx_dxil/reference_harness/fsr_provider_probe.cpp cross-compiles with
-  MinGW, independently enumerates upscaler and frame-generation providers,
+  MinGW, independently enumerates upscaler, frame-generation, and public
+  denoiser/Ray-Regeneration providers when compiled against the full SDK,
   creates a 4.1.1 API context, and records one command-list dispatch without
-  checking provider payloads into the tree. It reports Ray Regeneration as
-  unqueryable when the matching public SDK headers do not publish a create
-  descriptor, rather than guessing a private ABI value.
+  checking provider payloads into the tree. Its reduced-closure build reports
+  a missing denoiser header rather than guessing a private ABI value. A fresh
+  full-SDK 2.3.0/Wine-vkd3d run on selected RDNA2 adapter `1002:73df` listed
+  3.1.5/2.3.4 upscalers, 3.1.6 frame generation, and no denoiser/RR provider;
+  the 4.1.1 context selected analytical 3.1.5.
 - [-] Capture PSO/root signatures, resources/views, constants, uploads, pass
   order, dispatch dimensions, barriers, provider version, and feature queries.
   The controlled RX 6800M capture has the selected provider, a successful

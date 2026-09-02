@@ -6,13 +6,14 @@ extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model
 payloads.
 
 It creates a DX12 device, loads a caller-selected
-amd_fidelityfx_loader_dx12.dll, enumerates upscaler and frame-generation
-providers, and can create an FSR 4.1.1 API context. A successful create is
-enough to reveal which upscaler provider AMD selected; dispatch capture is a
-later, separate step because it needs correctly initialized color/depth/MV
-resources and a command queue. The API headers supplied with SDK 2.3 do not
-publish a Ray-Regeneration create descriptor, so the harness reports that
-limitation explicitly instead of guessing a private provider type.
+amd_fidelityfx_loader_dx12.dll, enumerates upscaler, frame-generation, and
+denoiser/Ray-Regeneration providers, and can create an FSR 4.1.1 API context.
+A successful create is enough to reveal which upscaler provider AMD selected;
+dispatch capture is a later, separate step because it needs correctly
+initialized color/depth/MV resources and a command queue. Ray Regeneration is
+published through the SDK's denoiser descriptor; when compiled only against
+the deliberately reduced Q2RTX FSR-only source closure, the probe clearly
+reports that the denoiser header is absent instead of guessing a private type.
 
 Build, replacing SDK with the local FidelityFX SDK 2.3 checkout:
 
@@ -20,6 +21,7 @@ Build, replacing SDK with the local FidelityFX SDK 2.3 checkout:
       -Wno-unknown-pragmas \
       -I"$SDK/Kits/FidelityFX/api/include" \
       -I"$SDK/Kits/FidelityFX/api/include/dx12" \
+      -I"$SDK/Kits/FidelityFX/denoisers/include" \
       -I"$SDK/Kits/FidelityFX/framegeneration/include" \
       -I"$SDK/Kits/FidelityFX/upscalers/include" \
   fsr_provider_probe.cpp -municode -static -static-libgcc -static-libstdc++ \
