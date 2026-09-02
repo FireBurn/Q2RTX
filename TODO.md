@@ -493,6 +493,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and Q2RTX experimental scheduler selection work on SDR/RX 6800M; HDR,
   long-duration visual/lifecycle coverage, and a general-purpose profile
   remain.
+  The reusable wrapper now rejects a generated output that aliases the
+  prepared colour/depth/motion or optional distortion input, and its API smoke
+  covers that fail-closed rule; this generalizes Q2RTX's source-v07 FSR4
+  recurrent-history isolation to any Vulkan host.
 - [-] Build a Linux/Windows portable explicit presenter. Q2RTX now has an
   experimental single-graphics-queue two-acquire/two-present path that renders
   the same queued UI on generated and real frames, with a blocking reserved

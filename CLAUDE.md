@@ -346,6 +346,9 @@ it official FSR4.1.1.
   analytical-FI output target. FI/OF must use the dedicated
   `VKPT_IMG_FSR_FRAMEGEN_OUTPUT` image for its generated presentation; the
   root `framegen_target_isolation` test enforces this ownership boundary.
+  The reusable SDK-3.1.6 FI wrapper enforces the general rule too: a dispatch
+  output must not alias its prepared colour, depth, motion, or optional
+  distortion input. Keep that fail-closed check in place for non-Q2 hosts.
   It also contains the exact public SDK v2.3.0 FSR3.1.5 source closure under
   `upstream/ffx-2.3.0`. Its object-only `fsr3-host-3.1.5-scaffold` target and
   graph test remain host-port gates, but the dedicated SDK-2.3 Vulkan

@@ -71,6 +71,14 @@ Current truth:
   for the safe transition only, not a replacement for an interactive sustained
   focused-present soak.
 
+- The reusable `ffx-vulkan::fsr3-vk-framegeneration-3.1.6` wrapper now makes
+  the same ownership rule fail closed for every host. `RecordDispatch` rejects
+  an output image that aliases the prepared colour, depth, motion, or optional
+  distortion field, and its API-smoke test asserts that rejection. The local
+  standalone suite passed 38/38 and the Q2RTX root suite passed 4/4 before
+  publication; update this record with the split hash and GitHub run once the
+  standalone push has completed.
+
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
   and player tree agree with the live ebuild's paths; it enables and checks all
