@@ -783,7 +783,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [-] Update in-game help, `doc/client.md`, notices, licenses, and screenshots.
   The source menu and client cvar documentation now describe the discrete v07
   model family, independent FSR3/FSR4 RCAS controls, deprecated inert cvars,
-  and fallback behavior. The reusable Vulkan subtree now has explicit upstream
+  fallback behavior, and the three read-only official-provider boundary cvars.
+  The reusable Vulkan subtree now has explicit upstream
   notices, a standalone-CI workflow, and a subtree-split publishing checklist;
   an isolated source copy passed 35/35 redistributable tests plus its installed
   external consumer. Release packaging and final screenshots remain.

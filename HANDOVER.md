@@ -99,6 +99,8 @@ Current truth:
   FI/OF before entering the expected menu-frame suspension, with no VUID, FSR,
   dispatch, or presenter error; capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
+  `doc/client.md` documents the corresponding read-only cvars and explicitly
+  distinguishes those statuses from runnable native-Vulkan selections.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one

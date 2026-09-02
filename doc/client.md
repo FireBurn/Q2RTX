@@ -927,6 +927,18 @@ The Video menu's **temporal diagnostics...** page displays this read-only
 status, together with the frame-generation reason and presentation cadence; it
 never treats these diagnostic cvars as editable settings.
 
+#### `flt_fsr4_official_provider_reason`, `flt_ray_regeneration_provider_reason`, `flt_ml_frame_generation_provider_reason`
+
+Read-only availability markers for AMD's newer signed neural providers. They
+are intentionally separate from `flt_upscaler_reason` and
+`flt_frame_generation_reason`: the latter describe the runnable native-Vulkan
+source-v07 FSR4 and analytical FSR3 FI/OF paths, whereas these values state
+the official-provider boundary. In the current native-Vulkan build they report
+the signed-DX12/no-native-Vulkan limitation; Ray Regeneration and ML Frame
+Generation additionally require compatible RX 9000-class hardware. They are
+shown in the Video menu's **temporal diagnostics...** page and are not
+selectable settings.
+
 #### `flt_temporal_debug_view`
 
 Selects a presentation-only visualization of the exact dense temporal input
