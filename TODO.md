@@ -716,6 +716,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and the expected menu-frame suspension without a VUID, parser, FSR,
   dispatch, or presenter error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
+  Root CTest also verifies all three menu rows, their order, and their concise
+  read-only cvar defaults (`temporal_provider_status`).
   There is deliberately no selectable pacing mode: active analytical FG always
   recreates the swapchain for FIFO so every generated->real pair is presented
   in order; Mailbox can replace a generated image and Immediate can tear it.

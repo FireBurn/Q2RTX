@@ -103,7 +103,10 @@ Current truth:
   dispatch, or presenter error; capture:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
   `doc/client.md` documents the corresponding read-only cvars and explicitly
-  distinguishes those statuses from runnable native-Vulkan selections.
+  distinguishes those statuses from runnable native-Vulkan selections. The
+  root `temporal_provider_status` CTest locks the three menu rows, ordering,
+  cvar names, and concise defaults against regression; the root suite now
+  passes 3/3.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one

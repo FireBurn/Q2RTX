@@ -298,6 +298,11 @@ IF(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_fsr4_v07_assets.py
                 ${CMAKE_SOURCE_DIR}/baseq2/fsr4_shaders)
+        add_test(NAME temporal_provider_status
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_temporal_provider_status.py
+                ${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu
+                ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr.c)
     endif()
 ENDIF()
 
