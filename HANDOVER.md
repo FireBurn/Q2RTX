@@ -44,6 +44,12 @@ Current truth:
   at frame 1209 with no VUID, FSR, dispatch, or presenter error. The recovered
   capture is full-colour and coherent:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR315_focus_loss_recovery.png`.
+  The same real KWin round-trip was repeated with source-v07 FSR4 Quality on
+  the same RX 6800M: reset `0x1000` occurred at frame 1086, then FSR4 +
+  SDK-3.1.6 FI/OF was history-valid and active at frame 1208 (31.2 logical
+  FPS), also with no VUID, FSR, dispatch, or presenter error. Its coherent
+  full-colour capture is
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_focus_loss_recovery.png`.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
