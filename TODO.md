@@ -624,6 +624,18 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   provider was offered by this RX 6800M/RADV/vkd3d-proton configuration.
   Re-test after relevant driver/provider changes; do not infer an INT8 path
   from embedded CS6.4 containers.
+- [x] Separate the community historical-RDNA2 report from the official 4.1.1
+  boundary. The legacy source-v07 API probe now cross-compiles warning-clean,
+  enumerates each explicit upscaler version, and can record a controlled
+  640x360 -> 1280x720 FSR4-only command list. On selected device 1002:73df,
+  the untouched loader listed only 3.1.5/2.3.4. The community
+  PROTON_FSR4_RDNA3_UPGRADE=1 and FSR4_UPGRADE=1 environment switches exposed
+  and created historical 4.0.2; placing cached amdxcffx64 v4.0.2 beside the
+  isolated loader alone did not. The controlled FSR4 dispatch API call
+  returned 0, but vkd3d then reported missing WMMA support and command-list
+  close returned 0x80070057, so no GPU-completed RDNA2 binary-provider frame
+  was established. This is neither official FSR4.1.1 nor a native Vulkan
+  provider; keep Q2RTX's source-v07 Vulkan work separate.
 - [x] Make the measured official-provider boundary visible in Q2RTX rather
   than leaving source-v07 FSR4 or analytical FI/OF ambiguous. The read-only
   temporal diagnostics page now labels official FSR4.1.1, Ray Regeneration,

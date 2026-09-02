@@ -303,6 +303,18 @@ highest-confidence native-Vulkan path for RDNA2.  The old AMD Vulkan
 frame-interpolation swapchain wrapper is Windows-specific and assumes distinct
 queues unavailable on this machine; build a portable explicit presenter.
 
+The historical FSR4 source-v07 SDK has a different public ABI from SDK 2.3.
+Use the legacy source-v07 provider probe rather than the 4.1.1 probe for it.
+On the selected RDNA2 adapter, its untouched signed loader enumerated only
+3.1.5 and 2.3.4. With the community PROTON_FSR4_RDNA3_UPGRADE=1 and
+FSR4_UPGRADE=1 switches it enumerated and created 4.0.2; adding the cached
+amdxcffx64 compatibility DLL alone did not change that outcome. Its one
+controlled dispatch returned success from FFX but command-list closure failed
+because vkd3d could not expose WMMA. Thus this is evidence of a historical
+DX12 provider-selection workaround, not a verified RDNA2 execution route or a
+replacement for Q2RTX's native Vulkan source-v07 implementation. Never call
+it official FSR4.1.1.
+
 ## Reusable modules
 
 - `extern/ffx-vulkan/`: standalone Vulkan C ABI, validation, capability probe,

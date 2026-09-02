@@ -75,3 +75,37 @@ provider version.  These records are intended for future compatible-adapter
 revalidation scripts: require a successful create and query, then inspect the
 selected name/ID rather than treating a successful request for a 4.x API as
 proof that its neural provider was used.
+
+## Historical source-v07 FSR4 provider probe
+
+fsr4_v07_provider_probe.cpp is deliberately separate from the SDK 2.3 probe.
+It targets the older public ABI used by the source-v07 FSR4 SDK and therefore
+does not make claims about FSR 4.1.1. It enumerates every old upscaler provider
+and explicitly creates each one, including its version override, then records
+the provider returned by the loader in an
+FFX_LEGACY_FSR4_PROVIDER_RESULT line.
+
+Build it against the caller's historical SDK:
+
+    x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Werror -Wno-switch \
+      -I"$SDK/Kits/FidelityFX/api/include" \
+      -I"$SDK/Kits/FidelityFX/api/include/dx12" \
+      -I"$SDK/Kits/FidelityFX/upscalers/include" \
+      fsr4_v07_provider_probe.cpp -municode -static -static-libgcc \
+      -static-libstdc++ -ld3d12 -ldxgi -lole32 -o fsr4_v07_provider_probe.exe
+
+Run it from an isolated copy of the SDK's signedbin directory. To test a
+community RDNA2 DXIL-compiler compatibility DLL, put only a caller-supplied
+copy named amdxcffx64.dll beside that isolated loader; do not overwrite an SDK,
+Proton cache, or game installation. A successful context creation only proves
+this old DX12 provider ran under that exact Wine/vkd3d configuration. It does
+not make the provider official, turn it into FSR 4.1.1, or provide a native
+Vulkan binary path for Q2RTX.
+
+Pass --dispatch to record one synthetic 640x360 -> 1280x720 reset frame for
+only a version whose reported name begins with 4. This is a command-recording
+and completion check with undefined throwaway input pixels, not an image
+quality test. The known RDNA2 community switch can make the old 4.0.2 provider
+enumerate and create, while this controlled command-list close presently fails
+under the local Wine/vkd3d stack because it cannot expose the provider's WMMA
+requirement. Keep create/query and dispatch results separate.

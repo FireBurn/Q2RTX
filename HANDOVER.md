@@ -10,6 +10,19 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The community RDNA2 FSR4 route has now been isolated and tested without
+  touching the game, SDK, or Proton cache. A new source-only legacy API probe
+  is required because that source-v07 SDK is ABI-incompatible with the SDK
+  2.3/FSR4.1.1 probe. On device 1002:73df, the historical signed loader
+  normally listed only 3.1.5 and 2.3.4; cached amdxcffx64 v4.0.2 alone did not
+  change this. With PROTON_FSR4_RDNA3_UPGRADE=1 and FSR4_UPGRADE=1, it listed
+  and created 4.0.2. A synthetic FSR4 dispatch returned 0, but vkd3d reported
+  missing WMMA support and command-list close failed 0x80070057, so this
+  configuration has not executed a completed FSR4 GPU frame. It is a
+  historical DX12/Wine provider-selection workaround, not official FSR4.1.1
+  and not a portable Vulkan replacement. The native Vulkan source-v07 path in
+  Q2RTX remains the runnable experimental FSR4 route on this machine.
+
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
   and player tree agree with the live ebuild's paths; it enables and checks all
