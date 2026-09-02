@@ -93,6 +93,17 @@ Current truth:
   `final_blit` modules; the loose asset directory contains all six model
   manifests, initializers, pre-pass weights, SPIR-V graphs, and the MIT notice.
 
+- The staged-package validation also uncovered a real upgrade hazard: adding
+  global FSR/RR images moves every sampled framebuffer descriptor binding, but
+  an incremental shader build/archive could retain an old module. A fresh
+  ebuild-equivalent build/install now removes the generated shader directory,
+  recompiles it as one ABI unit, reflects each module before packaging, and
+  recreates `shaders.pkz`. The installed archive contains exactly 47 modules
+  and passed all 6,696 global-binding checks. The launcher marker is now
+  `2026-09-framegen-output-v3`, preserving an old loose cache as a recoverable
+  backup rather than letting it override the matching archive. This prevents
+  the observed sampler-vs-storage-image validation mismatch at startup.
+
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
   `0725754c39b9e7187d07b9620e4131e2d9bad3d5` (parent Q2RTX commit
   `1b80d558`). It adds `ffx-vulkan::radiancecache-contract`: a deliberately
@@ -622,7 +633,7 @@ Current truth:
   would otherwise be paired with the new host descriptor layout and produce a
   validation type mismatch at pipeline creation. `setup/q2rtx.sh` now has a
   versioned shader-layout migration: it moves the loose directory to a dated
-  `pre-2026-08-rr-motion-v2` backup and lets the matching packaged archive
+  `pre-2026-09-framegen-output-v3` backup and lets the matching packaged archive
   load. Advanced users can retain a deliberately matching custom set with
   `Q2RTX_SKIP_SHADER_CACHE_MIGRATION=1`. The Gentoo ebuild verifies that this
   launcher migration is installed.

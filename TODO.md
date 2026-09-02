@@ -726,7 +726,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Migrate stale loose shader cache safely on descriptor-layout upgrades.
   The launcher backs up `shader_vkpt` instead of deleting it, then permits the
   packaged matching `shaders.pkz` to load. This prevents old SPIR-V from being
-  paired with the new RR-motion descriptor layout after a package upgrade.
+  paired with the new descriptor layout after a package upgrade. A new
+  `shader_global_texture_abi` build/CTest target reflects all current SPIR-V
+  modules against `global_textures.h`; the shader build clears the generated
+  output as one ABI unit and packaging recreates, rather than incrementally
+  updates, `shaders.pkz`. The exact ebuild-equivalent staged install contained
+  47 shader modules and passed 6,696 binding checks.
 
 - [x] Make the Gentoo live ebuild package the usable Vulkan feature set:
   system Vulkan/SDL/OpenAL/curl/zlib dependencies, external 7-Zip and shader
@@ -750,7 +755,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   confirmed the pinned 1.8.0 release archive has the expected `q2rtx/` root
   and all four imported release-data paths; the ebuild syntax check passed and
   `pkgcheck` reported only the expected `VisibleVcsPkg` notice for a live
-  `9999` package.
+  `9999` package. The later clean staging run also reflected the installed,
+  not merely source-tree, `shaders.pkz`: all 47 modules matched the current
+  global texture ABI (6,696 bindings), closing the upgrade-time stale-module
+  mismatch found by Vulkan validation.
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
