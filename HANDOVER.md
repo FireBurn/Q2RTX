@@ -88,7 +88,10 @@ Current truth:
   header backports only those published data declarations and continues to
   probe the real runtime extension. The portability commit is parent
   `26b3cbd1` / published split `7afc7ee7`; the remote `portable-vulkan`
-  workflow then completed configure, build, and tests successfully.
+  workflow then completed configure, build, and tests successfully. The
+  workflow subsequently moved from the deprecated Node-20 `checkout@v4` to
+  `checkout@v7` (parent `e69c5ce0` / published split `6868a9cf`); its follow-up
+  configure/build/test run also completed successfully.
 
 - The Q2RTX Temporal Diagnostics page now makes the provider boundary visible
   without truncation at 960x540. It separates active `FSR4 v07 INT8/DOT4` and
