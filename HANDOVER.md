@@ -30,7 +30,10 @@ Current truth:
   run all kept SDK-3.1.6 FI/OF active with no FI/OF or presentation VUID.
   Backend `1` is therefore the default; revision 2 migrates only the archived
   quarantine value once, while backend `0` remains an explicit 1.1.4
-  compatibility choice.
+  compatibility choice. A fresh 2026-09-02 FSR3.1.4 + backend-0 regression
+  also reached history-valid contract-v11 frame 308 with active 1.1.4 FI/OF,
+  no VUID/FSR/dispatch/presenter error, and a coherent full-colour capture:
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR3_FG_colour_after_rr.png`.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one
