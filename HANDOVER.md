@@ -15,9 +15,9 @@ Current truth:
   `e67626c1`). Its README now correctly describes the implemented,
   callback-based acquire plus immutable generated-then-real present-plan API;
   it no longer calls that API pending. The source-tree and installed-consumer
-  CTest suite passed 37/37 immediately before publication. Check the resulting
-  `portable-vulkan` GitHub Actions run before treating the remote update as
-  independently CI-verified.
+  CTest suite passed 37/37 immediately before publication. The resulting
+  `portable-vulkan` GitHub Actions run `33613959003` then independently
+  completed configure, build, and test successfully on Ubuntu 24.04.
 
 - A new validation-enabled odd-size FSR4-v07 Quality + RCAS/SPD-auto-exposure
   + SDK-3.1.6 FI/OF lifecycle capture completed 960x540 -> 1133x717 ->
