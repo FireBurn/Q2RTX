@@ -76,8 +76,9 @@ Current truth:
   an output image that aliases the prepared colour, depth, motion, or optional
   distortion field, and its API-smoke test asserts that rejection. The local
   standalone suite passed 38/38 and the Q2RTX root suite passed 4/4 before
-  publication; update this record with the split hash and GitHub run once the
-  standalone push has completed.
+  publication. It was published to `FireBurn/FSR-Vulkan` at
+  `0c3e9fe9bd8e83c3d4b03c5d7a6545df8ccc7c5a`; GitHub Actions run `33667286306`
+  completed configure, build, and test successfully on Ubuntu 24.04.
 
 - The Gentoo `q2rtx-9999.ebuild` was re-audited on 2026-09-02. Its release
   archive root and imported `blue_noise.pkz`, media archive, shareware PAK,
