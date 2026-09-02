@@ -86,7 +86,12 @@ Current truth:
   six source-v07 FSR4 model initializer/pre-weight/manifest/SPIR-V sets before
   and after installation. `bash -n` passed and `pkgcheck` reported only the
   expected `VisibleVcsPkg` notice for an unkeyworded live ebuild. No ebuild
-  change was needed.
+  change was needed. A fresh ebuild-equivalent system-dependency CMake
+  configure/build/install then staged the client, dedicated launcher/server,
+  menu/media/shader archives, and the complete FSR4-v07 asset directory. The
+  staged `shaders.pkz` contains the rebuilt `checkerboard_interleave` and
+  `final_blit` modules; the loose asset directory contains all six model
+  manifests, initializers, pre-pass weights, SPIR-V graphs, and the MIT notice.
 
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
   `0725754c39b9e7187d07b9620e4131e2d9bad3d5` (parent Q2RTX commit

@@ -845,6 +845,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   strict provider-neutral validation API for application-owned public
   inference/training buffers and atomic counters; the standalone suite passed
   38/38 locally and in GitHub Actions run `33665262969`. It does not add an
-  unsupported neural implementation. Release packaging and final screenshots
-  remain.
+  unsupported neural implementation. A fresh ebuild-equivalent staged install
+  on 2026-09-02 verified the client/launcher/server, current menu/media/shader
+  archives, and the complete six-model FSR4-v07 asset directory. A distributable
+  release artifact and final user-facing screenshots remain.
 - [x] Add `CLAUDE.md`, `TODO.md`, and a live `HANDOVER.md` maintenance rule.
