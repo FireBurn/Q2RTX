@@ -139,7 +139,10 @@ Current truth:
   2026-09-01; it built cleanly and passed all 36 redistributable CTests.
   The parent Q2RTX tree was rebuilt after the installed-consumer test was
   added, and its root CTest checks passed 2/2 (`fsr4_schedule` and
-  `fsr4_v07_assets`) on 2026-08-31.
+  `fsr4_v07_assets`) on 2026-08-31. A fresh 2026-09-02 verification of the
+  current tree passed the same Q2RTX 2/2 suite and all 37 local reusable
+  CTests, including the source-v07 asset-layout test that is intentionally
+  omitted from the clean redistributed package.
 
 - The development config's `flt_temporal_debug_view` is reset to `0` (Off).
   It had been left at view 22 while capturing the grayscale dominant-light
