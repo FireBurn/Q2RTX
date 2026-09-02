@@ -50,6 +50,13 @@ Current truth:
   FPS), also with no VUID, FSR, dispatch, or presenter error. Its coherent
   full-colour capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_focus_loss_recovery.png`.
+  This edge decision is now exported by the reusable
+  `ffx-vulkan::temporal-lifecycle` API as
+  `ffxVkTemporalPresentationAvailabilityChanged(previous, current)`, alongside
+  its camera-cut classifier. The standalone direct test and the isolated
+  installed full-stack consumer both pass, so non-Q2 Vulkan hosts can reset
+  all temporal providers on focus/visibility/WSI availability changes without
+  importing SDL or KWin details.
 
 - The FPS safety gate no longer visibly oscillates while learning FI cost. A
   fresh RX 6800M `vk_validation=1` 60-FPS-floor / 3,900-frame run made one

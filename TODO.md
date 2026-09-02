@@ -723,8 +723,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The classifier is now factored into the installed reusable
   `ffx-vulkan::temporal-lifecycle` target, and its boundary test proves normal
   movement, exact 256-unit/90-degree/0.35-radian boundaries, discontinuities,
-  and non-finite inputs. Q2RTX calls that same code before every provider
-  dispatch. A rebuilt RX 6800M FSR4-v07 DRS + SDK-3.1.6 FI/OF smoke reached
+  and non-finite inputs. Its presentation-availability helper likewise makes
+  both edges of a host focus/visibility/WSI availability change a shared
+  reset decision. Q2RTX calls those helpers before provider dispatch and
+  paired presentation. A rebuilt RX 6800M FSR4-v07 DRS + SDK-3.1.6 FI/OF smoke reached
   v11/history-valid frame 243 with no VUID/error after linking this target.
   An XTest free-camera lens-jump attempt did not reach the Wayland SDL window;
   the retained diagnostic correctly showed only the ordinary startup/map reset.

@@ -47,6 +47,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <SDL2/SDL_vulkan.h>
 
 #include "ffx_vk_framegeneration_presenter.h"
+#include "ffx_vk_temporal_lifecycle.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -3792,7 +3793,8 @@ R_BeginFrame_RTX(void)
 	 * and FI/OF only resumes after fresh temporal history exists. */
 	const bool framegen_window_active = cls.active == ACT_ACTIVATED;
 	static bool framegen_previous_window_active = true;
-	if (framegen_window_active != framegen_previous_window_active) {
+	if (ffxVkTemporalPresentationAvailabilityChanged(
+		framegen_previous_window_active, framegen_window_active)) {
 		framegen_previous_window_active = framegen_window_active;
 		vkpt_temporal_request_reset(VKPT_TEMPORAL_RESET_FOCUS_CHANGED);
 		vkpt_fsr_request_reset();
