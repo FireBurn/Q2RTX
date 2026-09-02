@@ -6,9 +6,10 @@ extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model
 payloads.
 
 It creates a DX12 device, loads a caller-selected
-amd_fidelityfx_loader_dx12.dll, enumerates upscaler, frame-generation, and
-denoiser/Ray-Regeneration providers, and can create FSR 4.1.1, Frame Generation
-4.0.1, or Ray Regeneration 1.2.0 API contexts. Each creation mode queries the
+amd_fidelityfx_loader_dx12.dll, enumerates upscaler, frame-generation,
+denoiser/Ray-Regeneration, and Radiance Caching providers, and can create FSR
+4.1.1, Frame Generation 4.0.1, Ray Regeneration 1.2.0, or Radiance Caching
+0.9.0 API contexts. Each creation mode queries the
 selected provider after creation, so a legacy fallback cannot be mistaken for
 the requested neural API version. Dispatch capture is a separate step because
 it needs correctly initialized color/depth/MV resources and a command queue.
@@ -25,6 +26,7 @@ Build, replacing SDK with the local FidelityFX SDK 2.3 checkout:
       -I"$SDK/Kits/FidelityFX/api/include/dx12" \
       -I"$SDK/Kits/FidelityFX/denoisers/include" \
       -I"$SDK/Kits/FidelityFX/framegeneration/include" \
+      -I"$SDK/Kits/FidelityFX/radiancecache/include" \
       -I"$SDK/Kits/FidelityFX/upscalers/include" \
   fsr_provider_probe.cpp -municode -static -static-libgcc -static-libstdc++ \
       -ld3d12 -ldxgi -lole32 -o fsr_provider_probe.exe
@@ -62,12 +64,14 @@ explicit D3D12-interception work.
 Use `--create-framegeneration` to create the Frame Generation 4 API context
 and report its selected provider. With the full SDK headers,
 `--create-denoiser` does the equivalent Ray Regeneration 1.2 context probe.
-These creation probes record allocation metadata but intentionally do not
-dispatch a synthetic neural frame or denoising workload. They are provider
-availability tests, not image-quality tests.
+With the full SDK Radiance Caching header, `--create-radiancecache` does the
+equivalent 0.9.0 provider availability probe. These creation probes record
+allocation metadata but intentionally do not dispatch a synthetic neural frame,
+denoising workload, or radiance-cache inference/training workload. They are
+provider availability tests, not image-quality tests.
 
-Every invocation ends with one stable `FFX_PROVIDER_PROBE_RESULT` line for
-each of `upscaler`, `frame-generation`, and `ray-regeneration`.  The fields
+Every invocation ends with one stable provider-result line for each of
+upscaler, frame-generation, ray-regeneration, and radiance-caching. The fields
 record whether that effect was requested, its create/query return values, and
 the provider actually selected.  `4294967295` means no query was possible
 (for example, creation returned `FFX_API_RETURN_NO_PROVIDER`); it is not a

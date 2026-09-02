@@ -30,6 +30,15 @@
 #ifndef FFX_PROVIDER_PROBE_HAS_DENOISER
 #define FFX_PROVIDER_PROBE_HAS_DENOISER 0
 #endif
+#if defined(__has_include)
+#if __has_include("ffx_radiancecache.h")
+#include "ffx_radiancecache.h"
+#define FFX_PROVIDER_PROBE_HAS_RADIANCECACHE 1
+#endif
+#endif
+#ifndef FFX_PROVIDER_PROBE_HAS_RADIANCECACHE
+#define FFX_PROVIDER_PROBE_HAS_RADIANCECACHE 0
+#endif
 #include "ffx_framegeneration.h"
 #include "ffx_upscale.h"
 
@@ -628,6 +637,54 @@ bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device
 }
 #endif
 
+#if FFX_PROVIDER_PROBE_HAS_RADIANCECACHE
+bool create_radiancecache_context(const FfxFunctions& functions,
+    ID3D12Device* device, ProviderSelection* selection)
+{
+    ffxCreateContextDescRadianceCache create = {};
+    ffxCreateBackendDX12Desc backend = {};
+    ffxCreateBackendDX12AllocationCallbacksDesc allocation_callbacks = {};
+    ffxContext context = nullptr;
+
+    create.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_RADIANCECACHE;
+    create.header.pNext = &backend.header;
+    create.version = FFX_RADIANCECACHE_VERSION;
+    /* Context creation is a provider-availability check, not a dispatch or
+     * image-quality test. Keep its resource bounds small for future supported
+     * hardware revalidation. */
+    create.maxInferenceSampleCount = 640 * 360;
+    create.maxTrainingSampleCount = 640 * 360;
+    backend.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+    backend.header.pNext = &allocation_callbacks.header;
+    backend.device = device;
+    allocation_callbacks.header.type =
+        FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12_ALLOCATION_CALLBACKS;
+    allocation_callbacks.pfnFfxResourceAllocator = provider_resource_allocate;
+    allocation_callbacks.pfnFfxResourceDeallocator = provider_resource_deallocate;
+
+    if (selection)
+        selection->attempted = true;
+    g_provider_allocation_device = device;
+    const ffxReturnCode_t result = functions.createContext(
+        &context, &create.header, nullptr);
+    if (selection)
+        selection->create_result = result;
+    std::printf("ffxCreateContext(Radiance Caching API %u.%u.%u) returned %u\n",
+        FFX_RADIANCECACHE_VERSION_MAJOR, FFX_RADIANCECACHE_VERSION_MINOR,
+        FFX_RADIANCECACHE_VERSION_PATCH, result);
+    if (result != FFX_API_RETURN_OK) {
+        g_provider_allocation_device = nullptr;
+        return false;
+    }
+    const bool query_success = report_selected_provider(functions, &context,
+        "radiance-caching", selection);
+    const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
+    g_provider_allocation_device = nullptr;
+    std::printf("ffxDestroyContext(radiance-caching) returned %u\n", destroy_result);
+    return query_success && destroy_result == FFX_API_RETURN_OK;
+}
+#endif
+
 void print_selection_summary(const char* effect, const ProviderSelection& selection)
 {
     char name[sizeof(selection.version_name)] = {};
@@ -650,7 +707,7 @@ void print_selection_summary(const char* effect, const ProviderSelection& select
 void print_usage(const wchar_t* executable)
 {
     ::fwprintf(stderr,
-        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser] [--provider-index N]\n",
+        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N]\n",
         executable);
 }
 
@@ -667,6 +724,7 @@ int wmain(int argc, wchar_t** argv)
     bool dispatch = false;
     bool create_framegeneration = false;
     bool create_denoiser = false;
+    bool create_radiancecache = false;
     uint64_t provider_index = UINT64_MAX;
     for (int index = 2; index < argc; ++index) {
         if (wcscmp(argv[index], L"--create") == 0) {
@@ -678,6 +736,8 @@ int wmain(int argc, wchar_t** argv)
             create_framegeneration = true;
         } else if (wcscmp(argv[index], L"--create-denoiser") == 0) {
             create_denoiser = true;
+        } else if (wcscmp(argv[index], L"--create-radiancecache") == 0) {
+            create_radiancecache = true;
         } else if (wcscmp(argv[index], L"--provider-index") == 0 && index + 1 < argc) {
             provider_index = std::wcstoull(argv[++index], nullptr, 10);
             create = true;
@@ -732,9 +792,22 @@ int wmain(int argc, wchar_t** argv)
     std::printf("ray-regeneration providers: not queried (full SDK denoiser header unavailable)\n");
 #endif
 
+#if FFX_PROVIDER_PROBE_HAS_RADIANCECACHE
+    std::vector<uint64_t> radiancecache_provider_ids;
+    if (!enumerate_effect_versions(functions, device,
+            FFX_API_CREATE_CONTEXT_DESC_TYPE_RADIANCECACHE,
+            "radiance-caching", &radiancecache_provider_ids)) {
+        std::fprintf(stderr,
+            "Radiance Caching provider enumeration unavailable for this loader/adapter.\n");
+    }
+#else
+    std::printf("radiance-caching providers: not queried (full SDK radiance-cache header unavailable)\n");
+#endif
+
     ProviderSelection upscaler_selection;
     ProviderSelection framegeneration_selection;
     ProviderSelection denoiser_selection;
+    ProviderSelection radiancecache_selection;
     bool success = true;
     if (create) {
         if (provider_index != UINT64_MAX && provider_index >= provider_ids.size()) {
@@ -760,10 +833,21 @@ int wmain(int argc, wchar_t** argv)
         success = false;
 #endif
     }
+    if (create_radiancecache) {
+#if FFX_PROVIDER_PROBE_HAS_RADIANCECACHE
+        success = create_radiancecache_context(functions, device,
+            &radiancecache_selection) && success;
+#else
+        std::fprintf(stderr,
+            "Cannot create Radiance Caching context: full SDK radiance-cache header unavailable.\n");
+        success = false;
+#endif
+    }
 
     print_selection_summary("upscaler", upscaler_selection);
     print_selection_summary("frame-generation", framegeneration_selection);
     print_selection_summary("ray-regeneration", denoiser_selection);
+    print_selection_summary("radiance-caching", radiancecache_selection);
 
     FreeLibrary(module);
     device->Release();

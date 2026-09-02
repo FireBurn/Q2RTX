@@ -297,6 +297,11 @@ internal provider type. Every run ends with stable
 use their actual selected names/IDs and return codes, not only a successful 4.x
 API-context creation.
 
+The full current SDK probe also covers Radiance Caching 0.9.0. On this RDNA2
+adapter it enumerated provider 0.9.0 but context creation returned error 6
+after vkd3d reported missing WMMA support. This is a measured
+unavailable-provider result, not evidence that Radiance Caching can run here.
+
 FSR3 analytical upscaling/frame interpolation has public source and is the
 highest-confidence native-Vulkan path for RDNA2.  The old AMD Vulkan
 frame-interpolation swapchain wrapper is Windows-specific and assumes distinct

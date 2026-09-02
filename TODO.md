@@ -641,6 +641,15 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   close returned 0x80070057, so no GPU-completed RDNA2 binary-provider frame
   was established. This is neither official FSR4.1.1 nor a native Vulkan
   provider; keep Q2RTX's source-v07 Vulkan work separate.
+- [x] Extend the official SDK 2.3 provider probe to Radiance Caching 0.9.0.
+  The optional full-SDK header is detected without making the reduced source
+  closure depend on it; the probe enumerates and optionally creates the
+  provider, then emits a fourth stable result line. On selected device
+  1002:73df, the signed provider enumerated as 0.9.0 but allocated its setup
+  resources then failed context creation with return 6 after vkd3d reported
+  missing WMMA support. This confirms that the current signed DX12 technical
+  preview is not runnable here and does not provide a native Vulkan
+  implementation.
 - [x] Make the measured official-provider boundary visible in Q2RTX rather
   than leaving source-v07 FSR4 or analytical FI/OF ambiguous. The read-only
   temporal diagnostics page now labels official FSR4.1.1, Ray Regeneration,

@@ -18,6 +18,12 @@ Current truth:
   fourth read-only temporal-diagnostics row for official Radiance Caching,
   alongside FSR4.1.1, RR, and MLFG, so the menu covers the full current SDK
   feature list without implying an unsupported native Vulkan implementation.
+  The controlled full-SDK DX12/Wine probe verifies the local behavior:
+  Radiance Caching provider 0.9.0 enumerates on device 1002:73df but context
+  creation returns 6 after vkd3d reports missing WMMA support. RR still returns
+  no-provider 4, while 4.1.1/4.0.1 select analytical 3.1.5/3.1.6. This makes
+  the fourth diagnostic row evidence-backed rather than a documentation-only
+  claim.
 
 - The community RDNA2 FSR4 route has now been isolated and tested without
   touching the game, SDK, or Proton cache. A new source-only legacy API probe
