@@ -493,10 +493,107 @@ bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
     return dispatch_success && destroy_result == FFX_API_RETURN_OK;
 }
 
+bool report_selected_provider(const FfxFunctions& functions, ffxContext* context,
+    const char* effect_name)
+{
+    ffxQueryGetProviderVersion provider_version = {};
+    provider_version.header.type = FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION;
+    const ffxReturnCode_t query_result = functions.query(context,
+        &provider_version.header);
+    std::printf("ffxQuery(GetProviderVersion, %s) returned %u: id=0x%016" PRIx64
+        " name=%s\n", effect_name, query_result, provider_version.versionId,
+        provider_version.versionName ? provider_version.versionName : "(unnamed)");
+    return query_result == FFX_API_RETURN_OK;
+}
+
+bool create_framegeneration_context(const FfxFunctions& functions,
+    ID3D12Device* device)
+{
+    ffxCreateContextDescFrameGeneration create = {};
+    ffxCreateBackendDX12Desc backend = {};
+    ffxCreateBackendDX12AllocationCallbacksDesc allocation_callbacks = {};
+    ffxCreateContextDescFrameGenerationVersion version = {};
+    ffxContext context = nullptr;
+
+    create.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION;
+    create.header.pNext = &backend.header;
+    create.displaySize = {1280, 720};
+    create.maxRenderSize = {1280, 720};
+    create.backBufferFormat = FFX_API_SURFACE_FORMAT_R16G16B16A16_FLOAT;
+    backend.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+    backend.header.pNext = &version.header;
+    backend.device = device;
+    version.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION_VERSION;
+    version.header.pNext = &allocation_callbacks.header;
+    version.version = FFX_FRAMEGENERATION_VERSION;
+    allocation_callbacks.header.type =
+        FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12_ALLOCATION_CALLBACKS;
+    allocation_callbacks.pfnFfxResourceAllocator = provider_resource_allocate;
+    allocation_callbacks.pfnFfxResourceDeallocator = provider_resource_deallocate;
+
+    g_provider_allocation_device = device;
+    const ffxReturnCode_t result = functions.createContext(
+        &context, &create.header, nullptr);
+    std::printf("ffxCreateContext(Frame Generation API %u.%u.%u) returned %u\n",
+        FFX_FRAMEGENERATION_VERSION_MAJOR, FFX_FRAMEGENERATION_VERSION_MINOR,
+        FFX_FRAMEGENERATION_VERSION_PATCH, result);
+    if (result != FFX_API_RETURN_OK) {
+        g_provider_allocation_device = nullptr;
+        return false;
+    }
+    const bool query_success = report_selected_provider(functions, &context,
+        "frame-generation");
+    const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
+    g_provider_allocation_device = nullptr;
+    std::printf("ffxDestroyContext(frame-generation) returned %u\n", destroy_result);
+    return query_success && destroy_result == FFX_API_RETURN_OK;
+}
+
+#if FFX_PROVIDER_PROBE_HAS_DENOISER
+bool create_denoiser_context(const FfxFunctions& functions, ID3D12Device* device)
+{
+    ffxCreateContextDescDenoiser create = {};
+    ffxCreateBackendDX12Desc backend = {};
+    ffxCreateBackendDX12AllocationCallbacksDesc allocation_callbacks = {};
+    ffxContext context = nullptr;
+
+    create.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_DENOISER;
+    create.header.pNext = &backend.header;
+    create.version = FFX_DENOISER_VERSION;
+    create.maxRenderSize = {640, 360};
+    create.signalFlags = FFX_DENOISER_SIGNAL_DIRECT_DIFFUSE;
+    backend.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+    backend.header.pNext = &allocation_callbacks.header;
+    backend.device = device;
+    allocation_callbacks.header.type =
+        FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12_ALLOCATION_CALLBACKS;
+    allocation_callbacks.pfnFfxResourceAllocator = provider_resource_allocate;
+    allocation_callbacks.pfnFfxResourceDeallocator = provider_resource_deallocate;
+
+    g_provider_allocation_device = device;
+    const ffxReturnCode_t result = functions.createContext(
+        &context, &create.header, nullptr);
+    std::printf("ffxCreateContext(Ray Regeneration API %u.%u.%u) returned %u\n",
+        FFX_DENOISER_VERSION_MAJOR, FFX_DENOISER_VERSION_MINOR,
+        FFX_DENOISER_VERSION_PATCH, result);
+    if (result != FFX_API_RETURN_OK) {
+        g_provider_allocation_device = nullptr;
+        return false;
+    }
+    const bool query_success = report_selected_provider(functions, &context,
+        "denoiser/ray-regeneration");
+    const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
+    g_provider_allocation_device = nullptr;
+    std::printf("ffxDestroyContext(denoiser/ray-regeneration) returned %u\n",
+        destroy_result);
+    return query_success && destroy_result == FFX_API_RETURN_OK;
+}
+#endif
+
 void print_usage(const wchar_t* executable)
 {
     ::fwprintf(stderr,
-        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch] [--provider-index N]\n",
+        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser] [--provider-index N]\n",
         executable);
 }
 
@@ -511,6 +608,8 @@ int wmain(int argc, wchar_t** argv)
 
     bool create = false;
     bool dispatch = false;
+    bool create_framegeneration = false;
+    bool create_denoiser = false;
     uint64_t provider_index = UINT64_MAX;
     for (int index = 2; index < argc; ++index) {
         if (wcscmp(argv[index], L"--create") == 0) {
@@ -518,6 +617,10 @@ int wmain(int argc, wchar_t** argv)
         } else if (wcscmp(argv[index], L"--dispatch") == 0) {
             create = true;
             dispatch = true;
+        } else if (wcscmp(argv[index], L"--create-framegeneration") == 0) {
+            create_framegeneration = true;
+        } else if (wcscmp(argv[index], L"--create-denoiser") == 0) {
+            create_denoiser = true;
         } else if (wcscmp(argv[index], L"--provider-index") == 0 && index + 1 < argc) {
             provider_index = std::wcstoull(argv[++index], nullptr, 10);
             create = true;
@@ -583,6 +686,17 @@ int wmain(int argc, wchar_t** argv)
                 ? 0 : provider_ids[static_cast<size_t>(provider_index)];
             success = create_fsr411_context(functions, device, provider_id, dispatch);
         }
+    }
+    if (create_framegeneration)
+        success = create_framegeneration_context(functions, device) && success;
+    if (create_denoiser) {
+#if FFX_PROVIDER_PROBE_HAS_DENOISER
+        success = create_denoiser_context(functions, device) && success;
+#else
+        std::fprintf(stderr,
+            "Cannot create Ray Regeneration context: full SDK denoiser header unavailable.\n");
+        success = false;
+#endif
     }
 
     FreeLibrary(module);

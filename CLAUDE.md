@@ -289,10 +289,11 @@ SDK 2.3 DX12/Wine entry point for that research. On this RX 6800M it enumerated
 only analytical upscaler 3.1.5/2.3.4 providers, and a 4.1.1 API context selected
 3.1.5 for a successful dispatch. That is a measured current RDNA2 fallback
 result, not evidence that official neural FSR4 is available. The probe also
-enumerates frame-generation and, with the full SDK's `ffx_denoiser.h`, the
-public denoiser/Ray-Regeneration providers independently. The deliberately
-reduced vendored source closure omits that header, and its build must report
-the omission rather than manufacture an internal provider type.
+creates a Frame Generation 4 context and, with the full SDK's
+`ffx_denoiser.h`, a Ray Regeneration 1.2 context independently before querying
+the selected provider. The deliberately reduced vendored source closure omits
+that header, and its build must report the omission rather than manufacture an
+internal provider type.
 
 FSR3 analytical upscaling/frame interpolation has public source and is the
 highest-confidence native-Vulkan path for RDNA2.  The old AMD Vulkan

@@ -7,13 +7,15 @@ payloads.
 
 It creates a DX12 device, loads a caller-selected
 amd_fidelityfx_loader_dx12.dll, enumerates upscaler, frame-generation, and
-denoiser/Ray-Regeneration providers, and can create an FSR 4.1.1 API context.
-A successful create is enough to reveal which upscaler provider AMD selected;
-dispatch capture is a later, separate step because it needs correctly
-initialized color/depth/MV resources and a command queue. Ray Regeneration is
-published through the SDK's denoiser descriptor; when compiled only against
-the deliberately reduced Q2RTX FSR-only source closure, the probe clearly
-reports that the denoiser header is absent instead of guessing a private type.
+denoiser/Ray-Regeneration providers, and can create FSR 4.1.1, Frame Generation
+4.0.1, or Ray Regeneration 1.2.0 API contexts. Each creation mode queries the
+selected provider after creation, so a legacy fallback cannot be mistaken for
+the requested neural API version. Dispatch capture is a separate step because
+it needs correctly initialized color/depth/MV resources and a command queue.
+Ray Regeneration is published through the SDK's denoiser descriptor; when
+compiled only against the deliberately reduced Q2RTX FSR-only source closure,
+the probe clearly reports that the denoiser header is absent instead of
+guessing a private type.
 
 Build, replacing SDK with the local FidelityFX SDK 2.3 checkout:
 
@@ -56,3 +58,10 @@ formats, mip counts, flags, and initial states without extracting a provider
 payload. It does not observe descriptor writes, root constants, barriers, or
 individual dispatch dimensions; those remain RenderDoc/d3d12-replayer or
 explicit D3D12-interception work.
+
+Use `--create-framegeneration` to create the Frame Generation 4 API context
+and report its selected provider. With the full SDK headers,
+`--create-denoiser` does the equivalent Ray Regeneration 1.2 context probe.
+These creation probes record allocation metadata but intentionally do not
+dispatch a synthetic neural frame or denoising workload. They are provider
+availability tests, not image-quality tests.

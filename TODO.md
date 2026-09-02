@@ -595,7 +595,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   3.1.5/2.3.4 upscalers, 3.1.6 frame generation, and no denoiser/RR provider;
   the 4.1.1 context selected analytical 3.1.5 and its auto-exposure-enabled
   metadata dispatch completed without an FFX warning, producing 11 paired
-  DXIL/SPIR-V captures outside the tree.
+  DXIL/SPIR-V captures outside the tree. The explicit Frame Generation 4.0.1
+  context likewise selected analytical 3.1.6, while the Ray Regeneration 1.2
+  context returned `FFX_API_RETURN_NO_PROVIDER` (4).
 - [-] Capture PSO/root signatures, resources/views, constants, uploads, pass
   order, dispatch dimensions, barriers, provider version, and feature queries.
   The controlled RX 6800M capture has the selected provider, a successful

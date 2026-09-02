@@ -399,8 +399,12 @@ Current truth:
   selecting only analytical FSR3.1.5/2.3.4, there is no honest native-Vulkan
   neural FSR4/RR/MLFG provider to attach on this machine. Keep the working
   native FSR3 FI/OF and source-v07 FSR4 paths distinct from that unavailable
-  binary feature set. Sources: https://github.com/GPUOpen-LibrariesAndSDKs/
-  FidelityFX-SDK and https://gpuopen.com/amd-fsr-sdk/.
+  binary feature set. A fresh full-SDK probe made the distinction direct:
+  Frame Generation API 4.0.1 created only after selecting analytical 3.1.6,
+  while Ray Regeneration API 1.2.0 creation returned
+  `FFX_API_RETURN_NO_PROVIDER` (4). Sources:
+  https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK and
+  https://gpuopen.com/amd-fsr-sdk/.
 
 - The menu revision now exposes all provider-neutral RR input views through
   view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the
