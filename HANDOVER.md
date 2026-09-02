@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- A new validation-enabled odd-size FSR4-v07 Quality + RCAS/SPD-auto-exposure
+  + SDK-3.1.6 FI/OF lifecycle capture completed 960x540 -> 1133x717 ->
+  960x540. The middle recreation selected the exact 760x480 -> 1133x717 graph;
+  the final recreation restored 644x361 -> 960x540. FI/OF reactivated after
+  both expected reset fallbacks, no VUID/FSR/dispatch/presenter error was
+  recorded, and the full-colour captures are
+  `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_odd_resize_1133x717.png`
+  and `FSR4_odd_resize_restored.png`. This closes odd-size live-resize coverage;
+  arbitrary reset/disocclusion coverage remains separate work.
+
 - The source-only official-provider probe now ends every run with stable
   `FFX_PROVIDER_PROBE_RESULT` records for upscaling, frame generation, and
   Ray Regeneration. A freshly cross-compiled full-SDK 2.3 run on RDNA2 recorded
