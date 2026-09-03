@@ -1730,9 +1730,9 @@ Live FSR4 command (the doubled `++` is required to pass literal Quake key
 commands through command-line parsing):
 
 ```sh
-env MESA_VK_DEVICE_SELECT=1002:73df! DRI_PRIME=1 VK_LOADER_DEBUG=error \
+env Q2RTX_DATA_DIR=/home/fireburn/Q2RTX \
+MESA_VK_DEVICE_SELECT=1002:73df! DRI_PRIME=1 VK_LOADER_DEBUG=error \
 ./q2rtx \
-  +set basedir /home/fireburn/Q2RTX \
   +set libdir /home/fireburn/Q2RTX \
   +set vid_fullscreen 0 +set vid_geometry 2560x1440+1920+0 \
   +set vid_vsync 0 +set viewsize 50 +set drs_enable 0 \
@@ -1740,6 +1740,10 @@ env MESA_VK_DEVICE_SELECT=1002:73df! DRI_PRIME=1 VK_LOADER_DEBUG=error \
   +set flt_fsr4_sharpening 0.5 \
   +set scr_fps 2 +set developer 1 +map base1 ++forward ++left
 ```
+
+`basedir` is created during platform bootstrap, before command-line `+set`
+commands execute. Use `Q2RTX_DATA_DIR` for a source/staged data tree; it is
+honored before the normal `/usr/share/quake2rtx` package path.
 
 The run rebuilt from its initial 320x240 -> 640x480 1080-tier context to a
 coherent 2160-tier 1280x720 -> 2560x1440 context.  It then rendered and moved
