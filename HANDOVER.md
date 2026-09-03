@@ -121,7 +121,10 @@ Current truth:
   renderer's eight-line limit) before placing controls; the concise
   current-control capture is
   `/home/fireburn/Q2RTX/build/menu-package.DaC2CA/xdg/quake2rtx/baseq2/screenshots/FSR_temporal_menu_layout_960x540_fixed.png`.
-  It visibly retains Temporal Diagnostics and Back above the help text.
+  It was re-captured after the measured-height refinement from the current
+  source binary at 960x540, visibly retaining Temporal Diagnostics and Back
+  above the two-line help text; the validation-enabled log has no VUID,
+  descriptor, FSR, or presenter error.
 
 - A fresh 2026-09-03 staged-package RX 6800M run loaded the shareware `demo1`
   map, selected source-v07 FSR4 Performance at 480x270 -> 960x540, and reached

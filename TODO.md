@@ -769,7 +769,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   a fresh staged-package 960x540 capture is readable and validation-clean.
   Compact menus now measure and reserve the longest visible wrapped status/help
   area, preventing a long FSR explanation from painting over the final control
-  rows without wasting eight lines for short hints. A final current
+  rows without wasting eight lines for short hints. The current-source
+  960x540 re-capture visibly retains Temporal Diagnostics and Back above its
+  two-line hint with validation clean. A final current
   ebuild-equivalent Release staging build installed the same layout and passed
   its menu, shader-ABI, and complete-FSR4-asset checks.
   The versioned loose menu migration now prevents an old user media archive
