@@ -1976,8 +1976,22 @@ void Menu_Init(menuFrameWork_t *menu)
 void Menu_Size(menuFrameWork_t *menu)
 {
     menuCommon_t *item;
-    int x, y, w, h;
+    int x, y, w, h, status_height;
     int i, widest = -1;
+
+    /* Menu_DrawStatus can wrap a compact menu item's help into as many as
+     * eight lines.  It used to draw those lines upward from menu->y2 without
+     * reserving any room, covering the final controls in a dense FSR menu. */
+    status_height = 0;
+    if (menu->compact) {
+        for (i = 0; i < menu->nitems; i++) {
+            item = menu->items[i];
+            if (!(item->flags & QMF_HIDDEN) && item->status && item->status[0]) {
+                status_height = CHAR_HEIGHT * 8;
+                break;
+            }
+        }
+    }
 
     // count visible items
     for (i = 0, h = 0; i < menu->nitems; i++) {
@@ -2002,8 +2016,8 @@ void Menu_Size(menuFrameWork_t *menu)
 
     // set menu top/bottom
     if (menu->compact) {
-        menu->y1 = (uis.height - h) / 2 - MENU_SPACING;
-        menu->y2 = (uis.height + h) / 2 + MENU_SPACING;
+        menu->y1 = (uis.height - h - status_height) / 2 - MENU_SPACING;
+        menu->y2 = (uis.height + h + status_height) / 2 + MENU_SPACING;
     } else {
         menu->y1 = 0;
         menu->y2 = uis.height;
@@ -2025,7 +2039,7 @@ void Menu_Size(menuFrameWork_t *menu)
     }
 
     // set menu vertical base
-    y = (uis.height - h) / 2;
+    y = (uis.height - h - status_height) / 2;
 
     // banner is horizontally centered and
     // positioned on top of all menu items
