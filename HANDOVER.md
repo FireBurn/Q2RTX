@@ -115,6 +115,11 @@ Current truth:
   the binary itself before `/usr/share/quake2rtx`, completing the launcher's
   documented staged/portable override rather than accidentally mixing a test
   binary with system-installed data.
+  The child page initially revealed that long `--status` help was drawn over
+  its final rows. Compact menus with visible help now reserve all eight legal
+  status lines before placing controls; the concise current-control capture is
+  `/home/fireburn/Q2RTX/build/menu-package.DaC2CA/xdg/quake2rtx/baseq2/screenshots/FSR_temporal_menu_layout_960x540_fixed.png`.
+  It visibly retains Temporal Diagnostics and Back above the help text.
 
 - A fresh 2026-09-03 staged-package RX 6800M run loaded the shareware `demo1`
   map, selected source-v07 FSR4 Performance at 480x270 -> 960x540, and reached

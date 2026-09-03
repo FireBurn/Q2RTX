@@ -186,13 +186,13 @@ begin temporal_settings
     title "Temporal Upscaling"
     background #212F3CD0
     style --compact
-    pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment. FSR4 v07 is an experimental source INT8 model, not official FSR 4.1.1; AMD's current 4.1.1 provider is signed DX12/Windows-only and needs RX 7000+/9000, so native Vulkan/RDNA2 uses this v07 path. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
+    pairs --status "FSR3 is native Vulkan. FSR4 v07 is an experimental source model for Vulkan/RDNA2, distinct from AMD's signed DX12-only FSR4.1.1 provider. Choose its matching quality model below." \
         "temporal upscaler" flt_upscaler \
         "Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
-    pairs --status "selects matching FSR3 or FSR4 v07 model ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. Changing it rebuilds FSR4's complete model graph and resets history." \
+    pairs --status "Selects Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. FSR4 rebuilds its matching model graph and resets history." \
         "FSR quality" flt_fsr_quality \
         "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
-    toggle --status "uses FSR4 v07's dedicated dynamic-resolution model and lets the Dynamic Resolution Scaling menu control render scale. It is ignored by FSR3 and replaces the fixed FSR4 quality model." \
+    toggle --status "Uses FSR4 v07's dedicated dynamic-resolution model and the Dynamic Resolution Scaling menu. It replaces FSR4's fixed quality model and is ignored by FSR3." \
         "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
     range -f "%.2f" --status "FSR3 RCAS amount (0 disables it); it is independent from the experimental FSR4 control below" \
         "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
@@ -200,13 +200,13 @@ begin temporal_settings
         "FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
     toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
         "FSR4 auto exposure" flt_fsr4_auto_exposure
-    pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3 3.1.4, FSR3.1.5, or source-v07 FSR4 super resolution; rectilinear single-GPU rendering; and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait. Enabling it recreates the swapchain with FIFO pacing so Mailbox/Immediate cannot discard or tear the generated-real pair." \
+    pairs --status "Experimental analytical FSR3 Optical Flow + Frame Interpolation. It requires an active temporal upscaler, rectilinear single-GPU rendering, and a focused FIFO swapchain; diagnostics report its real status and cadence." \
         "FSR3 frame generation" flt_frame_generation \
         "Off" 0 "Analytical (experimental)" 1
-    pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port and the default for fresh configs; it is validated for RGBA16F, sRGB/scRGB transfer handling, fence-token view retirement, and current RX 6800M FIFO presentation. Legacy 1.1.4 remains available for comparison." \
+    pairs --status "SDK 3.1.6 is the newer reusable Vulkan FI/OF scheduler and the default. Legacy 1.1.4 remains available for compatibility comparison." \
         "FSR3 FG scheduler" flt_frame_generation_backend \
         "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
-    range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation; recovery needs eight high samples plus conservative FI headroom to prevent visible on/off toggling." \
+    range --status "Minimum completed render FPS for analytical generation. 30 is the conservative default, 60 is AMD's target, and 0 disables this safety gate for testing." \
         "FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
     action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
         "temporal diagnostics..." pushmenu temporal_diagnostics
