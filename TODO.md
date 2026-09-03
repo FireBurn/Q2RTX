@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-09-02 (Europe/London)
+Last updated: 2026-09-03 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
