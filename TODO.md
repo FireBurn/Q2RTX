@@ -767,8 +767,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FSR additions no longer vertically squeeze controls at 960x540. A root CTest
   locks the RTX navigation and a maximum of 15 compact controls per child page;
   a fresh staged-package 960x540 capture is readable and validation-clean.
-  Compact menus now reserve their complete status/help area, preventing a long
-  FSR explanation from painting over the final control rows. A final current
+  Compact menus now measure and reserve the longest visible wrapped status/help
+  area, preventing a long FSR explanation from painting over the final control
+  rows without wasting eight lines for short hints. A final current
   ebuild-equivalent Release staging build installed the same layout and passed
   its menu, shader-ABI, and complete-FSR4-asset checks.
   The versioned loose menu migration now prevents an old user media archive

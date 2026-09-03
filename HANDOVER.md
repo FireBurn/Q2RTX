@@ -116,8 +116,10 @@ Current truth:
   documented staged/portable override rather than accidentally mixing a test
   binary with system-installed data.
   The child page initially revealed that long `--status` help was drawn over
-  its final rows. Compact menus with visible help now reserve all eight legal
-  status lines before placing controls; the concise current-control capture is
+  its final rows. Compact menus now measure the longest visible help hint at
+  the current width and reserve exactly its wrapped height (up to the
+  renderer's eight-line limit) before placing controls; the concise
+  current-control capture is
   `/home/fireburn/Q2RTX/build/menu-package.DaC2CA/xdg/quake2rtx/baseq2/screenshots/FSR_temporal_menu_layout_960x540_fixed.png`.
   It visibly retains Temporal Diagnostics and Back above the help text.
 

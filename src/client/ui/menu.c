@@ -1973,22 +1973,59 @@ void Menu_Init(menuFrameWork_t *menu)
     if (menu->maxs[1] > uis.height) menu->maxs[1] = uis.height;
 }
 
+/*
+ * Keep this in lockstep with Menu_DrawStatus: compact menus are centred around
+ * both their controls and the help text drawn beneath them.  Reserving the
+ * longest selectable item's actual wrapped height avoids both the old overlap
+ * and a permanent eight-line gap for a one-line hint.
+ */
+static int Menu_StatusLineCount(const char *txt)
+{
+    const char *p;
+    int linewidth = uis.width / CHAR_WIDTH;
+    int x = 0, l, count = 0;
+
+    if (!txt || !txt[0] || linewidth <= 0) {
+        return 0;
+    }
+
+    while (*txt) {
+        for (p = txt; *p > 32; p++)
+            ;
+        l = p - txt;
+
+        if ((l < linewidth && x + l > linewidth) || (x == linewidth)) {
+            if (count == 7) {
+                break;
+            }
+            count++;
+            x = 0;
+        }
+
+        txt++;
+        x++;
+    }
+
+    return count + 1;
+}
+
 void Menu_Size(menuFrameWork_t *menu)
 {
     menuCommon_t *item;
-    int x, y, w, h, status_height;
+    int x, y, w, h, status_height, status_lines;
     int i, widest = -1;
 
-    /* Menu_DrawStatus can wrap a compact menu item's help into as many as
-     * eight lines.  It used to draw those lines upward from menu->y2 without
-     * reserving any room, covering the final controls in a dense FSR menu. */
+    /* Menu_DrawStatus draws help upward from menu->y2.  It used to reserve no
+     * space at all, covering the final controls in a dense FSR menu. */
     status_height = 0;
     if (menu->compact) {
         for (i = 0; i < menu->nitems; i++) {
             item = menu->items[i];
             if (!(item->flags & QMF_HIDDEN) && item->status && item->status[0]) {
-                status_height = CHAR_HEIGHT * 8;
-                break;
+                status_lines = Menu_StatusLineCount(item->status);
+                if (status_lines * CHAR_HEIGHT > status_height) {
+                    status_height = status_lines * CHAR_HEIGHT;
+                }
             }
         }
     }

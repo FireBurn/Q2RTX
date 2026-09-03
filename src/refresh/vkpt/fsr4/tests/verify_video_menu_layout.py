@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import sys
 
 
 MAX_COMPACT_ITEMS = 15
+STATUS_WRAP_COLUMNS = 960 // 8
+MAX_STATUS_LINES = 8
 
 
 def menu_block(menu: str, name: str) -> list[str]:
@@ -30,6 +33,35 @@ def visible_item_count(lines: list[str]) -> int:
 def require(lines: list[str], text: str) -> None:
     if not any(text in line for line in lines):
         raise ValueError(f"missing menu control: {text}")
+
+
+def status_line_count(text: str, columns: int) -> int:
+    """Match Menu_DrawStatus's bounded word-wrap calculation."""
+    count = 0
+    used = 0
+    position = 0
+    while position < len(text):
+        word_end = position
+        while word_end < len(text) and ord(text[word_end]) > 32:
+            word_end += 1
+        word_length = word_end - position
+        if (word_length < columns and used + word_length > columns) or used == columns:
+            if count == MAX_STATUS_LINES - 1:
+                break
+            count += 1
+            used = 0
+        position += 1
+        used += 1
+    return count + 1 if text else 0
+
+
+def verify_status_space(lines: list[str], name: str) -> None:
+    statuses = re.findall(r'--status "([^"]*)"', "\n".join(lines))
+    if not statuses:
+        return
+    longest = max(status_line_count(status, STATUS_WRAP_COLUMNS) for status in statuses)
+    if longest > MAX_STATUS_LINES:
+        raise ValueError(f"{name} has help text exceeding the renderer's {MAX_STATUS_LINES}-line limit")
 
 
 def verify(menu_path: Path) -> None:
@@ -64,18 +96,26 @@ def verify(menu_path: Path) -> None:
             raise ValueError(f"{name} has {count} controls; maximum is {MAX_COMPACT_ITEMS}")
         for control in controls:
             require(lines, control)
+        verify_status_space(lines, name)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("menu", type=Path)
+    parser.add_argument("--menu-source", type=Path,
+                        help="menu.c implementation; verifies compact help reserves its wrapped height")
     args = parser.parse_args()
     try:
         verify(args.menu)
+        if args.menu_source:
+            source = args.menu_source.read_text(encoding="utf-8")
+            if ("Menu_StatusLineCount" not in source
+                    or "status_lines * CHAR_HEIGHT" not in source):
+                raise ValueError("compact menu help does not reserve its measured wrapped height")
     except (OSError, ValueError) as error:
         print(f"Video-menu layout verification failed: {error}", file=sys.stderr)
         return 1
-    print("Video-menu layout verification passed: compact RTX navigation and three bounded pages")
+    print("Video-menu layout verification passed: compact RTX navigation, bounded pages, and reserved help text")
     return 0
 
 

@@ -475,7 +475,8 @@ IF(IS_64_BIT)
             add_test(NAME video_menu_layout
                 COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_video_menu_layout.py
-                    ${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu)
+                    ${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu
+                    --menu-source ${CMAKE_CURRENT_SOURCE_DIR}/client/ui/menu.c)
         endif()
     endif()
 
