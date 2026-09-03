@@ -47,6 +47,16 @@ def verify(menu_path: Path, source_path: Path) -> None:
         if f'"{default}"' not in source:
             raise ValueError(f"concise cvar default missing: {cvar}")
 
+    # FSR3 is optional at compile time. A request for it must fail closed when
+    # omitted, not reach the independent FSR4-v07 resolver by fall-through.
+    resolver_guards = (
+        "if (requested != VKPT_UPSCALER_FSR4)",
+        '"fallback: requested FSR3 is not compiled"',
+    )
+    for guard in resolver_guards:
+        if guard not in source:
+            raise ValueError(f"optional-FSR3 resolver guard missing: {guard}")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -58,7 +68,7 @@ def main() -> int:
     except (OSError, ValueError) as error:
         print(f"Temporal provider-status verification failed: {error}", file=sys.stderr)
         return 1
-    print("Temporal provider-status verification passed: 4 official-provider rows")
+    print("Temporal provider-status verification passed: provider rows and optional-FSR3 fallback")
     return 0
 
 

@@ -228,6 +228,7 @@ cvar_t *cvar_flt_frame_generation_generated_fps = NULL;
 cvar_t *cvar_flt_frame_generation_debug_capture = NULL;
 static cvar_t *fsr3_frame_generation_backend_revision = NULL;
 cvar_t *cvar_flt_temporal_debug_view = NULL;
+#ifdef VKPT_FSR3
 static unsigned fsr3_fg_low_rate_frames;
 static unsigned fsr3_fg_recovery_frames;
 static bool fsr3_fg_rate_blocked;
@@ -246,6 +247,7 @@ static float fsr3_fg_enable_baseline_fps;
 static float fsr3_fg_active_input_fps;
 static float fsr3_fg_recovery_required_fps;
 static float fsr3_fg_recovery_input_fps;
+#endif
 cvar_t *cvar_flt_upscaler_active = NULL;
 cvar_t *cvar_flt_upscaler_reason = NULL;
 cvar_t *cvar_flt_fsr4_official_provider_reason = NULL;
@@ -1175,6 +1177,18 @@ static bool resolve_upscaler(int *active, const char **reason)
     }
 #endif
 
+    /* A build may deliberately omit the public FSR3 closure.  Do not let a
+     * request for either FSR3 provider fall through into the independent v07
+     * FSR4 resolver merely because that backend happens to be available. */
+    if (requested != VKPT_UPSCALER_FSR4) {
+#ifdef VKPT_FSR3
+        *reason = "fallback: requested temporal provider is unavailable";
+#else
+        *reason = "fallback: requested FSR3 is not compiled";
+#endif
+        return false;
+    }
+
     /* A v07 preset owns its whole model graph, persistent images, and
      * descriptors. Resolve it before reporting availability: otherwise a
      * quality cvar change is rejected here and the dispatch path that normally
@@ -1742,6 +1756,7 @@ vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
         return false;
     *view = (VkptTemporalDebugView)cvar_flt_temporal_debug_view->integer;
     if (*view == VKPT_TEMPORAL_DEBUG_FRAMEGEN_OUTPUT) {
+#ifdef VKPT_FSR3
         /* A debug view deliberately suspends new FI dispatches.  Keep the
          * most recently generated image inspectable while that cvar is set,
          * rather than using vkpt_fsr_frame_generation_is_ready(), which is
@@ -1757,6 +1772,12 @@ vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
         *image_view = qvk.images_views[VKPT_IMG_FSR_FRAMEGEN_OUTPUT];
         *extent = qvk.extent_unscaled;
         return *image_view && extent->width && extent->height;
+#else
+        if (reason && reason_size)
+            Q_snprintf(reason, reason_size,
+                "analytical frame generation is not compiled");
+        return false;
+#endif
     }
     if (*view == VKPT_TEMPORAL_DEBUG_FSR_RECONSTRUCTED) {
         if (!vkpt_fsr_is_enabled()) {

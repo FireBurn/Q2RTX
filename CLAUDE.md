@@ -288,6 +288,10 @@ analytical FSR3 FI/OF choices;
 keep the values short enough to fit the 52-character static column rather than
 silently ellipsizing the DX12/native-Vulkan or RX 9000 boundary.
 
+`CONFIG_VKPT_FSR3` is optional.  If it is disabled, requests for either FSR3
+upscaler or analytical frame-generation debug output must fail closed with an
+explicit not-compiled reason; they must never fall through to source-v07 FSR4.
+
 tools/ffx_dxil/reference_harness/fsr_provider_probe.cpp is the controlled AMD
 SDK 2.3 DX12/Wine entry point for that research. On this RX 6800M it enumerated
 only analytical upscaler 3.1.5/2.3.4 providers, and a 4.1.1 API context selected

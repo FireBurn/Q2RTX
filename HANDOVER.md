@@ -38,6 +38,12 @@ Current truth:
   and not a portable Vulkan replacement. The native Vulkan source-v07 path in
   Q2RTX remains the runnable experimental FSR4 route on this machine.
 
+- The central temporal resolver now fails closed in `CONFIG_VKPT_FSR3=OFF`
+  builds: a requested FSR3 provider cannot accidentally select FSR4-v07, and
+  the generated-output debug view reports that analytical frame generation is
+  not compiled. The exact no-FSR3 FSR translation unit and the normal
+  FSR3/FSR4 build both compile cleanly; the root CTest suite remains 6/6.
+
 - A fresh native-Q2RTX 960x540 validation-enabled source-v07 FSR4 Quality
   revalidation selected the exact 644x361 -> 960x540 INT8/DOT4 16-pass graph,
   automatic exposure, and the SDK-3.1.6 FI/OF presentation path. Diagnostics

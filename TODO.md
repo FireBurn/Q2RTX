@@ -801,7 +801,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   capability/fallback resolver and display one precise fallback reason.
   `flt_upscaler_active` and `flt_upscaler_reason` now publish the exact live
   outcome and are validated for both active FSR3 and nonlinear-projection
-  fallback. The menu now has a read-only diagnostics page for both provider
+  fallback. An FSR3-disabled configuration now also rejects either requested
+  FSR3 provider and its generated-output debug view explicitly rather than
+  falling through into source-v07 FSR4; its FSR translation unit is
+  warning-clean. The menu now has a read-only diagnostics page for both provider
   reasons and frame-generation cadence; its 2560x1440 Vulkan-validation
   capture is `/home/fireburn/Screenshot_temporal_diagnostics_window_20260820.png`.
 - [x] Use per-swapchain-image render-complete semaphores for generated/real
