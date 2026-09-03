@@ -522,3 +522,12 @@ stamp and `setup/package_shaders.cmake`'s fresh-archive behavior: incremental
 `7z a` archives and loose user shader caches can otherwise retain modules built
 against a previous table.  Bump the launcher shader-layout marker whenever this
 table changes; it preserves the old loose cache as a recoverable backup.
+
+## Packaged and portable launches
+
+`Q2RTX_DATA_DIR`, used by the installed launcher for portable/staged data, is
+also honored by the client before the `/usr/share/quake2rtx` default. Do not
+remove this: otherwise a staged executable can silently load stale system
+shader archives. Keep the RTX Video page as navigation only; its FSR controls
+belong on `temporal_settings`, which is protected by `video_menu_layout` so
+low-height modes remain readable.

@@ -104,6 +104,18 @@ Current truth:
   backup rather than letting it override the matching archive. This prevents
   the observed sampler-vs-storage-image validation mismatch at startup.
 
+- The Video menu’s all-in-one RTX page was visibly vertically crowded at
+  960x540. It now keeps only display basics and five navigation actions, with
+  bounded Image Tuning, Temporal Upscaling, and Ray Tracing Features pages.
+  `video_menu_layout` enforces this split (at most 15 compact controls per
+  child page). The fresh staged-package capture at
+  `/home/fireburn/Q2RTX/build/menu-package.DaC2CA/xdg/quake2rtx/baseq2/screenshots/FSR_video_menu_layout_960x540_fixed.png`
+  is readable without the old squeezed rows and its validation-enabled launch
+  logged no VUID or descriptor ABI error. `Q2RTX_DATA_DIR` is now honored by
+  the binary itself before `/usr/share/quake2rtx`, completing the launcher's
+  documented staged/portable override rather than accidentally mixing a test
+  binary with system-installed data.
+
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
   `0725754c39b9e7187d07b9620e4131e2d9bad3d5` (parent Q2RTX commit
   `1b80d558`). It adds `ffx-vulkan::radiancecache-contract`: a deliberately

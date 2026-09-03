@@ -762,6 +762,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 - [-] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
+  The Video entry point has been split into short display navigation plus
+  Image Tuning, Temporal Upscaling, and Ray Tracing Features pages, so the
+  FSR additions no longer vertically squeeze controls at 960x540. A root CTest
+  locks the RTX navigation and a maximum of 15 compact controls per child page;
+  a fresh staged-package 960x540 capture is readable and validation-clean.
   The versioned loose menu migration now prevents an old user media archive
   from hiding new upscaler enum values (the verified FSR3.1.5 menu formerly
   rendered as `???`). A generic read-only `static` menu item can now bind a
