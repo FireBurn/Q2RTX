@@ -217,6 +217,7 @@ Sys_Init
 void Sys_Init(void)
 {
     const char *homedir;
+    const char *data_dir;
     char    *xdg_data_home_dir;
     char     homegamedir[PATH_MAX];
     int      check_snprintf;
@@ -231,8 +232,19 @@ void Sys_Init(void)
     signal(SIGHUP, term_handler);
     signal(SIGUSR1, usr1_handler);
 
-    // Check for a full-install before searching local dirs
-    sprintf(baseDirectory, "%s", "/usr/share/quake2rtx");
+    // A packaged launcher may point at a staged or portable data directory.
+    // Honor it before the system prefix; otherwise a development/staged binary
+    // silently mixes its current executable with stale /usr shader archives.
+    data_dir = getenv("Q2RTX_DATA_DIR");
+    if (data_dir && data_dir[0]) {
+        check_snprintf = Q_snprintf(baseDirectory, sizeof(baseDirectory), "%s", data_dir);
+        if (check_snprintf >= sizeof(baseDirectory)) {
+            Sys_Error("Q2RTX_DATA_DIR path is too long\n");
+        }
+    } else {
+        // Check for a full-install before searching local dirs.
+        sprintf(baseDirectory, "%s", "/usr/share/quake2rtx");
+    }
     dir_hnd = opendir(baseDirectory);
     if (dir_hnd) {
         closedir(dir_hnd);
@@ -566,4 +578,3 @@ int main(int argc, char **argv)
     Com_Quit(NULL, ERR_DISCONNECT);
     return EXIT_FAILURE; // never gets here
 }
-

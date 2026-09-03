@@ -472,6 +472,10 @@ IF(IS_64_BIT)
                     ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_global_texture_shader_abi.py
                     ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/shader/global_textures.h
                     ${CMAKE_SOURCE_DIR}/baseq2/shader_vkpt)
+            add_test(NAME video_menu_layout
+                COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/refresh/vkpt/fsr4/tests/verify_video_menu_layout.py
+                    ${CMAKE_SOURCE_DIR}/baseq2/q2rtx.menu)
         endif()
     endif()
 

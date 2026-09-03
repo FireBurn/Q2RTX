@@ -137,58 +137,15 @@ begin video
     range -f "%.0f deg" "field of view" fov 60 160 5
     blank
 
+    // Keep the first Video page short enough to retain a normal readable font
+    // at 16:9 960x540 and other low-height modes. The prior all-in-one page
+    // could force the UI scaler to squeeze every control vertically.
     ifeq vid_rtx 1
         action "resolution scaling options..." pushmenu resolution
         action "HDR options..." pushmenu hdr
-        blank
-        range -f "%+.1f EV" "exposure bias (brightness)" tm_exposure_bias -5 0 0.1
-        range -p -f "%.0f%%" "contrast" tm_reinhard 0 1 0.1
-		range "texture LOD bias" pt_texture_lod_bias -2 2 0.5
-		pairs --status "used whenever the selected temporal upscaler is off or unavailable" \
-			"fallback anti-aliasing" flt_taa \
-			"none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
-		pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment. FSR4 v07 is an experimental source INT8 model, not official FSR 4.1.1; AMD's current 4.1.1 provider is signed DX12/Windows-only and needs RX 7000+/9000, so native Vulkan/RDNA2 uses this v07 path. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
-			"temporal upscaler" flt_upscaler \
-			"Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
-		pairs --status "selects matching FSR3 or FSR4 v07 model ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. Changing it rebuilds FSR4's complete model graph and resets history." \
-			"FSR quality" flt_fsr_quality \
-			"Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
-		toggle --status "uses FSR4 v07's dedicated dynamic-resolution model and lets the Dynamic Resolution Scaling menu control render scale. It is ignored by FSR3 and replaces the fixed FSR4 quality model." \
-			"FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
-		range -f "%.2f" --status "FSR3 RCAS amount (0 disables it); it is independent from the experimental FSR4 control below" \
-			"FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
-		range -f "%.2f" --status "experimental FSR4 v07 RCAS amount (0 disables it) after the selected model output." \
-			"FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
-		toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
-			"FSR4 auto exposure" flt_fsr4_auto_exposure
-		pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3 3.1.4, FSR3.1.5, or source-v07 FSR4 super resolution; rectilinear single-GPU rendering; and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait. Enabling it recreates the swapchain with FIFO pacing so Mailbox/Immediate cannot discard or tear the generated-real pair." \
-			"FSR3 frame generation" flt_frame_generation \
-			"Off" 0 "Analytical (experimental)" 1
-		pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port and the default for fresh configs; it is validated for RGBA16F, sRGB/scRGB transfer handling, fence-token view retirement, and current RX 6800M FIFO presentation. Legacy 1.1.4 remains available for comparison." \
-			"FSR3 FG scheduler" flt_frame_generation_backend \
-			"Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
-		range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation; recovery needs eight high samples plus conservative FI headroom to prevent visible on/off toggling." \
-			"FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
-		action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
-			"temporal diagnostics..." pushmenu temporal_diagnostics
-        pairs "global illumination" pt_num_bounce_rays low 0.5 medium 1 high 2
-        pairs "reflection/refraction depth" pt_reflect_refract off 0 1 1 2 2 4 4 8 8
-		toggle --status "turn some monitors in the game into security camera views" \
-            "security cameras" pt_cameras
-        toggle "caustics" pt_caustics
-        toggle "god rays" gr_enable
-        toggle "bloom" bloom_enable
-        blank
-        toggle "denoiser" flt_enable
-        toggle "textures" flt_fixed_albedo ~1
-        pairs "texture filtering" pt_nearest "anisotropic" 0 "mixed" 1 "nearest (noisy)" 2
-        pairs --status "experimental feature - simulates reflection and refraction effects in thick glass" \
-            "thick glass refraction" pt_thick_glass "disabled" 0 "photo mode only" 1 "enabled" 2
-        pairs projection pt_projection perspective 0 panini 1 stereographic 2 cylindrical 3 equirectangular 4 mercator 5
-        blank
-		pairs "multi-gpu support" sli "disabled" 0 "when available" 1
-        pairs "ray tracing API" ray_tracing_api "automatic selection" "auto" "prefer KHR_ray_query" "query"  "prefer KHR_ray_tracing_pipeline" "pipeline"
-        toggle "GPU profiler" profiler
+        action "image tuning..." pushmenu image_tuning
+        action "temporal upscaling..." pushmenu temporal_settings
+        action "ray tracing features..." pushmenu ray_tracing_settings
     endif
 
     ifneq vid_rtx 1
@@ -210,6 +167,72 @@ begin video
         blank
         toggle "use new textures and models" gl_use_hd_assets
     endif
+end
+
+begin image_tuning
+    title "Image Tuning"
+    background #212F3CD0
+    style --compact
+    range -f "%+.1f EV" "exposure bias (brightness)" tm_exposure_bias -5 0 0.1
+    range -p -f "%.0f%%" "contrast" tm_reinhard 0 1 0.1
+    range "texture LOD bias" pt_texture_lod_bias -2 2 0.5
+    pairs --status "used whenever the selected temporal upscaler is off or unavailable" \
+        "fallback anti-aliasing" flt_taa \
+        "none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
+    action "back" popmenu
+end
+
+begin temporal_settings
+    title "Temporal Upscaling"
+    background #212F3CD0
+    style --compact
+    pairs --status "FSR3 3.1.4 is the proven open-source Vulkan path and 3.1.5 is its public-SDK Vulkan experiment. FSR4 v07 is an experimental source INT8 model, not official FSR 4.1.1; AMD's current 4.1.1 provider is signed DX12/Windows-only and needs RX 7000+/9000, so native Vulkan/RDNA2 uses this v07 path. Both use the discrete quality choice below; FSR4 also has the separate DRS model." \
+        "temporal upscaler" flt_upscaler \
+        "Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
+    pairs --status "selects matching FSR3 or FSR4 v07 model ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. Changing it rebuilds FSR4's complete model graph and resets history." \
+        "FSR quality" flt_fsr_quality \
+        "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
+    toggle --status "uses FSR4 v07's dedicated dynamic-resolution model and lets the Dynamic Resolution Scaling menu control render scale. It is ignored by FSR3 and replaces the fixed FSR4 quality model." \
+        "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
+    range -f "%.2f" --status "FSR3 RCAS amount (0 disables it); it is independent from the experimental FSR4 control below" \
+        "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
+    range -f "%.2f" --status "experimental FSR4 v07 RCAS amount (0 disables it) after the selected model output." \
+        "FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
+    toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
+        "FSR4 auto exposure" flt_fsr4_auto_exposure
+    pairs --status "experimental analytical FSR3 Optical Flow + Frame Interpolation. Check flt_frame_generation_active/reason plus rendered/generated FPS diagnostics in the console. Requires active FSR3 3.1.4, FSR3.1.5, or source-v07 FSR4 super resolution; rectilinear single-GPU rendering; and a swapchain with surface minimum + two images (five on the tested RADV surface). Generated and real commands are queue-ordered without a CPU replay wait. Enabling it recreates the swapchain with FIFO pacing so Mailbox/Immediate cannot discard or tear the generated-real pair." \
+        "FSR3 frame generation" flt_frame_generation \
+        "Off" 0 "Analytical (experimental)" 1
+    pairs --status "selects the analytical scheduler. SDK 3.1.6 is the newer reusable Vulkan FI/OF port and the default for fresh configs; it is validated for RGBA16F, sRGB/scRGB transfer handling, fence-token view retirement, and current RX 6800M FIFO presentation. Legacy 1.1.4 remains available for comparison." \
+        "FSR3 FG scheduler" flt_frame_generation_backend \
+        "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
+    range --status "minimum completed render FPS before analytical frame generation engages. 30 is a conservative safety floor; 60 is AMD's recommended target; 0 disables the gate for testing. Four low samples pause generation; recovery needs eight high samples plus conservative FI headroom to prevent visible on/off toggling." \
+        "FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
+    action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \
+        "temporal diagnostics..." pushmenu temporal_diagnostics
+    action "back" popmenu
+end
+
+begin ray_tracing_settings
+    title "Ray Tracing Features"
+    background #212F3CD0
+    style --compact
+    pairs "global illumination" pt_num_bounce_rays low 0.5 medium 1 high 2
+    pairs "reflection/refraction depth" pt_reflect_refract off 0 1 1 2 2 4 4 8 8
+    toggle --status "turn some monitors in the game into security camera views" "security cameras" pt_cameras
+    toggle "caustics" pt_caustics
+    toggle "god rays" gr_enable
+    toggle "bloom" bloom_enable
+    toggle "denoiser" flt_enable
+    toggle "textures" flt_fixed_albedo ~1
+    pairs "texture filtering" pt_nearest "anisotropic" 0 "mixed" 1 "nearest (noisy)" 2
+    pairs --status "experimental feature - simulates reflection and refraction effects in thick glass" \
+        "thick glass refraction" pt_thick_glass "disabled" 0 "photo mode only" 1 "enabled" 2
+    pairs projection pt_projection perspective 0 panini 1 stereographic 2 cylindrical 3 equirectangular 4 mercator 5
+    pairs "multi-gpu support" sli "disabled" 0 "when available" 1
+    pairs "ray tracing API" ray_tracing_api "automatic selection" "auto" "prefer KHR_ray_query" "query" "prefer KHR_ray_tracing_pipeline" "pipeline"
+    toggle "GPU profiler" profiler
+    action "back" popmenu
 end
 
 begin temporal_diagnostics
