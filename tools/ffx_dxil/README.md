@@ -21,6 +21,19 @@ python3 tools/ffx_dxil/dxil_container_tool.py scan \
   --manifest build/ffx-dxil/sdk-2.3.json
 ```
 
+AMD's official `FidelityFX-Samples-v2.3.0-prebuilt.zip` has the same signed
+DLLs under separate sample `.../dx12/x64/Release` directories rather than
+`Kits/FidelityFX/signedbin`. Both layouts are accepted by the optional local
+integration check:
+
+```sh
+FFX_SDK_23_ROOT=/path/to/unpacked/FidelityFX-Samples-v2.3.0-prebuilt \
+  python3 -m unittest discover -s tools/ffx_dxil/tests -v
+```
+
+This check is metadata-only and also recognizes the separately shipped
+`amd_fidelityfx_radiancecache_dx12.dll`; it does not extract or retain payloads.
+
 The manifest records:
 
 - the name, byte size, and SHA-256 of each source DLL;

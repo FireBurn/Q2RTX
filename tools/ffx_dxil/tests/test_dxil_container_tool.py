@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
 
 
 TOOL_PATH = Path(__file__).resolve().parents[1] / "dxil_container_tool.py"
@@ -31,6 +32,11 @@ KNOWN_SDK23 = {
         "sha256": "02297beedd285e822d3a64f314cf00faf378dcec0edc47ff0c4dd71b3a8c2f18",
         "markers": 487,
         "unique": 486,
+    },
+    "amd_fidelityfx_radiancecache_dx12.dll": {
+        "sha256": "256db18d924c8cd38923d04e3ecd210695d3f0f796b240eab9663ad4d54e31a0",
+        "markers": 11,
+        "unique": 11,
     },
 }
 
@@ -145,12 +151,22 @@ class CaptureManifestTests(unittest.TestCase):
                 tool.build_capture_manifest(Path(temporary), {"0123456789abcdef"})
 
 
+def sdk23_runtime_roots(root):
+    """Return both the source-SDK and official prebuilt runtime layouts."""
+    return (
+        root,
+        root / "Kits/FidelityFX/signedbin",
+        root / "Samples/Upscalers/FidelityFX_FSR/dx12/x64/Release",
+        root / "Samples/Denoisers/FidelityFX_Denoiser/dx12/x64/Release",
+        root / "Samples/RadianceCaches/FidelityFX_NRC/dx12/x64/Release",
+    )
+
+
 def discover_local_sdk23_dlls():
     roots = []
     configured = os.environ.get("FFX_SDK_23_ROOT")
     if configured:
-        configured_path = Path(configured)
-        roots.extend([configured_path, configured_path / "Kits/FidelityFX/signedbin"])
+        roots.extend(sdk23_runtime_roots(Path(configured)))
     temporary_root = Path(os.environ.get("TMPDIR", "/tmp"))
     roots.extend(temporary_root.glob("fsr-sdk-2.3.*/Kits/FidelityFX/signedbin"))
     roots.extend(
@@ -161,6 +177,7 @@ def discover_local_sdk23_dlls():
         "amd_fidelityfx_upscaler_dx12.dll",
         "amd_fidelityfx_denoiser_dx12.dll",
         "amd_fidelityfx_framegeneration_dx12.dll",
+        "amd_fidelityfx_radiancecache_dx12.dll",
     )
     discovered = {}
     for root in roots:
@@ -172,6 +189,31 @@ def discover_local_sdk23_dlls():
 
 
 class LocalSdk23IntegrationTests(unittest.TestCase):
+    def test_discovers_official_prebuilt_runtime_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            expected = (
+                "amd_fidelityfx_upscaler_dx12.dll",
+                "amd_fidelityfx_denoiser_dx12.dll",
+                "amd_fidelityfx_framegeneration_dx12.dll",
+                "amd_fidelityfx_radiancecache_dx12.dll",
+            )
+            runtime_roots = sdk23_runtime_roots(root)
+            layout = (
+                (runtime_roots[2], expected[0]),
+                (runtime_roots[3], expected[1]),
+                (runtime_roots[2], expected[2]),
+                (runtime_roots[4], expected[3]),
+            )
+            for runtime_root, name in layout:
+                runtime_root.mkdir(parents=True, exist_ok=True)
+                (runtime_root / name).write_bytes(b"fixture")
+            with mock.patch.dict(os.environ, {"FFX_SDK_23_ROOT": str(root)}, clear=True):
+                self.assertEqual(
+                    [dll.name for dll in discover_local_sdk23_dlls()],
+                    list(expected),
+                )
+
     def test_installed_effect_dlls_when_present(self):
         dlls = discover_local_sdk23_dlls()
         if not dlls:

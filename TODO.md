@@ -601,7 +601,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Build deterministic DXBC/DXIL scanner, validator, optional extractor, and
   vkd3d capture manifest tooling in `tools/ffx_dxil` (9 tests passing).
 - [x] Verify SDK 2.3 containers: upscaler 1028/885, denoiser 630/630,
-  framegeneration 487/486 occurrences/unique, with zero malformed containers.
+  framegeneration 487/486, and radiance cache 11/11 occurrences/unique, with
+  zero malformed containers. The scanner's local integration test accepts both
+  the full-SDK `signedbin` tree and AMD's official 2.3.0 prebuilt sample layout
+  (the latter splits each signed effect DLL into its sample release directory).
 - [x] Verify Proton `amdxcffx64.dll`: 1294/1150, zero malformed containers.
 - [x] Build a minimal AMD SDK 2.3 DX12 harness under Proton and dump only
   actually selected DXIL/SPIR-V with VKD3D_SHADER_DUMP_PATH. The source-only

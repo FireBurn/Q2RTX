@@ -275,6 +275,11 @@ binary-only in AMD SDK 2.3 and officially DX12-only.  Shader extraction is demon
 but shader blobs alone do not supply pass selection, resources, constants,
 weights, barriers, scheduling, or presentation.  Treat those ports as measured
 reverse-engineering research and keep an honest fallback.
+AMD's official SDK 2.3 prebuilt archive splits signed effect DLLs into sample
+release directories rather than `Kits/FidelityFX/signedbin`; the metadata-only
+`tools/ffx_dxil` integration test accepts either layout. Keep every downloaded
+DLL, manifest, capture, and any opt-in extraction under an ignored build or
+temporary directory—never add those payloads to Q2RTX or `ffx-vulkan`.
 
 The temporal diagnostics menu must retain the four read-only official-provider
 rows: FSR4.1.1, Ray Regeneration, ML Frame Generation, and Radiance Caching.

@@ -580,6 +580,14 @@ Current truth:
   https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK and
   https://gpuopen.com/amd-fsr-sdk/.
 
+  The official `FidelityFX-Samples-v2.3.0-prebuilt.zip` was subsequently
+  scanned in an ignored build directory, without extraction: upscaler
+  1028/885, denoiser 630/630, frame-generation 487/486, and radiance cache
+  11/11 DXBC occurrences/unique containers, all structurally valid. The
+  metadata-only test now recognizes that prebuilt layout as well as the SDK
+  source tree; no signed DLL, container, shader, or model payload was added to
+  this repository.
+
 - The menu revision now exposes all provider-neutral RR input views through
   view 22 (`RR dominant light visibility`). Its FSR4 text distinguishes the
   working source-v07 Vulkan path from official FSR 4.1.1: AMD documents the
