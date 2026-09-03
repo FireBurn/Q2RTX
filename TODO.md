@@ -768,7 +768,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   locks the RTX navigation and a maximum of 15 compact controls per child page;
   a fresh staged-package 960x540 capture is readable and validation-clean.
   Compact menus now reserve their complete status/help area, preventing a long
-  FSR explanation from painting over the final control rows.
+  FSR explanation from painting over the final control rows. A final current
+  ebuild-equivalent Release staging build installed the same layout and passed
+  its menu, shader-ABI, and complete-FSR4-asset checks.
   The versioned loose menu migration now prevents an old user media archive
   from hiding new upscaler enum values (the verified FSR3.1.5 menu formerly
   rendered as `???`). A generic read-only `static` menu item can now bind a

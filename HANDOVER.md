@@ -132,6 +132,14 @@ Current truth:
   is a focused-presentation harness limitation, not evidence of a successful
   generated-frame run or a reason to bypass the focus safety gate.
 
+- The final current-commit ebuild-equivalent Release package staging build on
+  2026-09-03 passed all launcher, client/server, media/shareware, player-tree,
+  and six-model FSR4-v07 asset assertions. Its installed `shaders.pkz` has 47
+  modules and passed all 6,696 global descriptor-binding checks; its installed
+  `q2rtx.menu` passed the compact Video/Temporal layout gate. This verifies the
+  status-space fix and portable-data support in the distributable build rather
+  than only in the developer executable.
+
 - The standalone `FireBurn/FSR-Vulkan` `main` branch is now at
   `0725754c39b9e7187d07b9620e4131e2d9bad3d5` (parent Q2RTX commit
   `1b80d558`). It adds `ffx-vulkan::radiancecache-contract`: a deliberately
