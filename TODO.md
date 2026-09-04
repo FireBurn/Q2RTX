@@ -265,10 +265,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `0411b8d8`; its clean release build passes 36/36 applicable CTests.
   A distributor can now opt into a complete, validated v07 asset installation
   with `FFX_VK_PORTABLE_INSTALL_FSR4_V07_ASSETS` and an explicit asset path.
-  The package installs only the notice and six model-prefixed, manifest-backed
-  bundles under `share/ffx-vulkan/fsr4-v07`, then exposes that location through
-  `FFX_VK_FSR4_V07_ASSET_DIR`; unrelated neighbouring/extracted blobs are not
-  copied.
+  The package installs only the notice, five required shared assets, and six
+  model-prefixed, manifest-backed bundles under `share/ffx-vulkan/fsr4-v07`,
+  then exposes that location through `FFX_VK_FSR4_V07_ASSET_DIR`; unrelated
+  neighbouring/extracted blobs are not copied.
 - [x] Confirm RX 6800M prerequisites for FSR3 compute and analytical frame
   interpolation.
 - [x] Vendor the pinned MIT-licensed AMD FSR3 1.1.4 host runtime, pristine

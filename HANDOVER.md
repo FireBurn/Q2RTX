@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- A 2026-09-04 provenance audit rejected vendoring source-v07 model binaries
+  into the public reusable project. They first appear in one FSR4-addition
+  commit on a non-official fork; its generated HLSL has an AMD “all rights
+  reserved” header although the repository's general documentation says MIT.
+  The payload-bearing local change was removed before any push. The standalone
+  project remains fully reusable with a caller-supplied asset directory, while
+  Q2RTX retains its existing locally tracked demo assets. Its opt-in package
+  path now additionally validates and installs five shared required files
+  (`fsr4_initializers.bin`, `fsr4_pre_weights.bin`, aggregate manifest, RCAS,
+  and SPD) alongside each model's manifest-backed assets, fixing the prior
+  incomplete caller-supplied package contract.
+
 - AMD's current official SDK 2.3 page was rechecked after the native runtime
   validation. It lists FSR Upscaling 4.1.1, Frame Generation 4.0.1, Ray
   Regeneration 1.2.0, and Radiance Caching 0.9.0; only the analytical FSR3
