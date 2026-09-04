@@ -439,6 +439,8 @@ matching licensed bundle can enable
 notice, five shared assets, and six model-prefixed SPIR-V/initializer/
 pre-weight/manifest sets. The installed package exposes its opt-in location as
 `FFX_VK_FSR4_V07_ASSET_DIR`; never copy arbitrary neighbouring blobs.
+The installed-package consumer CTest must assert the complete 288-file opt-in
+payload, including RCAS and SPD, whenever that installation option is enabled.
 
 FSR4 v07 callers must bracket every provider dispatch with
 `ffxFsr4VkBeginFrame(interface, frame_id)` and retire it with

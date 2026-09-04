@@ -20,7 +20,9 @@ Current truth:
   path now additionally validates and installs five shared required files
   (`fsr4_initializers.bin`, `fsr4_pre_weights.bin`, aggregate manifest, RCAS,
   and SPD) alongside each model's manifest-backed assets, fixing the prior
-  incomplete caller-supplied package contract. The source-only reusable
+  incomplete caller-supplied package contract. Its installed-package CTest
+  now checks the exact 288-file opt-in payload while preserving the ordinary
+  source-only package case. The source-only reusable
   subtree update was pushed to `FireBurn/FSR-Vulkan` `main` as `fc3db3e0`;
   its GitHub Actions run `33820593234` completed successfully on 2026-09-04.
 

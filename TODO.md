@@ -268,7 +268,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   The package installs only the notice, five required shared assets, and six
   model-prefixed, manifest-backed bundles under `share/ffx-vulkan/fsr4-v07`,
   then exposes that location through `FFX_VK_FSR4_V07_ASSET_DIR`; unrelated
-  neighbouring/extracted blobs are not copied.
+  neighbouring/extracted blobs are not copied. The installed-package consumer
+  now asserts the exact 288-file opt-in payload, including RCAS and SPD, while
+  the ordinary source-only package test remains payload-free.
 - [x] Confirm RX 6800M prerequisites for FSR3 compute and analytical frame
   interpolation.
 - [x] Vendor the pinned MIT-licensed AMD FSR3 1.1.4 host runtime, pristine
