@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-03, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-04, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,18 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- The reusable FI/OF API now fails closed across a resize boundary. It records
+  the create-time maximum-render and display extents, rejects a larger prepare
+  input or a colour image not matching the fixed display extent, and requires
+  dispatch to use that same display extent. Its all-zero interpolation rect is
+  the explicit whole-display shorthand; any other rect must be non-empty and
+  fully contained. The four GPU API-smoke variants passed locally after adding
+  stale-colour, clipped-rect, partial-zero-rect, explicit-full-rect, and
+  default-full-rect checks. This prevents malformed generated work from
+  presenting as a resize-related flash/strobe. The source-only reusable
+  subtree update was pushed to `FireBurn/FSR-Vulkan` `main` as `6802a64a`;
+  Actions run `33821303895` completed successfully on 2026-09-04.
 
 - A 2026-09-04 provenance audit rejected vendoring source-v07 model binaries
   into the public reusable project. They first appear in one FSR4-addition

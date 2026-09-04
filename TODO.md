@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-09-03 (Europe/London)
+Last updated: 2026-09-04 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -14,8 +14,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   buffer ranges, performs image copies, propagates SDK job failures, supports
   inactive tail SPD mips, and uses regenerated exact Vulkan storage-image
   formats. The direct target, held weapon/emissive, camera cut, map transition,
-  and sustained 30-FPS-gated runs are full-colour and validation-clean. Backend
-  `1` is the default; `0` remains 1.1.4 compatibility.
+  and sustained 30-FPS-gated runs are full-colour and validation-clean. The
+  public FI/OF wrapper now also refuses stale post-resize display extents and
+  clipped/non-empty interpolation rectangles before it records GPU work;
+  smoke coverage exercises explicit and all-zero (full-display) rectangles.
+  Backend `1` is the default; `0` remains 1.1.4 compatibility.
 
 ## P0 — make the current FSR4 INT8 path correct and observable
 

@@ -482,6 +482,15 @@ premultiplied RGB/source alpha and published as
 `ui.rgb + scene.rgb * (1-ui.a)`. Do not replace this with a second direct UI
 draw unless falling back after alpha-target creation/recording failed.
 
+`ffx-vulkan::fsr3-vk-framegeneration-3.1.6` owns fixed maximum-render and
+display-sized shared resources. A host must recreate its context after a
+resize: `RecordPrepare` rejects render extents above the maximum and any scene
+colour extent other than the fixed display extent, while `RecordDispatch`
+requires that exact display extent. An all-zero interpolation rectangle means
+the entire display; every other rectangle must be non-empty and contained in
+it. Keep these fail-closed guards and their API-smoke coverage: otherwise a
+stale resize can record clipped generated-frame work and look like strobing.
+
 DXIL tooling:
 
 ```sh
