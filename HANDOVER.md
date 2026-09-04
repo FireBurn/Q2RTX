@@ -23,8 +23,9 @@ Current truth:
   incomplete caller-supplied package contract. Its installed-package CTest
   now checks the exact 288-file opt-in payload while preserving the ordinary
   source-only package case. The source-only reusable
-  subtree update was pushed to `FireBurn/FSR-Vulkan` `main` as `fc3db3e0`;
-  its GitHub Actions run `33820593234` completed successfully on 2026-09-04.
+  subtree updates were pushed to `FireBurn/FSR-Vulkan` `main` as `fc3db3e0`
+  and `d1c5da4b`; GitHub Actions runs `33820593234` and `33820855599`
+  completed successfully on 2026-09-04.
 
 - AMD's current official SDK 2.3 page was rechecked after the native runtime
   validation. It lists FSR Upscaling 4.1.1, Frame Generation 4.0.1, Ray
