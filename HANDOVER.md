@@ -20,7 +20,8 @@ Current truth:
   path now additionally validates and installs five shared required files
   (`fsr4_initializers.bin`, `fsr4_pre_weights.bin`, aggregate manifest, RCAS,
   and SPD) alongside each model's manifest-backed assets, fixing the prior
-  incomplete caller-supplied package contract.
+  incomplete caller-supplied package contract. The source-only reusable
+  subtree update was pushed to `FireBurn/FSR-Vulkan` `main` as `fc3db3e0`.
 
 - AMD's current official SDK 2.3 page was rechecked after the native runtime
   validation. It lists FSR Upscaling 4.1.1, Frame Generation 4.0.1, Ray
