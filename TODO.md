@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-09-04 (Europe/London)
+Last updated: 2026-09-08 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -500,8 +500,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   remain.
   The reusable wrapper now rejects a generated output that aliases the
   prepared colour/depth/motion or optional distortion input, and its API smoke
-  covers that fail-closed rule; this generalizes Q2RTX's source-v07 FSR4
-  recurrent-history isolation to any Vulkan host.
+  covers that fail-closed rule; it now also rejects non-finite motion, camera,
+  timing, and luminance constants before either SDK records work. This
+  generalizes Q2RTX's source-v07 FSR4 recurrent-history isolation and its
+  temporal-input safety to any Vulkan host.
 - [-] Build a Linux/Windows portable explicit presenter. Q2RTX now has an
   experimental single-graphics-queue two-acquire/two-present path that renders
   the same queued UI on generated and real frames, with a blocking reserved
@@ -673,6 +675,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   the 960x540 Vulkan-validation capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
 - [ ] Reproduce one fixed 4.1.1 upscale frame through the portable Vulkan ABI.
+- [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
+  on RDNA2 using an isolated probe. Prior environment-only probes do not
+  establish whether this path works. Verify actual GPU completion and model
+  selection/fallback; official AMD documentation still labels 4.1.1, and a
+  separate official 4.1.1b release has not been verified (2026-09-08).
 - [ ] Obtain legal/provenance review before redistributing any extracted model
   or shader payload; retain all required notices.
 

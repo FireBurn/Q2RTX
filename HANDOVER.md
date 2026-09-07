@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-04, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-08, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,30 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- September 8 release check: AMD's SDK documentation still names Upscaling
+  4.1.1; an official 4.1.1b release was not verified. OptiScaler v0.9.4's
+  upstream release notes document `Fsr4ForceEnableInt8` for the bundled SDK
+  upscaler DLL on unsupported GPUs, with internal FSR3 fallback detection.
+  This is a distinct lead from the older environment-only provider probes.
+  Next investigate that hook in an isolated SDK-2.3 probe and require GPU
+  completion plus model/fallback evidence. Do not infer native Q2RTX support
+  from provider enumeration. Sources:
+  https://github.com/optiscaler/OptiScaler/releases/tag/v0.9.4
+  https://gpuopen.com/manuals/fsr_sdk/
+
+- The reusable FI/OF dispatch boundary additionally rejects `NaN`/infinite
+  motion, camera, timing, and luminance inputs rather than relying on ordinary
+  comparisons, which let `NaN` through into SDK constants. Timing, camera
+  near/far, view scale, and vertical FOV must be positive; luminance must be a
+  finite ordered non-negative range. The four GPU API-smoke formats each prove
+  both a non-finite prepare vector and non-finite dispatch FOV fail before
+  recording a valid reset/temporal sequence. This closes another portable-host
+  route to flickering or corrupt generated frames. Local commit `2dbacfe7`
+  was published as subtree `c64f0934`; GitHub Actions run `33821620852`
+  completed successfully. Q2RTX's six tests and four FI/OF GPU smoke variants
+  passed before publication. These are API validation results, not evidence
+  that sustained interactive presentation is free of strobing.
 
 - The reusable FI/OF API now fails closed across a resize boundary. It records
   the create-time maximum-render and display extents, rejects a larger prepare

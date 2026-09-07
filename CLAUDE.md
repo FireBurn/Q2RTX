@@ -490,6 +490,10 @@ requires that exact display extent. An all-zero interpolation rectangle means
 the entire display; every other rectangle must be non-empty and contained in
 it. Keep these fail-closed guards and their API-smoke coverage: otherwise a
 stale resize can record clipped generated-frame work and look like strobing.
+All host-provided FI/OF motion, camera, timing, and luminance floats must also
+be finite; timing/near/far/view scale/FOV must be positive and luminance has a
+non-negative ordered range. Do not pass NaN/Inf through to the SDK: normal C++
+comparisons do not reject them and a bad constant can become a temporal flash.
 
 DXIL tooling:
 
