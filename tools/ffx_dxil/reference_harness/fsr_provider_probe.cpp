@@ -17,6 +17,7 @@
 #include <cwchar>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "ffx_api.h"
@@ -43,6 +44,78 @@
 #include "ffx_upscale.h"
 
 namespace {
+
+/* Experimental, process-local SDK 2.3 eligibility override. No on-disk DLL
+ * is changed. Signature identified by OptiScaler v0.9.4 (7534ad00),
+ * proxies/FfxApi_Proxy.h. Only an unambiguous executable-section match is
+ * accepted. This does not establish which model the provider executes. */
+static bool force_sdk_int8(HMODULE loader)
+{
+    wchar_t path[32768];
+    const DWORD length = GetModuleFileNameW(loader, path, 32768);
+    if (!length || length >= 32768)
+        return false;
+    std::wstring sibling(path, length);
+    const size_t separator = sibling.find_last_of(L"\\/");
+    if (separator == std::wstring::npos)
+        return false;
+    sibling.resize(separator + 1);
+    sibling += L"amd_fidelityfx_upscaler_dx12.dll";
+    HMODULE module = LoadLibraryW(sibling.c_str());
+    if (!module)
+        return false;
+    auto* base = reinterpret_cast<unsigned char*>(module);
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE || nt->Signature != IMAGE_NT_SIGNATURE ||
+        nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64)
+        return false;
+    const int signature[] = {
+        0x48,0x83,0xec,0x48,0x48,0x8b,0xc2,0x48,0x85,0xd2,0x74,0x54,
+        0x48,0x8d,0x54,0x24,0x20,0x48,0x8b,0xc8,0xe8,-1,-1,-1,-1,
+        0x81,0x7c,0x24,0x34,0x91,0,0,0,0x44,0x0f,0xb6,0xc0,0x75,0x23,
+        0x8b,0x54,0x24,0x30,0x8d,0x4a,0xff,0x83,0xf9,0x0e,0x76,0x13,
+        0x8d,0x4a,0xe0,0x81,0xf9,0xde,0,0,0,0x76,0x08,0x8d,0x4a,0xf0,0x83,0xf9,0x0f};
+    unsigned char* match = nullptr;
+    unsigned matches = 0;
+    const auto* section = IMAGE_FIRST_SECTION(nt);
+    for (unsigned s = 0; s < nt->FileHeader.NumberOfSections; ++s) {
+        if (!(section[s].Characteristics & IMAGE_SCN_MEM_EXECUTE))
+            continue;
+        const size_t start = section[s].VirtualAddress;
+        const size_t size = section[s].Misc.VirtualSize;
+        if (start > nt->OptionalHeader.SizeOfImage ||
+            size > nt->OptionalHeader.SizeOfImage - start)
+            return false;
+        for (size_t i = 0; i + sizeof(signature) / sizeof(signature[0]) <= size; ++i) {
+            bool equal = true;
+            for (size_t j = 0; j < sizeof(signature) / sizeof(signature[0]); ++j)
+                if (signature[j] >= 0 && base[start + i + j] != signature[j]) {
+                    equal = false;
+                    break;
+                }
+            if (equal) {
+                match = base + start + i;
+                ++matches;
+            }
+        }
+    }
+    std::printf("FFX_INT8_OVERRIDE signature_matches=%u\n", matches);
+    if (matches != 1)
+        return false;
+    const unsigned char replacement[] = {0xb0, 0x01, 0xc3}; // mov al,1; ret
+    DWORD protection = 0;
+    if (!VirtualProtect(match, sizeof(replacement), PAGE_EXECUTE_READWRITE, &protection))
+        return false;
+    std::memcpy(match, replacement, sizeof(replacement));
+    DWORD ignored = 0;
+    if (!VirtualProtect(match, sizeof(replacement), protection, &ignored) ||
+        !FlushInstructionCache(GetCurrentProcess(), match, sizeof(replacement)))
+        return false;
+    std::printf("FFX_INT8_OVERRIDE applied=1 rva=0x%zx (model execution unverified)\n",
+        static_cast<size_t>(match - base));
+    return true;
+}
 
 struct FfxFunctions {
     PfnFfxCreateContext createContext = nullptr;
@@ -707,7 +780,7 @@ void print_selection_summary(const char* effect, const ProviderSelection& select
 void print_usage(const wchar_t* executable)
 {
     ::fwprintf(stderr,
-        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N]\n",
+        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N] [--force-int8]\n",
         executable);
 }
 
@@ -722,12 +795,15 @@ int wmain(int argc, wchar_t** argv)
 
     bool create = false;
     bool dispatch = false;
+    bool force_int8 = false;
     bool create_framegeneration = false;
     bool create_denoiser = false;
     bool create_radiancecache = false;
     uint64_t provider_index = UINT64_MAX;
     for (int index = 2; index < argc; ++index) {
-        if (wcscmp(argv[index], L"--create") == 0) {
+        if (wcscmp(argv[index], L"--force-int8") == 0) {
+            force_int8 = true;
+        } else if (wcscmp(argv[index], L"--create") == 0) {
             create = true;
         } else if (wcscmp(argv[index], L"--dispatch") == 0) {
             create = true;
@@ -752,6 +828,7 @@ int wmain(int argc, wchar_t** argv)
     FfxFunctions functions;
     std::vector<uint64_t> provider_ids;
     if (!create_device(&device) || !load_functions(argv[1], &module, &functions) ||
+        (force_int8 && !force_sdk_int8(module)) ||
         !enumerate_effect_versions(functions, device,
             FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE, "upscaler", &provider_ids)) {
         if (module)

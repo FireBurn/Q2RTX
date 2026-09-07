@@ -84,6 +84,19 @@ proof that its neural provider was used.
 
 ### SDK 2.3 forced-INT8 investigation (2026-09-08)
 
+The probe now accepts experimental `--force-int8`. It loads the SDK upscaler
+beside the explicitly selected loader, requires exactly one matching signature
+in executable PE sections, and changes the eligibility function only in this
+process. It never writes a DLL file. A failed signature/protection check stops
+the probe. This flag is for isolated unsupported-GPU experiments; leave it off
+for the user's RDNA4 machine so the ordinary FP8/provider path can be tested.
+The MinGW build with warnings as errors passes; runtime is not yet verified.
+
+For RDNA4, first run without overrides using `--dispatch`, then separately
+`--create-framegeneration` and (with full SDK headers) `--create-denoiser`.
+Retain the complete output and selected-provider records. These experiments
+test the DX12 provider; they do not yet constitute native Vulkan integration.
+
 OptiScaler v0.9.4, commit `7534ad00bf9e590eedb99e8dd9fd8c89dae3654f`,
 implements `Fsr4ForceEnableInt8` in `OptiScaler/proxies/FfxApi_Proxy.h`.
 It locates an internal SDK upscaler GPU-eligibility function by signature and

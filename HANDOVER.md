@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- User now has an RDNA4 machine available for testing official FSR4.1.1 or
+  newer. Do not narrow the goal to RDNA2-compatible implementations. Prepare
+  ordinary official-provider tests for RDNA4 without the forced-INT8 override;
+  native Vulkan interoperability remains an implementation requirement.
+  The reference probe now implements optional process-local `--force-int8`
+  for separate RDNA2 research. It compiled with MinGW warnings as errors;
+  execution is still outstanding. No provider binaries were modified on disk.
+
 - The OptiScaler v0.9.4 forced-INT8 hook was traced to its SDK GPU-eligibility
   detour (upstream commit `7534ad00`). A read-only scan found exactly one
   matching signature in our SDK-2.3 upscaler DLL, file offset `0x8170`.
