@@ -45,9 +45,12 @@ its sibling provider DLLs:
       "$PWD/amd_fidelityfx_loader_dx12.dll" --dispatch
 
 The --dispatch option records and waits for one 640x360 -> 1280x720 reset
-frame. It intentionally uses throwaway, undefined input pixels and enables the
-provider's internal auto-exposure path: this is a validation-clean
-provider-schedule capture, not an image-quality test. Use --provider-index N
+frame. It uploads a two-colour checker pattern, constant device depth, and zero
+motion/reactive/composition inputs, and enables internal auto-exposure. Output
+starts as NaN sentinels and is copied to a readback buffer after dispatch. The
+probe requires finite RGB everywhere and some nonzero RGB after verified fence
+completion. This is a synthetic execution test, not a temporal image-quality
+test or proof of the internal neural model. Use --provider-index N
 only after recording the enumeration output. It is
 intentional that the probe does not claim FSR 4.1.1 runs on RDNA2: it records
 the provider and return code selected by the installed driver/DLL combination.
@@ -93,8 +96,10 @@ for the user's RDNA4 machine so the ordinary FP8/provider path can be tested.
 The MinGW build with warnings as errors passes. A 2026-09-08 RDNA2 run using
 Proton Experimental vkd3d-proton `634d341a5a312a3` selected provider 4.1.1,
 returned dispatch success, and passed the explicit fence/device completion
-check. Input pixels remain undefined; this does not establish image quality
-or rule out internal analytical fallback. Both modes now explicitly load the
+check. The deterministic checker input now produces finite, nonzero RGB across
+the entire output in both forced-INT8 and ordinary FSR3 modes. This does not
+establish temporal image quality or rule out internal analytical fallback.
+Both modes now explicitly load the
 same sibling upscaler DLL. With identical loading, the ordinary control selects
 3.1.5 and the forced-INT8 run selects 4.1.1; both reach the verified GPU fence.
 Thus the hook changes API provider selection independently of DLL discovery.

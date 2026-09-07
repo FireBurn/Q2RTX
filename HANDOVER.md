@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- SDK-2.3 probe now uploads deterministic two-colour checker RGB, constant
+  depth and zero motion/masks; output starts with NaN sentinels. It reads back
+  RGBA16F after fence/device completion and rejects non-finite RGB or all-black
+  output. Both forced provider 4.1.1 and control 3.1.5 passed with zero
+  non-finite RGB components and 2,764,800 nonzero components (1280x720x3).
+  Logs: `/tmp/q2rtx-int8-runtime.NAfvoo/forced-pixels.log` and
+  `control-pixels.log`. This replaces undefined-input evidence with a basic
+  pixel smoke test; spatial fidelity, temporal behavior and internal-model
+  verification still need work. Utility code is in `probe_pixels.h`.
+
 - Equalized the SDK-2.3 comparison: both probe modes explicitly load the same
   sibling upscaler DLL. `control-equal-load.log` selects 3.1.5 while
   `forced-equal-load.log` selects 4.1.1, both with fence=1/device_ok=1.

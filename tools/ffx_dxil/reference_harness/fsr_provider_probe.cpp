@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include "probe_pixels.h"
 
 #include "ffx_api.h"
 #include "ffx_api_dx12.h"
@@ -374,6 +375,7 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
     constexpr uint32_t output_width = 1280;
     constexpr uint32_t output_height = 720;
     DispatchResources resources;
+    ProbePixels pixels;
     ID3D12CommandQueue* queue = nullptr;
     ID3D12CommandAllocator* allocator = nullptr;
     ID3D12GraphicsCommandList* command_list = nullptr;
@@ -429,6 +431,13 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
         }
     }
 
+    if (!pixels.upload(device, command_list, resources.color, read_state, 0) ||
+        !pixels.upload(device, command_list, resources.depth, read_state, 1) ||
+        !pixels.upload(device, command_list, resources.motion_vectors, read_state, 2) ||
+        !pixels.upload(device, command_list, resources.reactive, read_state, 2) ||
+        !pixels.upload(device, command_list, resources.composition, read_state, 2) ||
+        !pixels.upload(device, command_list, resources.output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 3))
+        goto cleanup;
     {
         ffxDispatchDescUpscale dispatch = {};
         dispatch.header.type = FFX_API_DISPATCH_DESC_TYPE_UPSCALE;
@@ -463,6 +472,8 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
             goto cleanup;
     }
 
+    if (!pixels.copy_output(device, command_list, resources.output))
+        goto cleanup;
     {
         HRESULT hr = command_list->Close();
         if (FAILED(hr)) {
@@ -501,7 +512,7 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
         goto cleanup;
     }
     std::printf("FFX_DISPATCH_COMPLETION fence=1 device_ok=1 (pixel contents unverified)\n");
-    success = true;
+    success = pixels.verify();
 
 cleanup:
     if (fence_event)
