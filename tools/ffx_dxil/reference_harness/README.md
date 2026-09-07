@@ -90,7 +90,12 @@ in executable PE sections, and changes the eligibility function only in this
 process. It never writes a DLL file. A failed signature/protection check stops
 the probe. This flag is for isolated unsupported-GPU experiments; leave it off
 for the user's RDNA4 machine so the ordinary FP8/provider path can be tested.
-The MinGW build with warnings as errors passes; runtime is not yet verified.
+The MinGW build with warnings as errors passes. A 2026-09-08 RDNA2 run using
+Proton Experimental vkd3d-proton `634d341a5a312a3` selected provider 4.1.1,
+returned dispatch success, and passed the explicit fence/device completion
+check. Input pixels remain undefined; this does not establish image quality
+or rule out internal analytical fallback. The control also needs identical
+sibling-provider loading before attributing the selection change to the hook.
 
 For RDNA4, first run without overrides using `--dispatch`, then separately
 `--create-framegeneration` and (with full SDK headers) `--create-denoiser`.

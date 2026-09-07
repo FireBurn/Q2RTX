@@ -492,6 +492,12 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
             goto cleanup;
         }
     }
+    /* A removed device can wake a fence waiter without a completed frame. */
+    if (FAILED(device->GetDeviceRemovedReason()) || fence->GetCompletedValue() != 1) {
+        std::fprintf(stderr, "FFX dispatch fence/device completion check failed.\n");
+        goto cleanup;
+    }
+    std::printf("FFX_DISPATCH_COMPLETION fence=1 device_ok=1 (pixel contents unverified)\n");
     success = true;
 
 cleanup:

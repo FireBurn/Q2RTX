@@ -10,6 +10,21 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- 2026-09-08 forced-INT8 SDK-2.3 probe now executes successfully through
+  Wine + Proton Experimental vkd3d-proton `634d341a5a312a3` on adapter
+  1002:73df (reported as RX 6700 XT). The unique hook matched RVA `0x8d70`,
+  provider 4.1.1 was selected, dispatch returned 0, fence reached 1 and
+  GetDeviceRemovedReason succeeded. Logs and isolated Wine prefix live at
+  `/tmp/q2rtx-int8-runtime.NAfvoo/{forced.log,control.log,prefix}`.
+  Plain system Wine initially could not create a DX12 device; the isolated
+  prefix uses Proton Experimental's native DXGI/D3D12/D3D12Core DLLs.
+  Control without the override returned no provider, but forced mode also
+  preloads the sibling upscaler DLL: control loading must be equalized before
+  attributing that difference solely to the hook. Inputs remain undefined,
+  so pixel correctness and internal analytical fallback are not established.
+  Next initialize inputs and read back output, then inspect executed model
+  evidence and pursue native Vulkan interoperability for RDNA4 as requested.
+
 - User now has an RDNA4 machine available for testing official FSR4.1.1 or
   newer. Do not narrow the goal to RDNA2-compatible implementations. Prepare
   ordinary official-provider tests for RDNA4 without the forced-INT8 override;
