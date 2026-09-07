@@ -82,6 +82,28 @@ proof that its neural provider was used.
 
 ## Historical source-v07 FSR4 provider probe
 
+### SDK 2.3 forced-INT8 investigation (2026-09-08)
+
+OptiScaler v0.9.4, commit `7534ad00bf9e590eedb99e8dd9fd8c89dae3654f`,
+implements `Fsr4ForceEnableInt8` in `OptiScaler/proxies/FfxApi_Proxy.h`.
+It locates an internal SDK upscaler GPU-eligibility function by signature and
+detours it to return 1. This differs from the historical provider-selection
+environment switches below. It does not itself translate shaders to Vulkan.
+
+A read-only scan of the local SDK 2.3 sample upscaler DLL found exactly one
+matching signature at file offset `0x8170`. Its SHA-256 is
+`d0dcccc74a43c44ba435b7a369b456e0970d8a4464e4bd683119b374f2c9fb46`.
+This proves the local binary contains the targeted code signature, not that
+INT8 execution succeeds. No DLL was modified or executed for this scan.
+Next test the hook in an isolated SDK-2.3 probe, checking internal fallback
+and completed GPU execution as well as the API-selected provider. A file
+offset is not a loaded-module address; any probe must account for PE sections.
+
+Upstream source:
+https://github.com/optiscaler/OptiScaler/blob/7534ad00bf9e590eedb99e8dd9fd8c89dae3654f/OptiScaler/proxies/FfxApi_Proxy.h
+
+### Legacy probe usage
+
 fsr4_v07_provider_probe.cpp is deliberately separate from the SDK 2.3 probe.
 It targets the older public ABI used by the source-v07 FSR4 SDK and therefore
 does not make claims about FSR 4.1.1. It enumerates every old upscaler provider

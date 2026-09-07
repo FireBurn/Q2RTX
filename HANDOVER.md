@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The OptiScaler v0.9.4 forced-INT8 hook was traced to its SDK GPU-eligibility
+  detour (upstream commit `7534ad00`). A read-only scan found exactly one
+  matching signature in our SDK-2.3 upscaler DLL, file offset `0x8170`.
+  The binary hash and source link are recorded in the reference-harness
+  README. The isolated forced-INT8 dispatch experiment remains unexecuted;
+  this establishes a concrete candidate, not RDNA2 execution or native Vulkan
+  support. No DLL was modified by the scan.
+
 - September 8 release check: AMD's SDK documentation still names Upscaling
   4.1.1; an official 4.1.1b release was not verified. OptiScaler v0.9.4's
   upstream release notes document `Fsr4ForceEnableInt8` for the bundled SDK
