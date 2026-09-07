@@ -49,7 +49,7 @@ namespace {
  * is changed. Signature identified by OptiScaler v0.9.4 (7534ad00),
  * proxies/FfxApi_Proxy.h. Only an unambiguous executable-section match is
  * accepted. This does not establish which model the provider executes. */
-static bool force_sdk_int8(HMODULE loader)
+static bool prepare_sdk_upscaler(HMODULE loader, bool force_int8)
 {
     wchar_t path[32768];
     const DWORD length = GetModuleFileNameW(loader, path, 32768);
@@ -64,6 +64,9 @@ static bool force_sdk_int8(HMODULE loader)
     HMODULE module = LoadLibraryW(sibling.c_str());
     if (!module)
         return false;
+    std::printf("FFX_SDK_UPSCALER loaded=1 force_int8=%u\n", force_int8 ? 1u : 0u);
+    if (!force_int8)
+        return true;
     auto* base = reinterpret_cast<unsigned char*>(module);
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
     const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
@@ -834,7 +837,7 @@ int wmain(int argc, wchar_t** argv)
     FfxFunctions functions;
     std::vector<uint64_t> provider_ids;
     if (!create_device(&device) || !load_functions(argv[1], &module, &functions) ||
-        (force_int8 && !force_sdk_int8(module)) ||
+        !prepare_sdk_upscaler(module, force_int8) ||
         !enumerate_effect_versions(functions, device,
             FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE, "upscaler", &provider_ids)) {
         if (module)

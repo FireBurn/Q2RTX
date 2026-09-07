@@ -680,6 +680,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   establish whether this path works. Verify actual GPU completion and model
   selection/fallback; official AMD documentation still labels 4.1.1, and a
   separate official 4.1.1b release has not been verified (2026-09-08).
+  The isolated probe now completes GPU work with API provider 4.1.1 on
+  device 1002:73df using the override. An identical-loading control selects
+  3.1.5. Deterministic input/output checks and internal-model evidence remain.
 - [ ] Obtain legal/provenance review before redistributing any extracted model
   or shader payload; retain all required notices.
 

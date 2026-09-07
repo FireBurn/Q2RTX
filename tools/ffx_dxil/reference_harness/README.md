@@ -94,8 +94,10 @@ The MinGW build with warnings as errors passes. A 2026-09-08 RDNA2 run using
 Proton Experimental vkd3d-proton `634d341a5a312a3` selected provider 4.1.1,
 returned dispatch success, and passed the explicit fence/device completion
 check. Input pixels remain undefined; this does not establish image quality
-or rule out internal analytical fallback. The control also needs identical
-sibling-provider loading before attributing the selection change to the hook.
+or rule out internal analytical fallback. Both modes now explicitly load the
+same sibling upscaler DLL. With identical loading, the ordinary control selects
+3.1.5 and the forced-INT8 run selects 4.1.1; both reach the verified GPU fence.
+Thus the hook changes API provider selection independently of DLL discovery.
 
 For RDNA4, first run without overrides using `--dispatch`, then separately
 `--create-framegeneration` and (with full SDK headers) `--create-denoiser`.

@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Equalized the SDK-2.3 comparison: both probe modes explicitly load the same
+  sibling upscaler DLL. `control-equal-load.log` selects 3.1.5 while
+  `forced-equal-load.log` selects 4.1.1, both with fence=1/device_ok=1.
+  These logs are in `/tmp/q2rtx-int8-runtime.NAfvoo`. This resolves the DLL
+  discovery confound in the earlier experiment. Internal model selection and
+  pixel output remain unverified; next add deterministic upload/readback.
+
 - 2026-09-08 forced-INT8 SDK-2.3 probe now executes successfully through
   Wine + Proton Experimental vkd3d-proton `634d341a5a312a3` on adapter
   1002:73df (reported as RX 6700 XT). The unique hook matched RVA `0x8d70`,
