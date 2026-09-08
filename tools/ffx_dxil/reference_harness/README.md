@@ -20,8 +20,13 @@ guessing a private type.
 
 Build, replacing SDK with the local FidelityFX SDK 2.3 checkout:
 
+Also set `VULKAN_HEADERS` to a Vulkan-Headers checkout's `include` directory
+(in Q2RTX, `extern/Vulkan-Headers/include`). The interop diagnostic loads
+Vulkan functions dynamically; no Vulkan import library is required.
+
     x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Werror \
       -Wno-unknown-pragmas \
+      -I"$VULKAN_HEADERS" \
       -I"$SDK/Kits/FidelityFX/api/include" \
       -I"$SDK/Kits/FidelityFX/api/include/dx12" \
       -I"$SDK/Kits/FidelityFX/denoisers/include" \

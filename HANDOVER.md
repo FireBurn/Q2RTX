@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Same-process texture interop now passes: create D3D12 RGBA8 image, obtain
+  its VkImage, Vulkan transition/clear/transition/copy to D3D12 readback,
+  submit through DX12 and verify all 64 red pixels after the fence. Buffer
+  round trip and all four FSR4.1.1 checker frames also pass. Log:
+  `/tmp/q2rtx-int8-runtime.NAfvoo/interop-texture.log`. Build now requires
+  Vulkan-Headers include path, documented in the probe README. This is an
+  independent 8x8 image test, not FSR input sharing or native Linux transport.
+
 - Actual Vulkan/DX12 buffer round trip passed: interop allocator/command buffer,
   Vulkan fill on a D3D12 readback resource, DX12 submit, fence and CPU readback
   yielded 64/64 matching words. All four subsequent FSR4.1.1 checker frames

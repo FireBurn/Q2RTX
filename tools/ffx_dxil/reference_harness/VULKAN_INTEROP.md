@@ -28,6 +28,14 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The independent 8x8 texture test now passes as well: a D3D12-owned RGBA8
+image is cleared and copied using Vulkan after explicit UNDEFINED ->
+TRANSFER_DST -> TRANSFER_SRC transitions. DX12 submission and readback
+verify all 64 pixels. The resource is private to this test and discarded,
+so it does not yet test restoring a host image for a subsequent FSR dispatch.
+Next apply interop to actual provider inputs/outputs and establish native
+Linux external-memory transport.
+
 A real buffer round trip now passes locally: the probe creates a vkd3d interop
 allocator, obtains its Vulkan command buffer, records `vkCmdFillBuffer` on a
 D3D12 readback resource's Vulkan buffer, ends interop and submits through

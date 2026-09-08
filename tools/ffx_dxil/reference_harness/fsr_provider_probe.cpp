@@ -888,7 +888,7 @@ int wmain(int argc, wchar_t** argv)
     }
 
     report_vulkan_interop(device);
-    if (!test_interop_buffer(device)) {
+    if (!test_interop_buffer(device) || !test_interop_buffer(device, true)) {
         FreeLibrary(module);
         device->Release();
         return EXIT_FAILURE;

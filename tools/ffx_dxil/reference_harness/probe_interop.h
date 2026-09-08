@@ -2,7 +2,8 @@
 // Minimal declaration of the published ID3D12DXVKInteropDevice ABI.
 // Reference: ValveSoftware/Proton proton_11.0,
 // wineopenxr/vkd3d-proton-interop.h. Dispatchable Vulkan handles are opaque
-// pointers here; this diagnostic does not call Vulkan or own these handles.
+// pointers in the COM declaration; Vulkan calls use the official header types.
+#include <vulkan/vulkan.h>
 struct ProbeInteropDevice : IUnknown {
     virtual HRESULT STDMETHODCALLTYPE GetDXGIAdapter(REFIID, void**) = 0;
     virtual HRESULT STDMETHODCALLTYPE GetInstanceExtensions(UINT*, const char**) = 0;
@@ -24,7 +25,7 @@ struct ProbeInteropDevice1 : ProbeInteropDevice {
     virtual HRESULT STDMETHODCALLTYPE EndVkCommandBufferInterop(ID3D12CommandList*) = 0;
 };
 
-static bool test_interop_buffer(ID3D12Device* device)
+static bool test_interop_buffer(ID3D12Device* device, bool texture = false)
 {
     const GUID iid = {0x90ecf26e,0xb212,0x43f5,{0xb6,0x2a,0x82,0x5a,0xd7,0xb1,0x38,0x5e}};
     ProbeInteropDevice1* interop = nullptr;
@@ -35,6 +36,7 @@ static bool test_interop_buffer(ID3D12Device* device)
     ID3D12GraphicsCommandList* commands = nullptr;
     ID3D12Fence* fence = nullptr;
     ID3D12Resource* buffer = nullptr;
+    ID3D12Resource* image = nullptr;
     HANDLE event = nullptr;
     HMODULE vulkan = LoadLibraryW(L"vulkan-1.dll");
     bool success = false;
@@ -66,7 +68,54 @@ static bool test_interop_buffer(ID3D12Device* device)
         if (FAILED(interop->GetVulkanResourceInfo(buffer, &handle, &offset)) || !handle ||
             FAILED(interop->BeginVkCommandBufferInterop(commands, &vkcommands)) || !vkcommands)
             goto cleanup;
-        fill(vkcommands, handle, offset, 256, 0x1234abcd);
+        if (!texture) {
+            fill(vkcommands, handle, offset, 256, 0x1234abcd);
+        } else {
+            D3D12_HEAP_PROPERTIES heap{};
+            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+            heap.CreationNodeMask = heap.VisibleNodeMask = 1;
+            D3D12_RESOURCE_DESC desc{};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            desc.Width = desc.Height = 8;
+            desc.DepthOrArraySize = desc.MipLevels = desc.SampleDesc.Count = 1;
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+                D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&image)))) goto cleanup;
+            UINT64 image_handle = 0, image_offset = 0;
+            if (FAILED(interop->GetVulkanResourceInfo(image, &image_handle, &image_offset)) || !image_handle)
+                goto cleanup;
+            auto barrier = reinterpret_cast<PFN_vkCmdPipelineBarrier>(gdpa(logical, "vkCmdPipelineBarrier"));
+            auto clear = reinterpret_cast<PFN_vkCmdClearColorImage>(gdpa(logical, "vkCmdClearColorImage"));
+            auto copy = reinterpret_cast<PFN_vkCmdCopyImageToBuffer>(gdpa(logical, "vkCmdCopyImageToBuffer"));
+            if (!barrier || !clear || !copy) goto cleanup;
+            const auto cb = static_cast<VkCommandBuffer>(vkcommands);
+            const auto img = reinterpret_cast<VkImage>(image_handle);
+            VkImageMemoryBarrier b{};
+            b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            b.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.image = img;
+            b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &b);
+            VkClearColorValue color{};
+            color.float32[0] = color.float32[3] = 1.0f;
+            clear(cb, img, b.newLayout, &color, 1, &b.subresourceRange);
+            b.oldLayout = b.newLayout;
+            b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            b.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &b);
+            VkBufferImageCopy region{};
+            region.bufferOffset = offset;
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            region.imageExtent = {8, 8, 1};
+            copy(cb, img, b.newLayout, reinterpret_cast<VkBuffer>(handle), 1, &region);
+        }
         if (FAILED(interop->EndVkCommandBufferInterop(commands)) || FAILED(commands->Close()) ||
             FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
             goto cleanup;
@@ -83,11 +132,11 @@ static bool test_interop_buffer(ID3D12Device* device)
         if (FAILED(buffer->Map(0, &range, &mapped))) goto cleanup;
         unsigned matched = 0;
         for (unsigned i = 0; i < 64; ++i)
-            matched += static_cast<const UINT32*>(mapped)[i] == 0x1234abcd;
+            matched += static_cast<const UINT32*>(mapped)[i] == (texture ? 0xff0000ffu : 0x1234abcdu);
         D3D12_RANGE no_writes{0, 0};
         buffer->Unmap(0, &no_writes);
         success = matched == 64;
-        std::printf("FFX_VULKAN_BUFFER_ROUNDTRIP matched=%u expected=64\n", matched);
+        std::printf("FFX_VULKAN_%s_ROUNDTRIP matched=%u expected=64\n", texture ? "TEXTURE" : "BUFFER", matched);
     }
 cleanup:
     if (!success) std::fprintf(stderr, "Vulkan/DX12 buffer round trip failed.\n");
@@ -97,6 +146,7 @@ cleanup:
     if (allocator) allocator->Release();
     if (queue) queue->Release();
     if (buffer) buffer->Release();
+    if (image) image->Release();
     if (vulkan) FreeLibrary(vulkan);
     interop->Release();
     return success;
