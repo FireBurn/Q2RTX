@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Shared texture/fence smoke test passes: create a shareable DX12 texture,
+  export and reopen its Win32 handle, clear/copy its Vulkan image, submit
+  with an exported/reopened shared fence, and verify 64/64 red pixels.
+  All four provider checker frames still pass. Evidence:
+  `/tmp/q2rtx-int8-runtime.NAfvoo/interop-shared.log`. This is same-process
+  sharing, not native Linux transport. Upstream Wine's win32u Vulkan/D3DKMT
+  code translates these handles to host FDs internally; see the pinned
+  source investigation in `VULKAN_INTEROP.md` before designing transport.
+
 - External-handle diagnostic reports the Wine-facing provider device enables
   `VK_KHR_external_memory_win32`, but neither `external_memory_fd` nor
   `external_semaphore_fd`. The existing buffer/texture round trips and all

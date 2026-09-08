@@ -28,6 +28,28 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+Shared-resource testing now passes: the probe creates the texture with
+`D3D12_HEAP_FLAG_SHARED`, exports and reopens it using DX12 shared-handle
+methods, then performs the Vulkan clear/readback on the reopened resource.
+Its completion fence is also exported/reopened with `D3D12_FENCE_FLAG_SHARED`.
+The 64/64 pixel check and all four provider checks pass in
+`interop-shared.log`. This does not yet test two devices or processes.
+
+Wine source audit at commit `c860583954f29d7523d48e480aaf445d4217ccde`:
+`win32u/vulkan.c` maps Windows memory handles to host opaque FDs (or DMA-BUF),
+and semaphore handles to opaque FDs. Exported allocations use
+`vkGetMemoryFdKHR` internally and register the FD as a D3DKMT resource.
+`win32u/d3dkmt.c` retrieves local-object FDs using
+`wine_server_handle_to_fd`. These are internal Unix-side paths, not a public
+Windows Vulkan FD API. The installed Wine build must be checked separately;
+the pinned upstream implementation is architectural evidence only. Next
+investigate a versioned Unix helper boundary capable of duplicating and
+transferring those FDs with explicit resource metadata and ownership.
+
+Sources:
+- https://github.com/ValveSoftware/wine/blob/c860583954f29d7523d48e480aaf445d4217ccde/dlls/win32u/vulkan.c
+- https://github.com/ValveSoftware/wine/blob/c860583954f29d7523d48e480aaf445d4217ccde/dlls/win32u/d3dkmt.c
+
 The enabled-extension query on the actual Wine-facing provider device reports
 `enabled_memory_fd=0 enabled_semaphore_fd=0 enabled_memory_win32=1`.
 The same invocation passes both 64-word/pixel interop round trips and all four

@@ -25,7 +25,7 @@ struct ProbeInteropDevice1 : ProbeInteropDevice {
     virtual HRESULT STDMETHODCALLTYPE EndVkCommandBufferInterop(ID3D12CommandList*) = 0;
 };
 
-static bool test_interop_buffer(ID3D12Device* device, bool texture = false)
+static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool shared = false)
 {
     const GUID iid = {0x90ecf26e,0xb212,0x43f5,{0xb6,0x2a,0x82,0x5a,0xd7,0xb1,0x38,0x5e}};
     ProbeInteropDevice1* interop = nullptr;
@@ -80,8 +80,19 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false)
             desc.DepthOrArraySize = desc.MipLevels = desc.SampleDesc.Count = 1;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+            if (FAILED(device->CreateCommittedResource(&heap,
+                shared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE, &desc,
                 D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&image)))) goto cleanup;
+            if (shared) {
+                HANDLE exported = nullptr;
+                ID3D12Resource* reopened = nullptr;
+                HRESULT hr = device->CreateSharedHandle(image, nullptr, GENERIC_ALL, nullptr, &exported);
+                if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
+                if (exported) CloseHandle(exported);
+                if (FAILED(hr)) goto cleanup;
+                image->Release();
+                image = reopened;
+            }
             UINT64 image_handle = 0, image_offset = 0;
             if (FAILED(interop->GetVulkanResourceInfo(image, &image_handle, &image_offset)) || !image_handle)
                 goto cleanup;
@@ -117,8 +128,19 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false)
             copy(cb, img, b.newLayout, reinterpret_cast<VkBuffer>(handle), 1, &region);
         }
         if (FAILED(interop->EndVkCommandBufferInterop(commands)) || FAILED(commands->Close()) ||
-            FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
+            FAILED(device->CreateFence(0, shared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
+                IID_PPV_ARGS(&fence))))
             goto cleanup;
+        if (shared) {
+            HANDLE exported = nullptr;
+            ID3D12Fence* reopened = nullptr;
+            HRESULT hr = device->CreateSharedHandle(fence, nullptr, GENERIC_ALL, nullptr, &exported);
+            if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
+            if (exported) CloseHandle(exported);
+            if (FAILED(hr)) goto cleanup;
+            fence->Release();
+            fence = reopened;
+        }
         event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (!event) goto cleanup;
         ID3D12CommandList* lists[] = {commands};
@@ -136,7 +158,8 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false)
         D3D12_RANGE no_writes{0, 0};
         buffer->Unmap(0, &no_writes);
         success = matched == 64;
-        std::printf("FFX_VULKAN_%s_ROUNDTRIP matched=%u expected=64\n", texture ? "TEXTURE" : "BUFFER", matched);
+        std::printf("FFX_VULKAN_%s_ROUNDTRIP matched=%u expected=64\n",
+            shared ? "SHARED_TEXTURE" : texture ? "TEXTURE" : "BUFFER", matched);
     }
 cleanup:
     if (!success) std::fprintf(stderr, "Vulkan/DX12 buffer round trip failed.\n");
