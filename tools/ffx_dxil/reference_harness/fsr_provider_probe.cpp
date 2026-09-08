@@ -368,7 +368,7 @@ bool create_texture(ID3D12Device* device, uint32_t width, uint32_t height,
 }
 
 bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
-    ID3D12Device* device)
+    ID3D12Device* device, unsigned frame_index, bool reset)
 {
     constexpr uint32_t render_width = 640;
     constexpr uint32_t render_height = 360;
@@ -461,13 +461,14 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
         dispatch.upscaleSize = {output_width, output_height};
         dispatch.frameTimeDelta = 16.667f;
         dispatch.preExposure = 1.0f;
-        dispatch.reset = true;
+        dispatch.reset = reset;
         dispatch.cameraNear = 0.1f;
         dispatch.cameraFar = 1000.0f;
         dispatch.cameraFovAngleVertical = 1.0f;
         dispatch.viewSpaceToMetersFactor = 1.0f;
         const ffxReturnCode_t result = functions.dispatch(context, &dispatch.header);
-        std::printf("ffxDispatch(640x360 -> 1280x720) returned %u\n", result);
+        std::printf("ffxDispatch(640x360 -> 1280x720) frame=%u reset=%u returned %u\n",
+            frame_index, reset ? 1u : 0u, result);
         if (result != FFX_API_RETURN_OK)
             goto cleanup;
     }
@@ -611,7 +612,14 @@ bool create_fsr411_context(const FfxFunctions& functions, ID3D12Device* device,
         requirements_result, resource_requirements.required_resources,
         resource_requirements.optional_resources);
 
-    const bool dispatch_success = !dispatch || dispatch_once(functions, &context, device);
+    bool dispatch_success = true;
+    if (dispatch) {
+        // Retain one provider context across reset, history reuse and reseed.
+        // Each call waits for its fence before releasing application images.
+        for (unsigned frame = 0; frame < 4 && dispatch_success; ++frame)
+            dispatch_success = dispatch_once(functions, &context, device, frame,
+                frame == 0 || frame == 3);
+    }
     const ffxReturnCode_t destroy_result = functions.destroyContext(&context, nullptr);
     g_provider_allocation_device = nullptr;
     std::printf("ffxDestroyContext returned %u\n", destroy_result);

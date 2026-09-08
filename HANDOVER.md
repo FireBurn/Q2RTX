@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Official SDK probe now retains one context across four static frames:
+  reset, history reuse twice, and reset again. Forced provider 4.1.1 and
+  ordinary control 3.1.5 both pass finite RGB and 220/220 checker-centre
+  checks on every frame, with verified GPU completion. Logs are
+  `/tmp/q2rtx-int8-runtime.NAfvoo/forced-temporal.log` and
+  `control-temporal.log`. This tests static history reuse and reseeding,
+  not moving-scene quality, internal neural selection, or Vulkan interop.
+
 - Strengthened provider pixel verification with spatial content checks:
   all 220 checker tile centres retain the expected alternating red/green
   dominance in both forced-INT8 provider 4.1.1 and control 3.1.5. Both retain

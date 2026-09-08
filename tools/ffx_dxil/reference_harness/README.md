@@ -44,8 +44,9 @@ its sibling provider DLLs:
       wine /absolute/path/to/fsr_provider_probe.exe \
       "$PWD/amd_fidelityfx_loader_dx12.dll" --dispatch
 
-The --dispatch option records and waits for one 640x360 -> 1280x720 reset
-frame. It uploads a two-colour checker pattern, constant device depth, and zero
+The --dispatch option records and waits for four 640x360 -> 1280x720 frames
+in one provider context: reset, two history-reusing frames, then reset again.
+It uploads a two-colour checker pattern, constant device depth, and zero
 motion/reactive/composition inputs, and enables internal auto-exposure. Output
 starts as NaN sentinels and is copied to a readback buffer after dispatch. The
 probe requires finite RGB everywhere, some nonzero RGB, and the correct
