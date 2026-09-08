@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Installed Wine transport audit: runtime is staging 11.17; ntdll exports
+  the server FD helpers but win32u does not export the D3DKMT object helpers.
+  Matching upstream source requires opening the underlying object through
+  the Wine server before FD conversion. Next prototype a version-matched
+  Unix library using matching server protocol headers (not installed SDK
+  headers); reject mismatches and avoid private object-layout access.
+  Details and sources are in `VULKAN_INTEROP.md`. No cross-process transfer
+  has been implemented or verified yet.
+
 - Shared texture/fence smoke test passes: create a shareable DX12 texture,
   export and reopen its Win32 handle, clear/copy its Vulkan image, submit
   with an exported/reopened shared fence, and verify 64/64 red pixels.

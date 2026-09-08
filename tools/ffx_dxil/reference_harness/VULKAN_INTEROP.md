@@ -50,6 +50,29 @@ Sources:
 - https://github.com/ValveSoftware/wine/blob/c860583954f29d7523d48e480aaf445d4217ccde/dlls/win32u/vulkan.c
 - https://github.com/ValveSoftware/wine/blob/c860583954f29d7523d48e480aaf445d4217ccde/dlls/win32u/d3dkmt.c
 
+Installed-runtime follow-up: `/etc/eselect/wine/bin/wine` resolves to
+`/usr/bin/wine-staging-11.17`. Dynamic-symbol inspection of its
+`x86_64-unix/ntdll.so` confirms `wine_server_call`, `wine_server_send_fd`,
+`wine_server_fd_to_handle`, and `wine_server_handle_to_fd` are exported.
+Its `win32u.so` does **not** export `d3dkmt_object_get_fd` or
+`d3dkmt_open_resource`; directly resolving those private helpers will not work.
+
+The matching upstream wine-11.17 sources distinguish a shared wrapper handle
+from the underlying FD-bearing object. `d3dkmt_object_open` sends a server
+request with the shared handle and object type; the reply supplies an object
+handle, which the local FD helper then translates. A prototype must use
+matching Wine server protocol definitions inside a Unix library, close the
+temporary object handle and duplicated FD, and transfer the FD over a Unix
+socket. It must reject a mismatched Wine version/protocol rather than guess
+request numbers or inspect private in-memory object layouts. Installed SDK
+headers include `wine/unixlib.h` but not server protocol headers, so a
+matching Wine source/development input is required for this experiment.
+This is an experimental route, not a stable distribution dependency yet.
+
+Matching source:
+- https://github.com/wine-mirror/wine/blob/wine-11.17/dlls/win32u/d3dkmt.c
+- https://github.com/wine-mirror/wine/blob/wine-11.17/server/d3dkmt.c
+
 The enabled-extension query on the actual Wine-facing provider device reports
 `enabled_memory_fd=0 enabled_semaphore_fd=0 enabled_memory_win32=1`.
 The same invocation passes both 64-word/pixel interop round trips and all four
