@@ -28,6 +28,16 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The explicit-heap path has an export limitation: this runtime's
+`CreateSharedHandle(ID3D12Heap)` returns E_NOTIMPL (0x80004001).
+The probe now records that independently of heap creation/placed-image
+metadata; it must not imply a reopen succeeded. Size/alignment now come from
+GetResourceAllocationInfo for the 8x8 RGBA8 image. Placing/querying that image
+on the original heap is tested in `interop-placed-final.log`. Next inspect
+direct Vulkan export for the queried allocation, or obtain exact metadata
+for the already-exportable committed texture. Native image import remains
+unimplemented; this does not invalidate the successful fence import.
+
 The installed vkd3d exposes `ID3D12DXVKInteropDevice3` and its
 `GetVulkanHeapInfo` method. `inspect_shared_heap` creates a shared non-RT/DS
 texture heap requested at 65,536 bytes and obtains a valid Vulkan memory

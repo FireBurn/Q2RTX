@@ -695,6 +695,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Shared-heap metadata interface now verified: Device3 GetVulkanHeapInfo
   returns allocation/offset/type for a requested 64 KiB shared heap. Next
   place/export the test image using this heap and validate native import.
+  Update: placed image works, but DX12 shared-heap export returns E_NOTIMPL;
+  direct Vulkan allocation export or committed-resource metadata is needed.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model

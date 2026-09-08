@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Shared-heap export is NOT implemented by this vkd3d runtime:
+  CreateSharedHandle(ID3D12Heap) returns E_NOTIMPL (0x80004001).
+  `inspect_shared_heap` now derives size/alignment from an 8x8 RGBA8 image,
+  probes export separately, and creates/queries a placed image on the original
+  heap. Do not confuse committed-texture export success with heap export.
+  Evidence: `interop-placed-final.log`. Next investigate direct Vulkan memory
+  export on the queried heap allocation or obtain exact committed metadata.
+
 - Shared heap metadata query passes through ID3D12DXVKInteropDevice3:
   a requested 65,536-byte shared non-RT/DS texture heap returns a valid
   VkDeviceMemory, offset=0, memory_type=0. Log `interop-heap.log` retains all

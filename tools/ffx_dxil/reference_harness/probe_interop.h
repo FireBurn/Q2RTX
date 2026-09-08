@@ -41,9 +41,18 @@ static bool inspect_shared_heap(ID3D12Device* device)
         return true;
     }
     ID3D12Heap* heap = nullptr;
+    ID3D12Resource* placed = nullptr;
+    HANDLE exported = nullptr;
+    D3D12_RESOURCE_DESC image{};
+    image.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    image.Width = image.Height = 8;
+    image.DepthOrArraySize = image.MipLevels = image.SampleDesc.Count = 1;
+    image.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    image.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    const auto allocation = device->GetResourceAllocationInfo(0, 1, &image);
     D3D12_HEAP_DESC desc{};
-    desc.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-    desc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    desc.SizeInBytes = allocation.SizeInBytes;
+    desc.Alignment = allocation.Alignment;
     desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
     desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
     desc.Flags = D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
@@ -51,10 +60,22 @@ static bool inspect_shared_heap(ID3D12Device* device)
     UINT64 memory = 0, offset = 0;
     UINT32 type = UINT32_MAX;
     if (SUCCEEDED(hr)) hr = interop->GetVulkanHeapInfo(heap, &memory, &offset, &type);
-    const bool valid = SUCCEEDED(hr) && memory && type != UINT32_MAX;
+    const HRESULT export_hr = SUCCEEDED(hr) ? device->CreateSharedHandle(heap,
+        nullptr, GENERIC_ALL, nullptr, &exported) : hr;
+    std::printf("FFX_SHARED_HEAP_EXPORT status=0x%08lx\n", static_cast<unsigned long>(export_hr));
+    // Heap export is an optional capability, separate from placement support.
+    UINT64 vkimage = 0, image_offset = 0;
+    if (SUCCEEDED(hr)) hr = device->CreatePlacedResource(heap, 0, &image,
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&placed));
+    if (SUCCEEDED(hr)) hr = interop->GetVulkanResourceInfo(placed, &vkimage, &image_offset);
+    const bool valid = SUCCEEDED(hr) && memory && vkimage && type != UINT32_MAX;
     std::printf("FFX_SHARED_HEAP available=1 valid=%u status=0x%08lx size=%llu offset=%llu memory_type=%u\n",
         valid ? 1u : 0u, static_cast<unsigned long>(hr),
         static_cast<unsigned long long>(desc.SizeInBytes), static_cast<unsigned long long>(offset), type);
+    std::printf("FFX_SHARED_HEAP_IMAGE valid=%u image_offset=%llu\n",
+        valid ? 1u : 0u, static_cast<unsigned long long>(image_offset));
+    if (exported) CloseHandle(exported);
+    if (placed) placed->Release();
     if (heap) heap->Release();
     interop->Release();
     return valid;
