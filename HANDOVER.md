@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- The running vkd3d provider device exposes both ID3D12DXVKInteropDevice and
+  ID3D12DXVKInteropDevice2 (QueryInterface S_OK/non-null), now reported in
+  stable `FFX_VULKAN_INTEROP` lines. The same forced-INT8 invocation passes
+  all four static-history pixel tests. Full output is in
+  `/tmp/q2rtx-int8-runtime.NAfvoo/interop-capabilities.log`.
+  Next exercise the resource/command-buffer methods; availability alone is
+  not a Vulkan image round trip or native Q2RTX integration.
+
 - Interop source audit is recorded in
   `tools/ffx_dxil/reference_harness/VULKAN_INTEROP.md`. OptiScaler's shared
   resource/fence route uses Win32 handles; Proton exposes same-device Vulkan

@@ -46,6 +46,24 @@
 
 namespace {
 
+static void report_vulkan_interop(ID3D12Device* device)
+{
+    // Published vkd3d/Proton interop interface IDs. Only IUnknown is used
+    // here: availability alone does not certify a working image round trip.
+    const GUID ids[] = {
+        {0x39da4e09, 0xbd1c, 0x4198, {0x9f,0xae,0x86,0xbb,0xe3,0xbe,0x41,0xfd}},
+        {0x90ecf26e, 0xb212, 0x43f5, {0xb6,0x2a,0x82,0x5a,0xd7,0xb1,0x38,0x5e}},
+    };
+    const char* names[] = {"ID3D12DXVKInteropDevice", "ID3D12DXVKInteropDevice2"};
+    for (unsigned i = 0; i < 2; ++i) {
+        IUnknown* interop = nullptr;
+        const HRESULT hr = device->QueryInterface(ids[i], reinterpret_cast<void**>(&interop));
+        std::printf("FFX_VULKAN_INTEROP interface=%s available=%u hr=0x%08lx\n",
+            names[i], SUCCEEDED(hr) && interop ? 1u : 0u, static_cast<unsigned long>(hr));
+        if (interop) interop->Release();
+    }
+}
+
 /* Experimental, process-local SDK 2.3 eligibility override. No on-disk DLL
  * is changed. Signature identified by OptiScaler v0.9.4 (7534ad00),
  * proxies/FfxApi_Proxy.h. Only an unambiguous executable-section match is
@@ -865,6 +883,8 @@ int wmain(int argc, wchar_t** argv)
             device->Release();
         return EXIT_FAILURE;
     }
+
+    report_vulkan_interop(device);
 
     /* Frame generation has a separately selectable provider family.  It is
      * intentionally enumerated even when the caller only creates an

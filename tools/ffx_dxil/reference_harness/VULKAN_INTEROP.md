@@ -28,6 +28,13 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The reference probe now queries both `ID3D12DXVKInteropDevice` and
+`ID3D12DXVKInteropDevice2` using their published IIDs. On the local
+vkd3d-proton `634d341a5a312a3`, both return S_OK and non-null interfaces.
+The same invocation still passes all four provider pixel checks. This removes
+interface availability as the next uncertainty; method-level resource and
+command-buffer interoperability remains untested.
+
 Extend the Windows reference probe to query the vkd3d interop interface and
 record a Vulkan copy on the provider device, with a known pattern checked
 after a DX12 dispatch. Verify image layouts and queue synchronization before
