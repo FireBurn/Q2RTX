@@ -60,6 +60,15 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
         static_assert(sizeof(gipa) == sizeof(entry), "Win64 function pointer size");
         std::memcpy(&gipa, &entry, sizeof(gipa));
         auto gdpa = gipa ? reinterpret_cast<GetProc>(gipa(instance, "vkGetDeviceProcAddr")) : nullptr;
+        auto properties = gipa ? reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(
+            gipa(instance, "vkGetPhysicalDeviceProperties2")) : nullptr;
+        VkPhysicalDeviceIDProperties identity{};
+        identity.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+        VkPhysicalDeviceProperties2 props{};
+        props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        props.pNext = &identity;
+        if (!properties) goto cleanup;
+        properties(static_cast<VkPhysicalDevice>(physical), &props);
         using Fill = void (WINAPI*)(void*, UINT64, UINT64, UINT64, UINT32);
         auto fill = gdpa ? reinterpret_cast<Fill>(gdpa(logical, "vkCmdFillBuffer")) : nullptr;
         ProbePixels memory;
@@ -88,7 +97,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
                 HANDLE exported = nullptr;
                 ID3D12Resource* reopened = nullptr;
                 HRESULT hr = device->CreateSharedHandle(image, nullptr, GENERIC_ALL, nullptr, &exported);
-                if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, false)) hr = E_FAIL;
+                if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, false, identity.deviceUUID)) hr = E_FAIL;
                 if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
                 if (exported) CloseHandle(exported);
                 if (FAILED(hr)) goto cleanup;
@@ -137,7 +146,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             HANDLE exported = nullptr;
             ID3D12Fence* reopened = nullptr;
             HRESULT hr = device->CreateSharedHandle(fence, nullptr, GENERIC_ALL, nullptr, &exported);
-            if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, true)) hr = E_FAIL;
+            if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, true, identity.deviceUUID)) hr = E_FAIL;
             if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
             if (exported) CloseHandle(exported);
             if (FAILED(hr)) goto cleanup;

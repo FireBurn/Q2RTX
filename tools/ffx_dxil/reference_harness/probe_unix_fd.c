@@ -25,22 +25,24 @@ struct probe_fd_args {
     uint32_t shared_handle;
     uint32_t is_semaphore;
     uint32_t fd_valid;
+    uint8_t device_uuid[16];
 };
 
-static int transfer_fd(int fd, uint32_t kind)
+static int transfer_fd(int fd, uint32_t kind, const uint8_t* uuid)
 {
     const char *path = getenv("FFX_PROBE_FD_SOCKET");
     struct sockaddr_un address = {.sun_family = AF_UNIX};
     struct ucred peer;
     socklen_t peer_size = sizeof(peer);
     struct timeval timeout = {.tv_sec = 10};
-    struct probe_fd_packet packet = {PROBE_FD_MAGIC, 1, kind, 0};
+    struct probe_fd_packet packet = {PROBE_FD_MAGIC, 2, kind, 0, {0}};
     struct iovec iov = {&packet, sizeof(packet)};
     union { struct cmsghdr align; char bytes[CMSG_SPACE(sizeof(int))]; } control = {0};
     struct msghdr message = {0};
     struct cmsghdr *cmsg;
     int sock, result = -1;
     if (!path || !*path) return 0;
+    memcpy(packet.device_uuid, uuid, 16);
     if (strlen(path) >= sizeof(address.sun_path)) return -1;
     strcpy(address.sun_path, path);
     sock = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
@@ -72,7 +74,7 @@ static NTSTATUS inspect_shared_fd(void *opaque)
     int fd = -1;
     struct stat info;
 
-    if (!args || args->abi_version != 1 || args->is_semaphore > 1)
+    if (!args || args->abi_version != 2 || args->is_semaphore > 1)
         return STATUS_INVALID_PARAMETER;
     args->fd_valid = 0;
     if (!args->shared_handle) return STATUS_INVALID_HANDLE;
@@ -89,7 +91,7 @@ static NTSTATUS inspect_shared_fd(void *opaque)
 
     status = wine_server_handle_to_fd(object, GENERIC_ALL, &fd, NULL);
     if (!status) {
-        if (fstat(fd, &info) || transfer_fd(fd, args->is_semaphore)) status = STATUS_UNSUCCESSFUL;
+        if (fstat(fd, &info) || transfer_fd(fd, args->is_semaphore, args->device_uuid)) status = STATUS_UNSUCCESSFUL;
         else args->fd_valid = 1;
         close(fd);
     }

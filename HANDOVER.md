@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Native Vulkan shared-fence import/wait now passes: receiver selects the
+  sender's device UUID, imports the opaque FD into a timeline semaphore,
+  waits for 1 and reads observed=1. Native receiver with
+  `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation` exited 0 with no validation
+  messages; sender `interop-native-semaphore.log` retains all GPU round trips
+  and four checker passes. Protocol/PE-Unix ABI now version 2 carrying UUID.
+  Texture FD is still closed without import. Next implement exact allocation
+  metadata, matching native image creation/import, and queue-family/layout
+  ownership transfer; this is not yet a provider frame bridge.
+
 - Cross-process SCM_RIGHTS transport passes: native `probe_fd_receiver`
   reports kind=0/1, descriptors=1, valid=1 for texture/fence from Wine.
   Sender log `interop-fd-transport.log` retains all GPU round trips and four

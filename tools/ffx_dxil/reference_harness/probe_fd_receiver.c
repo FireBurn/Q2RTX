@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include "probe_fd_transport.h"
+#include "probe_native_semaphore.h"
 
 static int receive_one(int server, unsigned expected)
 {
@@ -22,7 +23,7 @@ static int receive_one(int server, unsigned expected)
     union { struct cmsghdr align; char bytes[CMSG_SPACE(sizeof(int) * 8)]; } control = {0};
     struct msghdr message = {0};
     unsigned count = 0;
-    int client, valid = 1;
+    int client, valid = 1, received = -1;
     if (poll(&ready, 1, 45000) != 1) return 0;
     client = accept4(server, NULL, NULL, SOCK_CLOEXEC);
     if (client < 0) return 0;
@@ -47,13 +48,19 @@ static int receive_one(int server, unsigned expected)
             struct stat info;
             memcpy(&fd, (char *)CMSG_DATA(cmsg) + i, sizeof(fd));
             if (fstat(fd, &info)) valid = 0;
-            close(fd);
+            if (received < 0) received = fd;
+            else close(fd);
             ++count;
         }
     }
-    valid &= count == 1 && packet.magic == PROBE_FD_MAGIC && packet.version == 1 &&
+    valid &= count == 1 && packet.magic == PROBE_FD_MAGIC && packet.version == 2 &&
         packet.kind == expected && packet.reserved == 0;
     printf("FFX_NATIVE_FD kind=%u descriptors=%u valid=%d\n", packet.kind, count, valid);
+    if (valid && packet.kind == 1) {
+        valid = probe_native_semaphore(received, packet.device_uuid);
+        received = -1;
+    }
+    if (received >= 0) close(received);
     close(client);
     return valid;
 }

@@ -9,7 +9,7 @@ template<typename T> static T probe_ntdll_proc(HMODULE module, const char* name)
     return result;
 }
 
-static bool inspect_unix_shared_handle(HANDLE shared, bool semaphore)
+static bool inspect_unix_shared_handle(HANDLE shared, bool semaphore, const uint8_t* uuid)
 {
     wchar_t path[32768];
     DWORD length = GetEnvironmentVariableW(L"FFX_PROBE_UNIX_FD_LIB", path, 32768);
@@ -35,8 +35,9 @@ static bool inspect_unix_shared_handle(HANDLE shared, bool semaphore)
         std::fprintf(stderr, "Unix FD library load failed: 0x%08lx\n", static_cast<unsigned long>(status));
         return false;
     }
-    struct Args { UINT32 abi, handle, semaphore, valid; };
-    Args args{1, static_cast<UINT32>(reinterpret_cast<uintptr_t>(shared)), semaphore ? 1u : 0u, 0};
+    struct Args { UINT32 abi, handle, semaphore, valid; uint8_t uuid[16]; };
+    Args args{2, static_cast<UINT32>(reinterpret_cast<uintptr_t>(shared)), semaphore ? 1u : 0u, 0, {}};
+    std::memcpy(args.uuid, uuid, 16);
     status = (*dispatcher)(library[1], 0, &args);
     LONG unload = query(GetCurrentProcess(), &library[0], 1004, nullptr, 0, nullptr);
     std::printf("FFX_UNIX_FD kind=%s status=0x%08lx valid=%u unload=0x%08lx\n",

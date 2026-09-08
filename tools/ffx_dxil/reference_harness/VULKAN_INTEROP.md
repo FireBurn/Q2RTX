@@ -28,6 +28,25 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+Native timeline semaphore import/wait now passes. Protocol and PE/Unix ABI
+version 2 carry the provider's Vulkan device UUID; the native receiver selects
+that exact physical device, enables timeline semaphores and external semaphore
+FDs, imports the fence with permanent OPAQUE_FD semantics, waits up to 10 seconds
+for value 1, and reads back observed=1. The receiver consumes the FD on import
+success, closes it on failure, and destroys its semaphore/device afterward.
+The validation-enabled receiver exited 0 with no validation messages; sender
+log is `interop-native-semaphore.log`. All prior GPU/checker tests still pass.
+This is a native CPU wait on a GPU-signalled timeline, not a native image
+import or two-way GPU frame handoff. `probe_native_semaphore.h` owns the test.
+
+Receiver build now requires Vulkan headers and loader:
+`cc -std=c11 -Wall -Wextra -Werror -Iextern/Vulkan-Headers/include
+tools/ffx_dxil/reference_harness/probe_fd_receiver.c -lvulkan
+-o /tmp/q2rtx-probe-fd-receiver`.
+
+Import requirements consulted:
+https://docs.vulkan.org/refpages/latest/refpages/source/VkImportSemaphoreFdInfoKHR.html
+
 SCM_RIGHTS transport now passes from the Wine Unix helper to a separate native
 Linux process. `probe_fd_receiver.c` receives exactly one descriptor for each
 texture/fence packet and validates it with `fstat`; both report valid=1.
