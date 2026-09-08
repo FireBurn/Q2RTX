@@ -26,6 +26,40 @@ struct ProbeInteropDevice1 : ProbeInteropDevice {
     virtual HRESULT STDMETHODCALLTYPE EndVkCommandBufferInterop(ID3D12CommandList*) = 0;
 };
 
+struct ProbeInteropDevice3 : ProbeInteropDevice1 {
+    virtual HRESULT STDMETHODCALLTYPE LockVulkanQueue(ID3D12CommandQueue*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE UnlockVulkanQueue(ID3D12CommandQueue*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetVulkanHeapInfo(ID3D12Heap*, UINT64*, UINT64*, UINT32*) = 0;
+};
+
+static bool inspect_shared_heap(ID3D12Device* device)
+{
+    const GUID iid = {0x22a70184,0xa6a4,0x4c24,{0xbf,0x97,0x7d,0x6d,0xf9,0xf1,0x2d,0x8a}};
+    ProbeInteropDevice3* interop = nullptr;
+    if (FAILED(device->QueryInterface(iid, reinterpret_cast<void**>(&interop)))) {
+        std::printf("FFX_SHARED_HEAP available=0\n");
+        return true;
+    }
+    ID3D12Heap* heap = nullptr;
+    D3D12_HEAP_DESC desc{};
+    desc.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    desc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
+    desc.Flags = D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+    HRESULT hr = device->CreateHeap(&desc, IID_PPV_ARGS(&heap));
+    UINT64 memory = 0, offset = 0;
+    UINT32 type = UINT32_MAX;
+    if (SUCCEEDED(hr)) hr = interop->GetVulkanHeapInfo(heap, &memory, &offset, &type);
+    const bool valid = SUCCEEDED(hr) && memory && type != UINT32_MAX;
+    std::printf("FFX_SHARED_HEAP available=1 valid=%u status=0x%08lx size=%llu offset=%llu memory_type=%u\n",
+        valid ? 1u : 0u, static_cast<unsigned long>(hr),
+        static_cast<unsigned long long>(desc.SizeInBytes), static_cast<unsigned long long>(offset), type);
+    if (heap) heap->Release();
+    interop->Release();
+    return valid;
+}
+
 static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool shared = false)
 {
     const GUID iid = {0x90ecf26e,0xb212,0x43f5,{0xb6,0x2a,0x82,0x5a,0xd7,0xb1,0x38,0x5e}};

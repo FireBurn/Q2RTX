@@ -28,6 +28,19 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The installed vkd3d exposes `ID3D12DXVKInteropDevice3` and its
+`GetVulkanHeapInfo` method. `inspect_shared_heap` creates a shared non-RT/DS
+texture heap requested at 65,536 bytes and obtains a valid Vulkan memory
+handle, offset=0 and memory_type=0. All existing GPU/checker tests still pass
+in `interop-heap.log`. This is a separate empty heap, not the existing
+committed texture's allocation, and heap size is the requested DX12 size.
+Next put the test image in an explicit shared heap, export that heap, and
+carry checked allocation/image metadata to native Vulkan. Do not derive
+opaque-FD memory type from image requirements alone.
+
+Interface declaration:
+https://github.com/HansKristian-Work/vkd3d-proton/blob/master/include/vkd3d_device_vkd3d_ext.idl
+
 Native timeline semaphore import/wait now passes. Protocol and PE/Unix ABI
 version 2 carry the provider's Vulkan device UUID; the native receiver selects
 that exact physical device, enables timeline semaphores and external semaphore

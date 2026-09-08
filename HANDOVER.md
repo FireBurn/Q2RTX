@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Shared heap metadata query passes through ID3D12DXVKInteropDevice3:
+  a requested 65,536-byte shared non-RT/DS texture heap returns a valid
+  VkDeviceMemory, offset=0, memory_type=0. Log `interop-heap.log` retains all
+  three existing GPU round trips and four checker passes. This test has no
+  placed image and does not export/import heap memory yet. Next use an
+  explicit shared heap for the image test and carry its memory metadata.
+
 - Native Vulkan shared-fence import/wait now passes: receiver selects the
   sender's device UUID, imports the opaque FD into a timeline semaphore,
   waits for 1 and reads observed=1. Native receiver with

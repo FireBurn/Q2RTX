@@ -692,6 +692,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Update: native same-UUID Vulkan device imports the shared timeline fence FD,
   waits for 1 and observes 1 with no validation messages. Texture import and
   external image ownership/layout synchronization remain unimplemented.
+  Shared-heap metadata interface now verified: Device3 GetVulkanHeapInfo
+  returns allocation/offset/type for a requested 64 KiB shared heap. Next
+  place/export the test image using this heap and validate native import.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model
