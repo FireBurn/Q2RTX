@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Interop source audit is recorded in
+  `tools/ffx_dxil/reference_harness/VULKAN_INTEROP.md`. OptiScaler's shared
+  resource/fence route uses Win32 handles; Proton exposes same-device Vulkan
+  resource/command interfaces. Neither alone solves a native Linux process
+  talking to a Wine provider. Next prototype a Vulkan/DX12 image round trip
+  on the reference provider device before wiring a game menu selection.
+
 - Official SDK probe now retains one context across four static frames:
   reset, history reuse twice, and reset again. Forced provider 4.1.1 and
   ordinary control 3.1.5 both pass finite RGB and 220/220 checker-centre
