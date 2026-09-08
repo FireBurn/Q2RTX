@@ -28,6 +28,22 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+Vulkan-owned export allocation succeeds on the provider device:
+`test_owned_export_allocation` explicitly allocates 65,536 bytes/type 0 with
+OPAQUE_WIN32 export enabled, exports a valid handle, then closes/frees it.
+`interop-owned-export.log` also retains all four checker passes. No image is
+bound to this allocation yet. This provides a route where allocation metadata
+is owned by the bridge rather than inferred from a committed DX12 texture.
+Next create/bind an exportable Vulkan image and test
+`CreateResourceFromBorrowedHandle` before transporting image metadata/FD.
+
+Source audit: explicit heap allocation in `memory.c` does not add the export
+chain used by committed shared resources in `resource.c`. Therefore no direct
+export was attempted on the DX12 heap's allocation. The new allocation is
+explicitly export-enabled from creation.
+https://github.com/HansKristian-Work/vkd3d-proton/blob/master/libs/vkd3d/memory.c
+https://github.com/HansKristian-Work/vkd3d-proton/blob/master/libs/vkd3d/resource.c
+
 The explicit-heap path has an export limitation: this runtime's
 `CreateSharedHandle(ID3D12Heap)` returns E_NOTIMPL (0x80004001).
 The probe now records that independently of heap creation/placed-image

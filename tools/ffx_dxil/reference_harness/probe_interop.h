@@ -3,6 +3,7 @@
 // Reference: ValveSoftware/Proton proton_11.0,
 // wineopenxr/vkd3d-proton-interop.h. Dispatchable Vulkan handles are opaque
 // pointers in the COM declaration; Vulkan calls use the official header types.
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
 #include "probe_unix_loader.h"
 struct ProbeInteropDevice : IUnknown {
@@ -31,6 +32,50 @@ struct ProbeInteropDevice3 : ProbeInteropDevice1 {
     virtual HRESULT STDMETHODCALLTYPE UnlockVulkanQueue(ID3D12CommandQueue*) = 0;
     virtual HRESULT STDMETHODCALLTYPE GetVulkanHeapInfo(ID3D12Heap*, UINT64*, UINT64*, UINT32*) = 0;
 };
+
+static bool test_owned_export_allocation(ProbeInteropDevice* interop, UINT64 size, UINT32 type)
+{
+    void *instance = nullptr, *physical = nullptr, *logical = nullptr;
+    if (FAILED(interop->GetVulkanHandles(&instance, &physical, &logical))) return false;
+    HMODULE vulkan = LoadLibraryW(L"vulkan-1.dll");
+    if (!vulkan) return false;
+    auto gipa = probe_ntdll_proc<PFN_vkGetInstanceProcAddr>(vulkan, "vkGetInstanceProcAddr");
+    auto gdpa = gipa ? reinterpret_cast<PFN_vkGetDeviceProcAddr>(
+        gipa(static_cast<VkInstance>(instance), "vkGetDeviceProcAddr")) : nullptr;
+    const auto device = static_cast<VkDevice>(logical);
+    auto allocate = gdpa ? reinterpret_cast<PFN_vkAllocateMemory>(gdpa(device, "vkAllocateMemory")) : nullptr;
+    auto release = gdpa ? reinterpret_cast<PFN_vkFreeMemory>(gdpa(device, "vkFreeMemory")) : nullptr;
+    auto export_memory = gdpa ? reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
+        gdpa(device, "vkGetMemoryWin32HandleKHR")) : nullptr;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    HANDLE handle = nullptr;
+    VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
+    if (allocate && release && export_memory) {
+        VkExportMemoryAllocateInfo external{};
+        external.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        VkMemoryAllocateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        info.pNext = &external;
+        info.allocationSize = size;
+        info.memoryTypeIndex = type;
+        result = allocate(device, &info, nullptr, &memory);
+        if (result == VK_SUCCESS) {
+            VkMemoryGetWin32HandleInfoKHR get{};
+            get.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+            get.memory = memory;
+            get.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            result = export_memory(device, &get, &handle);
+        }
+    }
+    const bool valid = result == VK_SUCCESS && handle;
+    std::printf("FFX_OWNED_VULKAN_EXPORT valid=%u result=%d size=%llu memory_type=%u\n",
+        valid ? 1u : 0u, result, static_cast<unsigned long long>(size), type);
+    if (handle) CloseHandle(handle);
+    if (memory) release(device, memory, nullptr);
+    FreeLibrary(vulkan);
+    return valid;
+}
 
 static bool inspect_shared_heap(ID3D12Device* device)
 {
@@ -69,6 +114,7 @@ static bool inspect_shared_heap(ID3D12Device* device)
         D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&placed));
     if (SUCCEEDED(hr)) hr = interop->GetVulkanResourceInfo(placed, &vkimage, &image_offset);
     const bool valid = SUCCEEDED(hr) && memory && vkimage && type != UINT32_MAX;
+    const bool owned_export = valid && test_owned_export_allocation(interop, desc.SizeInBytes, type);
     std::printf("FFX_SHARED_HEAP available=1 valid=%u status=0x%08lx size=%llu offset=%llu memory_type=%u\n",
         valid ? 1u : 0u, static_cast<unsigned long>(hr),
         static_cast<unsigned long long>(desc.SizeInBytes), static_cast<unsigned long long>(offset), type);
@@ -78,7 +124,7 @@ static bool inspect_shared_heap(ID3D12Device* device)
     if (placed) placed->Release();
     if (heap) heap->Release();
     interop->Release();
-    return valid;
+    return valid && owned_export;
 }
 
 static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool shared = false)

@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Provider-device Vulkan-owned allocation export passes: explicitly allocate
+  65,536 bytes/type 0 with OPAQUE_WIN32 export enabled, obtain a valid Win32
+  handle, close/free it. `interop-owned-export.log` retains four checker
+  passes. This allocation has no image yet. Explicit DX12 heap export remains
+  unsupported; next create a Vulkan-owned exportable image with exact retained
+  metadata, and expose it to DX12 via borrowed-resource interoperability.
+
 - Shared-heap export is NOT implemented by this vkd3d runtime:
   CreateSharedHandle(ID3D12Heap) returns E_NOTIMPL (0x80004001).
   `inspect_shared_heap` now derives size/alignment from an 8x8 RGBA8 image,
