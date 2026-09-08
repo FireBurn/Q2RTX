@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include "probe_pixels.h"
+#include "probe_interop.h"
 
 #include "ffx_api.h"
 #include "ffx_api_dx12.h"
@@ -449,6 +450,8 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
         }
     }
 
+    if (!inspect_interop_resources(device, queue, resources.output))
+        goto cleanup;
     if (!pixels.upload(device, command_list, resources.color, read_state, 0) ||
         !pixels.upload(device, command_list, resources.depth, read_state, 1) ||
         !pixels.upload(device, command_list, resources.motion_vectors, read_state, 2) ||

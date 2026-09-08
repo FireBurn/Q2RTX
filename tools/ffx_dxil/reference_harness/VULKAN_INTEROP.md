@@ -28,6 +28,13 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+`probe_interop.h` now exercises the base interface's device, queue, image
+and layout queries on each dispatch's actual output. The local four-frame
+forced-INT8 run returns valid/non-null handles, queue family 0 and image
+layout 1 (GENERAL), while all pixel checks pass. It does not yet submit a
+Vulkan command through those handles. Ordinary Windows without the interface
+reports unavailable and can still run the DX12 pixel probe.
+
 The reference probe now queries both `ID3D12DXVKInteropDevice` and
 `ID3D12DXVKInteropDevice2` using their published IIDs. On the local
 vkd3d-proton `634d341a5a312a3`, both return S_OK and non-null interfaces.

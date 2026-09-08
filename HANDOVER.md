@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Added method-level vkd3d interop diagnostics (`probe_interop.h`): device,
+  queue, native output image and its layout all resolve successfully in the
+  four-frame forced-INT8 run (family=0, layout=GENERAL). All four 220/220
+  pixel checks still pass. Log:
+  `/tmp/q2rtx-int8-runtime.NAfvoo/interop-resources.log`.
+  Next record a synchronized Vulkan operation on these resources; the probe
+  currently queries handles only and does not implement cross-process sharing.
+
 - The running vkd3d provider device exposes both ID3D12DXVKInteropDevice and
   ID3D12DXVKInteropDevice2 (QueryInterface S_OK/non-null), now reported in
   stable `FFX_VULKAN_INTEROP` lines. The same forced-INT8 invocation passes
