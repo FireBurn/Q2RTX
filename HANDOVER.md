@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Added `probe_unix_fd.c`, the isolated Wine Unix half of FD inspection.
+  It opens the underlying resource/sync through server protocol 961,
+  duplicates/validates/closes the FD and closes the temporary object handle.
+  Strict C compilation passes using matching wine-11.17 server headers in
+  `/tmp/q2rtx-wine-headers.IYXf7k`; output `/tmp/q2rtx-probe-unix-fd.so`.
+  It is NOT called yet: next add a version-checked PE Unix-library loader
+  and exercise it with the shared GPU texture/fence. No runtime FD proof yet.
+
 - Installed Wine transport audit: runtime is staging 11.17; ntdll exports
   the server FD helpers but win32u does not export the D3DKMT object helpers.
   Matching upstream source requires opening the underlying object through

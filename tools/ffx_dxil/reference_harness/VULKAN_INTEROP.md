@@ -73,6 +73,27 @@ Matching source:
 - https://github.com/wine-mirror/wine/blob/wine-11.17/dlls/win32u/d3dkmt.c
 - https://github.com/wine-mirror/wine/blob/wine-11.17/server/d3dkmt.c
 
+`probe_unix_fd.c` now implements the Unix half of this experiment: open a
+resource/synchronization object from its shared handle, obtain its FD, check
+it with `fstat`, and close both temporary handles. It does not send the FD or
+import it into another Vulkan device yet. Its protocol-961 build guard rejects
+other headers. The PE caller must verify the runtime Wine version before
+invoking it; that loader/caller is not implemented yet, so this source is not
+wired into the existing probe or game. Compilation passed with:
+
+```sh
+cc -std=c11 -fPIC -shared -Wall -Wextra -Werror -D__WINESRC__ \
+  -I/tmp/q2rtx-wine-headers.IYXf7k -I/usr/include/wine \
+  -I/usr/include/wine/windows \
+  tools/ffx_dxil/reference_harness/probe_unix_fd.c \
+  -o /tmp/q2rtx-probe-unix-fd.so
+```
+
+The temporary include directory contains unmodified `wine/server.h` and
+`wine/server_protocol.h` downloaded from upstream tag wine-11.17. Only compile
+coverage exists so far; next implement the version-checked PE loader and call
+this operation on the shared texture/fence from the existing GPU test.
+
 The enabled-extension query on the actual Wine-facing provider device reports
 `enabled_memory_fd=0 enabled_semaphore_fd=0 enabled_memory_win32=1`.
 The same invocation passes both 64-word/pixel interop round trips and all four

@@ -683,6 +683,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Vulkan clear/readback test (64/64 pixels); Unix FD transfer is still untested.
   Installed Wine 11.17 exports server FD helpers but not D3DKMT object access;
   a matching-source Unix helper/server protocol prototype is the next step.
+  Unix inspection half now compiles (`probe_unix_fd.c`, protocol 961 guard);
+  version-checked PE loader and live shared-resource invocation remain to do.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model
