@@ -687,6 +687,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   version-checked PE loader and live shared-resource invocation remain to do.
   Update: optional version-checked loader now passes live texture/fence FD
   inspection. Remaining: SCM_RIGHTS transport and native Vulkan import tests.
+  Update: native receiver now receives/validates both descriptor kinds over
+  SCM_RIGHTS. Vulkan allocation metadata, imports and GPU waits remain untested.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model

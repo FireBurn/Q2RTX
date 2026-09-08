@@ -28,6 +28,24 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+SCM_RIGHTS transport now passes from the Wine Unix helper to a separate native
+Linux process. `probe_fd_receiver.c` receives exactly one descriptor for each
+texture/fence packet and validates it with `fstat`; both report valid=1.
+The sender's GPU round trips and four checker frames still pass in
+`interop-fd-transport.log`. Both endpoints require same-UID peers; the socket
+is owner-only and created without replacing an existing path. The receiver
+closes all received descriptors, including rejected packets. This protocol
+contains only descriptor kind/version, not sufficient Vulkan import metadata.
+It does not prove memory or semaphore import, layout ownership, or GPU waits.
+
+Build the receiver with `cc -std=c11 -Wall -Wextra -Werror
+tools/ffx_dxil/reference_harness/probe_fd_receiver.c -o
+/tmp/q2rtx-probe-fd-receiver`. Start it with an unused socket pathname inside
+a private temporary directory, then run the existing Wine probe with
+`FFX_PROBE_FD_SOCKET` set to that pathname, plus `FFX_PROBE_UNIX_FD_LIB` as
+below. Receiver waits at most 45 seconds per connection and 10 seconds for
+each packet. No game or installed library uses this diagnostic protocol.
+
 The optional PE loader now invokes the Unix helper successfully on both
 shared texture and fence handles: `FFX_UNIX_FD` reports status=0, valid=1,
 unload=0 for each. All three GPU round trips and four checker frames pass in

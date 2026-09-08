@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Cross-process SCM_RIGHTS transport passes: native `probe_fd_receiver`
+  reports kind=0/1, descriptors=1, valid=1 for texture/fence from Wine.
+  Sender log `interop-fd-transport.log` retains all GPU round trips and four
+  checker passes. Receiver currently fstats/closes descriptors, not Vulkan
+  imports. Add allocation/adapter metadata and import/wait tests next.
+  New files `probe_fd_transport.h` and `probe_fd_receiver.c`; sender opt-in
+  `FFX_PROBE_FD_SOCKET`, same-UID peers and owner-only socket required.
+
 - Live Unix FD inspection now passes for both shared texture and fence:
   status=0, valid=1, unload=0, with all three GPU round trips and all four
   checker frames still passing. Log `interop-unix-fd-linked.log` under the
