@@ -28,6 +28,15 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+A real buffer round trip now passes locally: the probe creates a vkd3d interop
+allocator, obtains its Vulkan command buffer, records `vkCmdFillBuffer` on a
+D3D12 readback resource's Vulkan buffer, ends interop and submits through
+D3D12. After fence/device verification all 64 CPU-read words match the known
+pattern. The subsequent four official-provider pixel checks also pass.
+This establishes same-process buffer command interoperability, not image
+sharing or transport into the native Linux process. Next apply the pattern
+to a texture with explicit layout transitions.
+
 `probe_interop.h` now exercises the base interface's device, queue, image
 and layout queries on each dispatch's actual output. The local four-frame
 forced-INT8 run returns valid/non-null handles, queue family 0 and image

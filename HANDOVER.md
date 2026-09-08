@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Actual Vulkan/DX12 buffer round trip passed: interop allocator/command buffer,
+  Vulkan fill on a D3D12 readback resource, DX12 submit, fence and CPU readback
+  yielded 64/64 matching words. All four subsequent FSR4.1.1 checker frames
+  still pass. Log: `/tmp/q2rtx-int8-runtime.NAfvoo/interop-buffer.log`.
+  This proves same-process commands/resources work; next test image layouts
+  and then native-Linux transport. It is not yet a Q2RTX provider bridge.
+
 - Added method-level vkd3d interop diagnostics (`probe_interop.h`): device,
   queue, native output image and its layout all resolve successfully in the
   four-frame forced-INT8 run (family=0, layout=GENERAL). All four 220/220

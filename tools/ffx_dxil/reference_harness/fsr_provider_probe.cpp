@@ -888,6 +888,11 @@ int wmain(int argc, wchar_t** argv)
     }
 
     report_vulkan_interop(device);
+    if (!test_interop_buffer(device)) {
+        FreeLibrary(module);
+        device->Release();
+        return EXIT_FAILURE;
+    }
 
     /* Frame generation has a separately selectable provider family.  It is
      * intentionally enumerated even when the caller only creates an
