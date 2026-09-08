@@ -10,6 +10,14 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Strengthened provider pixel verification with spatial content checks:
+  all 220 checker tile centres retain the expected alternating red/green
+  dominance in both forced-INT8 provider 4.1.1 and control 3.1.5. Both retain
+  zero non-finite RGB components. Logs are `forced-checker.log` and
+  `control-checker.log` in `/tmp/q2rtx-int8-runtime.NAfvoo`.
+  This excludes a flat output passing the earlier nonzero-only check.
+  Temporal-frame quality and internal model confirmation remain outstanding.
+
 - SDK-2.3 probe now uploads deterministic two-colour checker RGB, constant
   depth and zero motion/masks; output starts with NaN sentinels. It reads back
   RGBA16F after fence/device completion and rejects non-finite RGB or all-black

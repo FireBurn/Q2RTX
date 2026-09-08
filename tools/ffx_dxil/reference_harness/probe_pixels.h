@@ -95,7 +95,7 @@ struct ProbePixels {
         unsigned char* mapped = nullptr;
         if (FAILED(readback->Map(0, nullptr, reinterpret_cast<void**>(&mapped))))
             return false;
-        size_t nonfinite = 0, nonzero = 0;
+        size_t nonfinite = 0, nonzero = 0, checker_samples = 0, checker_matches = 0;
         for (UINT y = 0; y < output_layout.Footprint.Height; ++y)
             for (UINT x = 0; x < output_layout.Footprint.Width; ++x) {
                 uint16_t rgba[4];
@@ -104,10 +104,25 @@ struct ProbePixels {
                     nonfinite += (rgba[c] & 0x7c00) == 0x7c00;
                     nonzero += (rgba[c] & 0x7fff) != 0;
                 }
+                // Sample tile centres, away from reconstruction boundaries.
+                // Input tiles are 32 pixels wide; this probe scales by 2.
+                // Positive finite half floats preserve ordering as integers.
+                if (x % 64 == 32 && y % 64 == 32) {
+                    ++checker_samples;
+                    const bool green_tile = ((x / 64) ^ (y / 64)) & 1;
+                    const bool positive_finite = (rgba[0] & 0x8000) == 0 &&
+                        (rgba[1] & 0x8000) == 0 &&
+                        (rgba[0] & 0x7c00) != 0x7c00 &&
+                        (rgba[1] & 0x7c00) != 0x7c00;
+                    checker_matches += positive_finite &&
+                        (green_tile ? rgba[1] > rgba[0] : rgba[0] > rgba[1]);
+                }
             }
         D3D12_RANGE no_writes{0, 0};
         readback->Unmap(0, &no_writes);
         std::printf("FFX_PIXEL_CHECK rgb_nonfinite=%zu rgb_nonzero=%zu\n", nonfinite, nonzero);
-        return nonfinite == 0 && nonzero != 0;
+        std::printf("FFX_CHECKER_CHECK matched=%zu sampled=%zu\n", checker_matches, checker_samples);
+        return nonfinite == 0 && nonzero != 0 && checker_samples != 0 &&
+            checker_matches == checker_samples;
     }
 };

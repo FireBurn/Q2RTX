@@ -48,8 +48,10 @@ The --dispatch option records and waits for one 640x360 -> 1280x720 reset
 frame. It uploads a two-colour checker pattern, constant device depth, and zero
 motion/reactive/composition inputs, and enables internal auto-exposure. Output
 starts as NaN sentinels and is copied to a readback buffer after dispatch. The
-probe requires finite RGB everywhere and some nonzero RGB after verified fence
-completion. This is a synthetic execution test, not a temporal image-quality
+probe requires finite RGB everywhere, some nonzero RGB, and the correct
+red/green dominance at every checker tile centre after verified fence
+completion. Both 4.1.1 forced-INT8 and 3.1.5 control pass all 220 sampled
+centres at 1280x720. This is a synthetic execution test, not a temporal image-quality
 test or proof of the internal neural model. Use --provider-index N
 only after recording the enumeration output. It is
 intentional that the probe does not claim FSR 4.1.1 runs on RDNA2: it records
