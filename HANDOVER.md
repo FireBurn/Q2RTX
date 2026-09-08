@@ -10,6 +10,13 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Vulkan-owned image creation/binding/export and DX12 borrowed wrapping pass.
+  New 8x8 RGBA8 sampled/storage/transfer image uses queried requirements:
+  4,096-byte dedicated allocation, type 0 (not guessed 64 KiB heap size).
+  CreateResourceFromBorrowedHandle returns S_OK; no commands use this wrapper
+  yet. `interop-owned-image.log` retains four checker passes. Next exercise
+  pixel access through the wrapper and carry exact metadata for native import.
+
 - Provider-device Vulkan-owned allocation export passes: explicitly allocate
   65,536 bytes/type 0 with OPAQUE_WIN32 export enabled, obtain a valid Win32
   handle, close/free it. `interop-owned-export.log` retains four checker

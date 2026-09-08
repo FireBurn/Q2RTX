@@ -33,7 +33,18 @@ struct ProbeInteropDevice3 : ProbeInteropDevice1 {
     virtual HRESULT STDMETHODCALLTYPE GetVulkanHeapInfo(ID3D12Heap*, UINT64*, UINT64*, UINT32*) = 0;
 };
 
-static bool test_owned_export_allocation(ProbeInteropDevice* interop, UINT64 size, UINT32 type)
+struct ProbeBorrowedDevice : IUnknown {
+    virtual HRESULT STDMETHODCALLTYPE GetVulkanHandles(VkInstance*, VkPhysicalDevice*, VkDevice*) = 0;
+    virtual BOOL STDMETHODCALLTYPE GetExtensionSupport(int) = 0;
+    virtual HRESULT STDMETHODCALLTYPE CreateCubinComputeShaderWithName(const void*, UINT32, UINT32, UINT32, UINT32, const char*, void**) = 0;
+    virtual HRESULT STDMETHODCALLTYPE DestroyCubinComputeShader(void*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetCudaTextureObject(D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_CPU_DESCRIPTOR_HANDLE, UINT32*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetCudaSurfaceObject(D3D12_CPU_DESCRIPTOR_HANDLE, UINT32*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE CaptureUAVInfo(void*) = 0;
+    virtual HRESULT STDMETHODCALLTYPE CreateResourceFromBorrowedHandle(const D3D12_RESOURCE_DESC1*, UINT64, ID3D12Resource**) = 0;
+};
+
+static bool test_owned_export_allocation(ID3D12Device* d3d, ProbeInteropDevice* interop, UINT64 size, UINT32 type)
 {
     void *instance = nullptr, *physical = nullptr, *logical = nullptr;
     if (FAILED(interop->GetVulkanHandles(&instance, &physical, &logical))) return false;
@@ -47,19 +58,52 @@ static bool test_owned_export_allocation(ProbeInteropDevice* interop, UINT64 siz
     auto release = gdpa ? reinterpret_cast<PFN_vkFreeMemory>(gdpa(device, "vkFreeMemory")) : nullptr;
     auto export_memory = gdpa ? reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
         gdpa(device, "vkGetMemoryWin32HandleKHR")) : nullptr;
+    auto create_image = gdpa ? reinterpret_cast<PFN_vkCreateImage>(gdpa(device, "vkCreateImage")) : nullptr;
+    auto destroy_image = gdpa ? reinterpret_cast<PFN_vkDestroyImage>(gdpa(device, "vkDestroyImage")) : nullptr;
+    auto requirements = gdpa ? reinterpret_cast<PFN_vkGetImageMemoryRequirements>(gdpa(device, "vkGetImageMemoryRequirements")) : nullptr;
+    auto bind = gdpa ? reinterpret_cast<PFN_vkBindImageMemory>(gdpa(device, "vkBindImageMemory")) : nullptr;
     VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImage image = VK_NULL_HANDLE;
+    ID3D12Resource* borrowed = nullptr;
+    ProbeBorrowedDevice* bridge = nullptr;
     HANDLE handle = nullptr;
     VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
-    if (allocate && release && export_memory) {
+    if (allocate && release && export_memory && create_image && destroy_image && requirements && bind) {
+        VkExternalMemoryImageCreateInfo image_external{};
+        image_external.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+        image_external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        VkImageCreateInfo image_info{};
+        image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        image_info.pNext = &image_external;
+        image_info.imageType = VK_IMAGE_TYPE_2D;
+        image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+        image_info.extent = {8, 8, 1};
+        image_info.mipLevels = image_info.arrayLayers = 1;
+        image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+        image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+        image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        result = create_image(device, &image_info, nullptr, &image);
+        VkMemoryRequirements req{};
+        if (result == VK_SUCCESS) {
+            requirements(device, image, &req);
+            size = req.size;
+            if (type >= 32 || !(req.memoryTypeBits & (1u << type))) result = VK_ERROR_FEATURE_NOT_PRESENT;
+        }
+        VkMemoryDedicatedAllocateInfo dedicated{};
+        dedicated.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
+        dedicated.image = image;
         VkExportMemoryAllocateInfo external{};
         external.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        external.pNext = &dedicated;
         external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
         VkMemoryAllocateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         info.pNext = &external;
         info.allocationSize = size;
         info.memoryTypeIndex = type;
-        result = allocate(device, &info, nullptr, &memory);
+        if (result == VK_SUCCESS) result = allocate(device, &info, nullptr, &memory);
+        if (result == VK_SUCCESS) result = bind(device, image, memory, 0);
         if (result == VK_SUCCESS) {
             VkMemoryGetWin32HandleInfoKHR get{};
             get.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
@@ -68,10 +112,25 @@ static bool test_owned_export_allocation(ProbeInteropDevice* interop, UINT64 siz
             result = export_memory(device, &get, &handle);
         }
     }
-    const bool valid = result == VK_SUCCESS && handle;
+    HRESULT wrap = E_NOINTERFACE;
+    const GUID iid = {0x099a73fd,0x2199,0x4f45,{0xbf,0x48,0x0e,0xb8,0x6f,0x6f,0xdb,0x65}};
+    if (result == VK_SUCCESS && handle && SUCCEEDED(d3d->QueryInterface(iid, reinterpret_cast<void**>(&bridge)))) {
+        D3D12_RESOURCE_DESC1 desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = desc.Height = 8;
+        desc.DepthOrArraySize = desc.MipLevels = desc.SampleDesc.Count = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        wrap = bridge->CreateResourceFromBorrowedHandle(&desc, reinterpret_cast<UINT64>(image), &borrowed);
+    }
+    const bool valid = result == VK_SUCCESS && handle && SUCCEEDED(wrap) && borrowed;
+    std::printf("FFX_OWNED_IMAGE_WRAP status=0x%08lx valid=%u\n", static_cast<unsigned long>(wrap), valid ? 1u : 0u);
     std::printf("FFX_OWNED_VULKAN_EXPORT valid=%u result=%d size=%llu memory_type=%u\n",
         valid ? 1u : 0u, result, static_cast<unsigned long long>(size), type);
     if (handle) CloseHandle(handle);
+    if (borrowed) borrowed->Release();
+    if (bridge) bridge->Release();
+    if (image) destroy_image(device, image, nullptr);
     if (memory) release(device, memory, nullptr);
     FreeLibrary(vulkan);
     return valid;
@@ -114,7 +173,7 @@ static bool inspect_shared_heap(ID3D12Device* device)
         D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&placed));
     if (SUCCEEDED(hr)) hr = interop->GetVulkanResourceInfo(placed, &vkimage, &image_offset);
     const bool valid = SUCCEEDED(hr) && memory && vkimage && type != UINT32_MAX;
-    const bool owned_export = valid && test_owned_export_allocation(interop, desc.SizeInBytes, type);
+    const bool owned_export = valid && test_owned_export_allocation(device, interop, desc.SizeInBytes, type);
     std::printf("FFX_SHARED_HEAP available=1 valid=%u status=0x%08lx size=%llu offset=%llu memory_type=%u\n",
         valid ? 1u : 0u, static_cast<unsigned long>(hr),
         static_cast<unsigned long long>(desc.SizeInBytes), static_cast<unsigned long long>(offset), type);

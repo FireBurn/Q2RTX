@@ -28,6 +28,17 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The owned-export test now creates an 8x8 RGBA8 Vulkan image with
+sampled/storage/transfer usages, queries memory requirements, allocates
+dedicated exportable memory, binds it, and exports its Win32 handle.
+`ID3D12DeviceExt1::CreateResourceFromBorrowedHandle` successfully wraps that
+VkImage as a DX12 resource. Requirements return 4,096 bytes/type 0, distinct
+from the earlier 65,536-byte DX12 heap. The wrapper is released before the
+underlying image/memory. No commands access the wrapper yet; this is
+creation/binding/export coverage, not pixel interoperability. All four
+checker frames pass in `interop-owned-image.log`. Next test wrapper pixel
+access, then pass these exact allocation/image parameters to native import.
+
 Vulkan-owned export allocation succeeds on the provider device:
 `test_owned_export_allocation` explicitly allocates 65,536 bytes/type 0 with
 OPAQUE_WIN32 export enabled, exports a valid handle, then closes/frees it.

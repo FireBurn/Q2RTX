@@ -699,6 +699,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   direct Vulkan allocation export or committed-resource metadata is needed.
   Explicit Vulkan allocation/export now passes on the provider device. Next
   bind an image and test the borrowed-resource API before native image import.
+  Update: exportable Vulkan image binds successfully and borrowed DX12 wrapper
+  creation returns S_OK. Wrapper pixel access and native image import remain.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model
