@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Live Unix FD inspection now passes for both shared texture and fence:
+  status=0, valid=1, unload=0, with all three GPU round trips and all four
+  checker frames still passing. Log `interop-unix-fd-linked.log` under the
+  existing isolated runtime directory. `probe_unix_loader.h` opt-in env
+  `FFX_PROBE_UNIX_FD_LIB` requires an NT library path and runtime Wine 11.17.
+  The Unix .so must explicitly link installed Wine's Unix ntdll.so; without
+  that dependency load returned DLL_NOT_FOUND. Next transport descriptors
+  with SCM_RIGHTS and verify native Vulkan memory/semaphore import. Current
+  helper only validates/closes FDs; it does not transfer them.
+
 - Added `probe_unix_fd.c`, the isolated Wine Unix half of FD inspection.
   It opens the underlying resource/sync through server protocol 961,
   duplicates/validates/closes the FD and closes the temporary object handle.

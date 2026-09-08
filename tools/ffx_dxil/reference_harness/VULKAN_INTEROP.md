@@ -28,6 +28,19 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The optional PE loader now invokes the Unix helper successfully on both
+shared texture and fence handles: `FFX_UNIX_FD` reports status=0, valid=1,
+unload=0 for each. All three GPU round trips and four checker frames pass in
+`/tmp/q2rtx-int8-runtime.NAfvoo/interop-unix-fd-linked.log`. The loader refuses
+runtime versions other than Wine 11.17. Enable only for this experiment with
+`FFX_PROBE_UNIX_FD_LIB='\??\Z:\tmp\q2rtx-probe-unix-fd.so'` (an NT path).
+The helper must link explicitly against the installed
+`/usr/lib/wine-staging-11.17/wine/x86_64-unix/ntdll.so`; the earlier unlinked
+build failed to load. Append that input to the compile command below.
+Descriptors are currently validated and immediately closed, not transferred
+or Vulkan-imported. Next implement Unix socket SCM_RIGHTS transport with
+explicit memory/semaphore metadata and test imports on a native device.
+
 Shared-resource testing now passes: the probe creates the texture with
 `D3D12_HEAP_FLAG_SHARED`, exports and reopens it using DX12 shared-handle
 methods, then performs the Vulkan clear/readback on the reopened resource.
@@ -78,21 +91,22 @@ resource/synchronization object from its shared handle, obtain its FD, check
 it with `fstat`, and close both temporary handles. It does not send the FD or
 import it into another Vulkan device yet. Its protocol-961 build guard rejects
 other headers. The PE caller must verify the runtime Wine version before
-invoking it; that loader/caller is not implemented yet, so this source is not
-wired into the existing probe or game. Compilation passed with:
+invoking it; `probe_unix_loader.h` now provides that optional caller for the
+standalone probe, not the game. Compilation passed with:
 
 ```sh
 cc -std=c11 -fPIC -shared -Wall -Wextra -Werror -D__WINESRC__ \
   -I/tmp/q2rtx-wine-headers.IYXf7k -I/usr/include/wine \
   -I/usr/include/wine/windows \
   tools/ffx_dxil/reference_harness/probe_unix_fd.c \
+  /usr/lib/wine-staging-11.17/wine/x86_64-unix/ntdll.so \
   -o /tmp/q2rtx-probe-unix-fd.so
 ```
 
 The temporary include directory contains unmodified `wine/server.h` and
 `wine/server_protocol.h` downloaded from upstream tag wine-11.17. Only compile
-coverage exists so far; next implement the version-checked PE loader and call
-this operation on the shared texture/fence from the existing GPU test.
+coverage existed initially; live shared texture/fence invocation now passes
+as recorded above. This still does not prove native-device importability.
 
 The enabled-extension query on the actual Wine-facing provider device reports
 `enabled_memory_fd=0 enabled_semaphore_fd=0 enabled_memory_win32=1`.

@@ -4,6 +4,7 @@
 // wineopenxr/vkd3d-proton-interop.h. Dispatchable Vulkan handles are opaque
 // pointers in the COM declaration; Vulkan calls use the official header types.
 #include <vulkan/vulkan.h>
+#include "probe_unix_loader.h"
 struct ProbeInteropDevice : IUnknown {
     virtual HRESULT STDMETHODCALLTYPE GetDXGIAdapter(REFIID, void**) = 0;
     virtual HRESULT STDMETHODCALLTYPE GetInstanceExtensions(UINT*, const char**) = 0;
@@ -87,6 +88,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
                 HANDLE exported = nullptr;
                 ID3D12Resource* reopened = nullptr;
                 HRESULT hr = device->CreateSharedHandle(image, nullptr, GENERIC_ALL, nullptr, &exported);
+                if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, false)) hr = E_FAIL;
                 if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
                 if (exported) CloseHandle(exported);
                 if (FAILED(hr)) goto cleanup;
@@ -135,6 +137,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             HANDLE exported = nullptr;
             ID3D12Fence* reopened = nullptr;
             HRESULT hr = device->CreateSharedHandle(fence, nullptr, GENERIC_ALL, nullptr, &exported);
+            if (SUCCEEDED(hr) && !inspect_unix_shared_handle(exported, true)) hr = E_FAIL;
             if (SUCCEEDED(hr)) hr = device->OpenSharedHandle(exported, IID_PPV_ARGS(&reopened));
             if (exported) CloseHandle(exported);
             if (FAILED(hr)) goto cleanup;
