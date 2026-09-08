@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- External-handle diagnostic reports the Wine-facing provider device enables
+  `VK_KHR_external_memory_win32`, but neither `external_memory_fd` nor
+  `external_semaphore_fd`. The existing buffer/texture round trips and all
+  four 220/220 checker checks still pass in
+  `/tmp/q2rtx-int8-runtime.NAfvoo/interop-external.log`. This rules out directly
+  calling FD export on that exposed device; it does not establish what the
+  underlying Unix driver supports. Native integration needs Wine-side handle
+  translation/transport, not raw VkImage or Win32 handle forwarding.
+
 - Same-process texture interop now passes: create D3D12 RGBA8 image, obtain
   its VkImage, Vulkan transition/clear/transition/copy to D3D12 readback,
   submit through DX12 and verify all 64 red pixels after the fence. Buffer

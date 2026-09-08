@@ -675,6 +675,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   the 960x540 Vulkan-validation capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
 - [ ] Reproduce one fixed 4.1.1 upscale frame through the portable Vulkan ABI.
+  Same-process DX12/Vulkan buffer and texture round trips pass, but native
+  Linux transport remains missing. The Wine-facing device enables Win32
+  external memory, not FD memory/semaphore export; investigate Unix-side
+  handle translation before attempting a cross-process GPU bridge.
 - [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
   on RDNA2 using an isolated probe. Prior environment-only probes do not
   establish whether this path works. Verify actual GPU completion and model

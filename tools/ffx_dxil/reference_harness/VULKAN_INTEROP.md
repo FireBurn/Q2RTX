@@ -28,6 +28,16 @@ Source: https://github.com/ValveSoftware/Proton/blob/proton_11.0/wineopenxr/vkd3
 
 ## Next executable milestone
 
+The enabled-extension query on the actual Wine-facing provider device reports
+`enabled_memory_fd=0 enabled_semaphore_fd=0 enabled_memory_win32=1`.
+The same invocation passes both 64-word/pixel interop round trips and all four
+220/220 checker checks (`interop-external.log`). This is a device-enabled
+extension list, not a physical-device capability list: it says nothing about
+the underlying Unix driver's FD support. Direct FD export through this
+Windows Vulkan device is not available. Investigate Wine's Win32 external
+memory/fence translation before choosing a native Linux transport; never
+reinterpret the resulting Windows handles as Unix descriptors.
+
 The independent 8x8 texture test now passes as well: a D3D12-owned RGBA8
 image is cleared and copied using Vulkan after explicit UNDEFINED ->
 TRANSFER_DST -> TRANSFER_SRC transitions. DX12 submission and readback

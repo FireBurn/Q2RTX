@@ -172,6 +172,21 @@ static bool inspect_interop_resources(ID3D12Device* device,
     const HRESULT handles = interop->GetVulkanHandles(&instance, &physical, &logical);
     const HRESULT queues = interop->GetVulkanQueueInfo(queue, &vkqueue, &family);
     const HRESULT resources = interop->GetVulkanResourceInfo(image, &vkimage, &offset);
+    UINT extension_count = 0;
+    if (SUCCEEDED(interop->GetDeviceExtensions(&extension_count, nullptr)) && extension_count < 4096) {
+        std::vector<const char*> extensions(extension_count);
+        if (SUCCEEDED(interop->GetDeviceExtensions(&extension_count, extensions.data()))) {
+            bool memory_fd = false, semaphore_fd = false, memory_win32 = false;
+            for (const char* extension : extensions) {
+                if (!extension) continue;
+                memory_fd |= std::strcmp(extension, "VK_KHR_external_memory_fd") == 0;
+                semaphore_fd |= std::strcmp(extension, "VK_KHR_external_semaphore_fd") == 0;
+                memory_win32 |= std::strcmp(extension, "VK_KHR_external_memory_win32") == 0;
+            }
+            std::printf("FFX_INTEROP_EXTERNAL enabled_memory_fd=%u enabled_semaphore_fd=%u enabled_memory_win32=%u\n",
+                memory_fd ? 1u : 0u, semaphore_fd ? 1u : 0u, memory_win32 ? 1u : 0u);
+        }
+    }
     interop->GetVulkanImageLayout(image, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &layout);
     const bool valid = SUCCEEDED(handles) && SUCCEEDED(queues) && SUCCEEDED(resources) &&
         instance && physical && logical && vkqueue && vkimage && family != UINT32_MAX && layout > 0;
