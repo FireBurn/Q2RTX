@@ -10,6 +10,17 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Benchmark automation repaired using cl_beginmapcmd after activation,
+  cl_autopause=0 and cl_paused=0 (not the unrelated `paused` cvar).
+  quake002.png is console-free/unpaused FSR4 Quality, but mostly grey with
+  black right/bottom regions. Control quake003.png with flt_upscaler=0 is
+  also mostly grey (without those borders). Both inspected under
+  `/tmp/q2rtx-perf.2Hd3sG/quake2rtx/baseq2/screenshots/`. This is a common
+  rendering/setup problem plus possible scaling issue, not proof that FSR
+  alone causes the grey scene. Fix/check assets, renderer settings and shader
+  provenance before drawing performance conclusions. Capture trigger:
+  `cl_beginmapcmd "wait 240; screenshot; fsr_diagnostics; quit"`.
+
 - Live isolated fullscreen 1440p launch confirms source-v07 Quality resolves
   active at 1716x964 -> 2560x1440 (44.9% pixel load), FG off, immediate
   presentation. X11 override failed VID_Init; default SDL driver launches.

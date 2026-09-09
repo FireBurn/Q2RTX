@@ -13,6 +13,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and pixel-load diagnostics added; no performance fix verified yet.
   Isolated 1440p launch confirms Quality's 44.9% input pixel load, but captures
   show console/paused scene; repair harness before treating runs as benchmarks.
+  Map-ready hook now yields unpaused captures; both fallback and FSR4 show
+  mostly-grey scenes, with additional borders in FSR4. Diagnose common render
+  setup/assets/shader output before trusting the performance comparison.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
