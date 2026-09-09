@@ -1,5 +1,11 @@
 # Official FSR provider probe
 
+The deliverable is a native Vulkan provider, without Wine/DX12 at runtime.
+This executable is a reference for recovering and verifying that provider's
+graph. Shared-resource experiments run only with `--interop`; omit it for
+shader/dispatch captures so unrelated commands and interop failures cannot
+contaminate the reference workload.
+
 fsr_provider_probe.cpp is a deliberately small Windows/DX12 program for
 observing the public AMD FFX API under Wine/Proton. It does not contain,
 extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model

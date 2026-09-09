@@ -638,6 +638,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## P3 — FSR 4.1.1 binary-provider research
 
+- [x] Isolate provider capture from optional shared-resource experiments using
+  `--interop`; strict build and four-frame forced-provider pixel run pass.
+- [ ] Obtain a dispatch-capable capture runtime: installed prebuilt trace and
+  breadcrumbs attempts emit no per-dispatch evidence. Build with explicit
+  trace/profiling or use a capture layer; do not infer execution from PSOs.
+
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
   Fresh forced/control captures contain 30/11 SPIR-V modules with disjoint

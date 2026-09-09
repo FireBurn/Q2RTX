@@ -10,6 +10,17 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Provider probe now requires `--interop` for resource-sharing experiments;
+  ordinary native-port reference captures no longer depend on them. Strict
+  MinGW build and forced-4.1.1 four-frame pixel run pass without that flag:
+  `/tmp/q2rtx-native411-graph.ZteXUM/isolated-probe.log`.
+  Prebuilt runtime attempts with `VKD3D_DEBUG=trace` and
+  `VKD3D_CONFIG=breadcrumbs_trace` completed but did not emit dispatch traces.
+  Local vkd3d source gates trace/breadcrumbs at build time (`enable_trace`);
+  next use an explicitly trace/profiling-enabled reference runtime or a
+  capture layer. No dispatch graph has been recovered yet. Existing dirty
+  `probe_interop.h` borrowed-image experiment remains separate and uncommitted.
+
 - Direction correction: official 4.1.1 must execute natively through Vulkan,
   without Wine/DX12 at runtime. Older interop "next steps" below are historical
   reference experiments, NOT the production implementation plan.

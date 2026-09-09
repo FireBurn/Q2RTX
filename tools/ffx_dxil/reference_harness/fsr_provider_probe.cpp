@@ -829,7 +829,7 @@ void print_selection_summary(const char* effect, const ProviderSelection& select
 void print_usage(const wchar_t* executable)
 {
     ::fwprintf(stderr,
-        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N] [--force-int8]\n",
+        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N] [--force-int8] [--interop]\n",
         executable);
 }
 
@@ -845,6 +845,7 @@ int wmain(int argc, wchar_t** argv)
     bool create = false;
     bool dispatch = false;
     bool force_int8 = false;
+    bool interop = false;
     bool create_framegeneration = false;
     bool create_denoiser = false;
     bool create_radiancecache = false;
@@ -852,6 +853,8 @@ int wmain(int argc, wchar_t** argv)
     for (int index = 2; index < argc; ++index) {
         if (wcscmp(argv[index], L"--force-int8") == 0) {
             force_int8 = true;
+        } else if (wcscmp(argv[index], L"--interop") == 0) {
+            interop = true;
         } else if (wcscmp(argv[index], L"--create") == 0) {
             create = true;
         } else if (wcscmp(argv[index], L"--dispatch") == 0) {
@@ -887,9 +890,12 @@ int wmain(int argc, wchar_t** argv)
         return EXIT_FAILURE;
     }
 
-    report_vulkan_interop(device);
-    if (!inspect_shared_heap(device) || !test_interop_buffer(device) || !test_interop_buffer(device, true) ||
-        !test_interop_buffer(device, true, true)) {
+    // Keep unrelated resource-sharing work out of provider graph captures.
+    // Interoperability is a reference experiment, not a native-port dependency.
+    if (interop)
+        report_vulkan_interop(device);
+    if (interop && (!inspect_shared_heap(device) || !test_interop_buffer(device) ||
+        !test_interop_buffer(device, true) || !test_interop_buffer(device, true, true))) {
         FreeLibrary(module);
         device->Release();
         return EXIT_FAILURE;
