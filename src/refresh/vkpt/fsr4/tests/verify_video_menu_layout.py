@@ -88,6 +88,8 @@ def verify(menu_path: Path) -> None:
         ),
         "upscaler_tuning": ("FSR3 sharpening", "FSR4 sharpening"),
         "frame_generation_settings": ("frame generation", "FSR3 FG scheduler"),
+        "resolution": ("FSR quality", "fixed resolution scale"),
+        "dynamic_resolution": ("dynamic resolution scaling", "target frames per second"),
         "ray_tracing_settings": ("global illumination", "GPU profiler"),
     }
     for name, controls in pages.items():
@@ -98,6 +100,29 @@ def verify(menu_path: Path) -> None:
         for control in controls:
             require(lines, control)
         verify_status_space(lines, name)
+
+    # Provider controls must carry a runtime condition, not merely explanatory
+    # help text. The menu parser supports a single (non-nested) condition.
+    expected_conditions = {
+        "flt_fsr3_sharpening": {"ifeq flt_upscaler 1", "ifeq flt_upscaler 3"},
+        "flt_fsr4_sharpening": {"ifeq flt_upscaler 2"},
+        "flt_fsr4_auto_exposure": {"ifeq flt_upscaler 2"},
+        "flt_fsr4_dynamic_resolution": {"ifeq flt_upscaler 2"},
+        "viewsize": {"ifeq flt_upscaler 0"},
+        "flt_fsr_quality": {"ifneq flt_upscaler 0"},
+    }
+    for name in ("resolution", "upscaler_tuning"):
+        condition = None
+        for line in menu_block(menu, name):
+            if line.startswith(("ifeq ", "ifneq ")):
+                if condition is not None:
+                    raise ValueError("menu conditions must not nest")
+                condition = line
+            elif line == "endif":
+                condition = None
+            for cvar, allowed in expected_conditions.items():
+                if re.search(r"\b" + cvar + r"\b", line) and condition not in allowed:
+                    raise ValueError(f"{cvar} exposed under incorrect condition: {condition}")
 
 
 def main() -> int:

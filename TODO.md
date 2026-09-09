@@ -14,6 +14,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
+  Resolution page now gates fixed scale to fallback and FSR4 model controls
+  to FSR4; regression checks cover these conditions. Live interaction pending.
 
 - [x] Reproduce and repair generated/real strobing from the generated target
   itself, rather than inferring correctness from a real-slot screenshot.

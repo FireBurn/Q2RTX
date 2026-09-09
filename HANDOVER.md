@@ -10,6 +10,12 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Resolution controls now have one canonical page: FSR quality for FSR,
+  manual viewsize only for fallback, FSR4 dynamic-model controls only for
+  FSR4. Dynamic controller parameters have a separate short child page.
+  Layout test now verifies provider conditions and rejects unsupported nested
+  conditions. All six CTest tests pass; live UI interactions still unverified.
+
 - 2026-09-09 user reports no fullscreen 1440p/2160p speedup on RDNA2/RDNA4,
   with FG sometimes worse. Do not claim performance benefit without paired
   measurements. Code audit confirms FG request forces FIFO; generated/real

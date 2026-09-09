@@ -83,6 +83,27 @@ begin environment
 end
 
 begin resolution
+    title "Resolution Scaling"
+    background #212F3CD0
+    style --compact
+    ifeq flt_upscaler 0
+        range -f "%.0f%%" --status "Used by Q2RTX fallback when dynamic resolution is off." "fixed resolution scale" viewsize 25 200 5
+        action "dynamic resolution..." pushmenu dynamic_resolution
+    endif
+    ifneq flt_upscaler 0
+        pairs --status "Fixed FSR input ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, Ultra Performance 33%. FSR4's dynamic model overrides this preset." \
+            "FSR quality" flt_fsr_quality "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
+    endif
+    ifeq flt_upscaler 2
+        toggle --status "Uses the FSR4 v07 dynamic-resolution model instead of the fixed quality preset. Configure its controller below." \
+            "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
+        action "dynamic resolution..." pushmenu dynamic_resolution
+    endif
+    action "back" popmenu
+end
+
+begin dynamic_resolution
+    title "Dynamic Resolution"
     background #212F3CD0
     style --compact
 	toggle "dynamic resolution scaling" drs_enable
@@ -91,7 +112,7 @@ begin resolution
 	range -f "%.0f%%" --status "only effective in dynamic mode" "minimum scale" drs_minscale 25 100 5
 	range -f "%.0f%%" --status "only effective in dynamic mode" "maximum scale" drs_maxscale 50 150 5
 	blank
-    range -f "%.0f%%" "fixed resolution scale" viewsize 25 200 5
+    action "back" popmenu
 end
 
 begin hdr
@@ -189,12 +210,8 @@ begin temporal_settings
     pairs --status "FSR3 is native Vulkan. FSR4 v07 is an experimental source model for Vulkan/RDNA2, distinct from AMD's signed DX12-only FSR4.1.1 provider. Choose its matching quality model below." \
         "temporal upscaler" flt_upscaler \
         "Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
-    pairs --status "Selects Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. FSR4 rebuilds its matching model graph and resets history." \
-        "FSR quality" flt_fsr_quality \
-        "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
     action "upscaler tuning..." pushmenu upscaler_tuning
-    action --status "Legacy fixed scale and dynamic resolution. Fixed FSR quality models override these controls." \
-        "resolution controller..." pushmenu resolution
+    action "resolution scaling..." pushmenu resolution
     action "temporal diagnostics..." pushmenu temporal_diagnostics
     action "back" popmenu
 end
@@ -204,8 +221,6 @@ begin upscaler_tuning
     background #212F3CD0
     style --compact
     ifeq flt_upscaler 2
-    toggle --status "Uses FSR4 v07's dedicated dynamic-resolution model and the resolution controller. It replaces FSR4's fixed quality model." \
-        "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
     range -f "%.2f" --status "experimental FSR4 v07 RCAS amount (0 disables it) after the selected model output." \
         "FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
     toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
