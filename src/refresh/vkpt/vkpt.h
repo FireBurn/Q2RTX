@@ -517,6 +517,7 @@ void create_orthographic_matrix(mat4_t matrix, float xmin, float xmax,
 	PROFILER_DO(BLOOM,                      1) \
 	PROFILER_DO(TONE_MAPPING,               1) \
 	PROFILER_DO(FSR,                        1) \
+	PROFILER_DO(FRAME_GENERATION,           1) \
 	PROFILER_DO(UPDATE_ENVIRONMENT,         1) \
 	PROFILER_DO(GOD_RAYS,                   1) \
 	PROFILER_DO(GOD_RAYS_REFLECT_REFRACT,   1) \

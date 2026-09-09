@@ -3541,8 +3541,10 @@ R_RenderFrame_RTX(refdef_t *fd)
 
 		if (qvk.framegen_present_active) {
 			bool generated_frame_safe = false;
+			BEGIN_PERF_MARKER(post_cmd_buf, PROFILER_FRAME_GENERATION);
 			VkResult framegen_result = vkpt_fsr_frame_generation_record(post_cmd_buf,
 				&generated_frame_safe);
+			END_PERF_MARKER(post_cmd_buf, PROFILER_FRAME_GENERATION);
 			if (framegen_result == VK_SUCCESS) {
 				/* A reset dispatch seeds optical-flow/interpolation history from
 				 * the current real frame.  It has no valid preceding frame from

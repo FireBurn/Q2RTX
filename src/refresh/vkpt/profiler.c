@@ -342,6 +342,7 @@ draw_profiler(int enable_asvgf)
 	if(vkpt_fsr_is_enabled())
 	{
 		PROFILER_DO(PROFILER_FSR, 1);
+		PROFILER_DO(PROFILER_FRAME_GENERATION, 1);
 	}
 #undef PROFILER_DO
 

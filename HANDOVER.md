@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- FG-on pilot found a concrete degraded state: after 360 warmup frames the
+  request remained on/FIFO, but active=no, generated=0, gate blocked=yes and
+  re-enable=120 FPS (threshold=30). Reported rendered=27.8, logical=58.8;
+  these are distinct telemetry windows, not interchangeable FPS measures.
+  FG-off GPU average 19.756 ms vs gated FG-on 21.068 ms; not active FG cost.
+  Evidence `/tmp/q2rtx-perf.2Hd3sG/paired-fg-console.log`. Next investigate
+  learned recovery threshold and forced FIFO while suspended. Added a
+  dedicated GPU FRAME_GENERATION timestamp scope (dispatch-side only, excludes
+  blits/presentation/CPU waits) for separating costs on the next run.
+
 - First same-camera 1440p paired pilot completed, input disabled, same demo1
   session, FG off: fallback GPU frame average 37.067 ms/60 samples; source-v07
   FSR4 Quality 21.629 ms/60 samples, FSR scope 3.656 ms/60 samples. Both

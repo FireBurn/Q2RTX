@@ -1314,6 +1314,10 @@ void vkpt_fsr_print_diagnostics(void)
     Com_Printf("  GPU rolling averages: frame=%.3f ms (%zu samples), "
                "FSR scope=%.3f ms (%zu samples); zero samples means unavailable\n",
         gpu_frame_ms, gpu_frame_samples, gpu_fsr_ms, gpu_fsr_samples);
+    size_t gpu_fg_samples = 0;
+    const double gpu_fg_ms = vkpt_get_profiler_average(PROFILER_FRAME_GENERATION, &gpu_fg_samples);
+    Com_Printf("  GPU frame-generation recording: %.3f ms (%zu samples); "
+               "excludes final blits, presentation and CPU waits\n", gpu_fg_ms, gpu_fg_samples);
     Com_Printf("  presentation: mode=%u vsync_requested=%u framegen_fifo=%u; "
                "FIFO pairs consume two refresh slots per rendered frame\n",
         (unsigned)qvk.present_mode, qvk.surf_vsync ? 1u : 0u,
