@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Grey fallback scene resolved in isolated test: development executable had
+  defaulted to `/usr/share/quake2rtx` and its differing shaders.pkz. Adding a
+  home-overlay symlink to checkout `baseq2/shader_vkpt` restores full-colour
+  demo1 in inspected quake004.png at 2560x1440. Also linked checkout menu so
+  live menu tests exercise edited definitions. No system assets modified.
+  Evidence `/tmp/q2rtx-perf.2Hd3sG/quake2rtx/baseq2/screenshots/quake004.png`.
+  Earlier grey captures are invalid performance controls. Repeat FSR4 with
+  the matched shader overlay next; package/executable shader provenance must
+  be included in test harness and deployment checks.
+
 - Benchmark automation repaired using cl_beginmapcmd after activation,
   cl_autopause=0 and cl_paused=0 (not the unrelated `paused` cvar).
   quake002.png is console-free/unpaused FSR4 Quality, but mostly grey with
