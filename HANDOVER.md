@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- First same-camera 1440p paired pilot completed, input disabled, same demo1
+  session, FG off: fallback GPU frame average 37.067 ms/60 samples; source-v07
+  FSR4 Quality 21.629 ms/60 samples, FSR scope 3.656 ms/60 samples. Both
+  screenshots quake006/007 inspected full-colour at the same camera; weapon
+  and sign animations differ. Each phase warmed 240 frames. Evidence copied
+  to `/tmp/q2rtx-perf.2Hd3sG/paired-noinput-console.log`. This is one-scene GPU
+  scope timing, not displayed FPS or comprehensive benchmark. Need repeated
+  reversed-order runs and FG-on cadence comparison; do not generalize to
+  user's RDNA4, 2160p, or official 4.1.1. Matched shader overlay is essential.
+
 - Matched-shader FSR4 Quality full-colour capture inspected at quake005.png
   under `/tmp/q2rtx-perf.2Hd3sG/quake2rtx/baseq2/screenshots/`; prior black
   borders are absent. Camera differs from fallback quake004, so timings must

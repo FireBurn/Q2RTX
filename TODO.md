@@ -22,6 +22,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Matched FSR4 capture is full colour without borders. Camera differs from
   baseline: deterministic replay still required. GPU averages/sample counts
   are now exposed through fsr_diagnostics for machine-readable comparisons.
+  First same-camera/input-disabled 1440p pilot: fallback 37.067 ms versus
+  source-v07 Quality 21.629 ms GPU average, FG off. Repeat/reverse ordering,
+  measure actual FG cadence and costs, then test further resolutions/devices.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
