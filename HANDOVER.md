@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Live isolated fullscreen 1440p launch confirms source-v07 Quality resolves
+  active at 1716x964 -> 2560x1440 (44.9% pixel load), FG off, immediate
+  presentation. X11 override failed VID_Init; default SDL driver launches.
+  Evidence under `/tmp/q2rtx-perf.2Hd3sG/quake2rtx/baseq2/`. Both inspected
+  screenshots quake000/001 show the console/paused scene, so these runs are
+  rejected as performance/visual correctness benchmarks. Scripted console
+  closure/timing needs repair before paired measurements. Local displays
+  expose 1440p and 1800p, not a native 2160p mode; do not claim 4K fullscreen
+  coverage. User settings untouched (isolated XDG_DATA_HOME).
+
 - Resolution controls now have one canonical page: FSR quality for FSR,
   manual viewsize only for fallback, FSR4 dynamic-model controls only for
   FSR4. Dynamic controller parameters have a separate short child page.

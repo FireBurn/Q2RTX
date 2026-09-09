@@ -11,6 +11,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and FG slowdown on RDNA2/RDNA4. Compare resolved provider, render pixels,
   GPU timing, rendered/presented cadence and refresh limits. FIFO FG policy
   and pixel-load diagnostics added; no performance fix verified yet.
+  Isolated 1440p launch confirms Quality's 44.9% input pixel load, but captures
+  show console/paused scene; repair harness before treating runs as benchmarks.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
