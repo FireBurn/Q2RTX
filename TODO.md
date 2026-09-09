@@ -638,6 +638,15 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## P3 — FSR 4.1.1 binary-provider research
 
+- [ ] Priority correction (2026-09-10): port the official graph to native
+  Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
+  Fresh forced/control captures contain 30/11 SPIR-V modules with disjoint
+  filename hashes (paths in HANDOVER). Identify ML operations and actual
+  executed dispatches, then recover resource/constants/model-upload graph
+  and replay through Vulkan. Pipeline dumps alone do not prove ML execution.
+  Cross-process transport tasks below are historical experiments, not the
+  dependency chain for this native implementation.
+
 - [x] Build deterministic DXBC/DXIL scanner, validator, optional extractor, and
   vkd3d capture manifest tooling in `tools/ffx_dxil` (9 tests passing).
 - [x] Verify SDK 2.3 containers: upscaler 1028/885, denoiser 630/630,

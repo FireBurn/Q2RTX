@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-09, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-10, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,21 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- Direction correction: official 4.1.1 must execute natively through Vulkan,
+  without Wine/DX12 at runtime. Older interop "next steps" below are historical
+  reference experiments, NOT the production implementation plan.
+- Fresh reference captures obtained on September 10 after restoring Proton
+  D3D12/DXGI DLLs in the isolated `/tmp/q2rtx-provider.mquWaB/prefix` (the
+  previous prefix copies failed imports with c0000135). Forced 4.1.1 produced
+  30 SPIR-V modules, ordinary 3.1.5 control 11, with zero shared filename
+  hashes. Both runs exited 0. Forced run completed four GPU/pixel checks;
+  paired capture manifest validation passed. Raw local evidence:
+  `/tmp/q2rtx-native411-capture.Jfqzte` and
+  `/tmp/q2rtx-native411-control.wDVxac`. These are pipeline-creation dumps,
+  not proof of executed ML dispatches. Next inspect shader operations and
+  capture dispatch order, bindings, constants and weight uploads for native
+  replay. Do not resume cross-process image transport as the deliverable.
 
 - Off/on/off unrestricted pilot completed: GPU averages21.278/28.545/28.292
   ms; FG scope0/2.965/0 ms. Last off phase did not return to initial timing,
