@@ -192,18 +192,24 @@ ffxReturnCode_t provider_resource_allocate(uint32_t effect_id,
         return FFX_API_RETURN_ERROR_RUNTIME_ERROR;
     }
     std::printf("provider resource: effect=0x%08" PRIx32
-        " %llux%u format=%u mips=%u flags=0x%x state=0x%x\n",
+        " %llux%u format=%u mips=%u flags=0x%x state=0x%x"
+        " resource=%p dimension=%u heap=%u gpu_va=0x%016" PRIx64 "\n",
         effect_id, static_cast<unsigned long long>(description->Width),
         description->Height, static_cast<unsigned>(description->Format),
         description->MipLevels, static_cast<unsigned>(description->Flags),
-        static_cast<unsigned>(initial_state));
+        static_cast<unsigned>(initial_state), static_cast<void*>(*resource),
+        static_cast<unsigned>(description->Dimension),
+        static_cast<unsigned>(heap_properties->Type),
+        description->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER
+            ? static_cast<uint64_t>((*resource)->GetGPUVirtualAddress()) : uint64_t{0});
     return FFX_API_RETURN_OK;
 }
 
 ffxReturnCode_t provider_resource_deallocate(uint32_t effect_id,
     ID3D12Resource* resource)
 {
-    std::printf("provider resource release: effect=0x%08" PRIx32 "\n", effect_id);
+    std::printf("provider resource release: effect=0x%08" PRIx32 " resource=%p\n",
+        effect_id, static_cast<void*>(resource));
     if (resource)
         resource->Release();
     return FFX_API_RETURN_OK;

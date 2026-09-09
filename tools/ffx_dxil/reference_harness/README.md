@@ -6,6 +6,24 @@ graph. Shared-resource experiments run only with `--interop`; omit it for
 shader/dispatch captures so unrelated commands and interop failures cannot
 contaminate the reference workload.
 
+### Local upload snapshots for native replay research
+
+`vkd3d-reference-upload.patch` applies to vkd3d-proton `634d341a5a312a3`.
+Build with `enable_trace=true` (the optional profiling device wrapper at that
+revision is stale; leave `enable_profiling=false`). Set
+`VKD3D_REFERENCE_UPLOAD_PATH` to a new private directory when running this
+synthetic probe. The Windows-only hook snapshots CPU-visible UPLOAD buffers
+up to 64 MiB at Unmap, with resource/GPU-address/size records in the trace.
+Files use exclusive creation; never reuse a directory. It is disabled without
+that variable and is not a production-runtime feature.
+
+Snapshots contain whole allocations, including padding; treat every byte as
+private, potentially proprietary capture data. Do not publish them. Unmap
+snapshots are not dispatch-time snapshots: a persistently mapped ring may
+already have overwritten earlier constants. Check address reuse and lifetime
+before using any snapshot for replay. Resources never unmapped, GPU-local
+contents, and buffers above the bound are not captured by this hook.
+
 fsr_provider_probe.cpp is a deliberately small Windows/DX12 program for
 observing the public AMD FFX API under Wine/Proton. It does not contain,
 extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model

@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Upload capture now works with opt-in `vkd3d-reference-upload.patch` against
+  the pinned reference runtime. Run `/tmp/q2rtx-native411-upload.TmZOJV`
+  exits 0 and retains four passing pixel checks, the 128 KiB upload, and
+  an 819,200-byte dynamic constant-ring snapshot at VA ffff800103290000.
+  This hook dumps bounded UPLOAD buffers at Unmap, not at dispatch, so check
+  ring reuse before treating bytes as historical constants. Whole allocations
+  can include padding and proprietary data; all binary captures remain local.
+  Provider allocation logs now include resource identity, dimension, heap type
+  and buffer GPU VA, with identities on release for lifetime correlation.
+  Next join CBV addresses and descriptor trace to these snapshots, identify
+  initializer layout, and validate a first native kernel replay.
+
 - Actual official 4.1.1 command trace recovered: 112 direct dispatch calls
   across four completed checker frames, using 28 unique kernels, each four
   times. The previously inspected INT8/DOT4 module `0cf0c70309ac947e` is

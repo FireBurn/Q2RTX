@@ -1,0 +1,54 @@
+diff --git a/libs/vkd3d/resource.c b/libs/vkd3d/resource.c
+index 35e3dc8f..af0a3ae2 100644
+--- a/libs/vkd3d/resource.c
++++ b/libs/vkd3d/resource.c
+@@ -2620,6 +2620,41 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface,
+     return S_OK;
+ }
+ 
++/* Opt-in reference capture only; never enabled in a production runtime. */
++static void capture_upload_on_unmap(struct d3d12_resource *resource)
++{
++#ifdef _WIN32
++    char directory[VKD3D_PATH_MAX], path[VKD3D_PATH_MAX];
++    static LONG sequence;
++    HANDLE file;
++    DWORD written;
++    int length;
++    if (!vkd3d_get_env_var("VKD3D_REFERENCE_UPLOAD_PATH", directory, sizeof(directory)) ||
++            resource->desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
++            resource->heap_properties.Type != D3D12_HEAP_TYPE_UPLOAD ||
++            !resource->mem.cpu_address || !resource->desc.Width ||
++            resource->desc.Width > 64 * 1024 * 1024)
++        return;
++    length = snprintf(path, sizeof(path), "%s/upload-%08lx-%016"PRIx64".bin",
++            directory, (unsigned long)InterlockedIncrement(&sequence), resource->res.va);
++    if (length < 0 || (size_t)length >= sizeof(path))
++        return;
++    file = CreateFileA(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    if (file == INVALID_HANDLE_VALUE)
++    {
++        ERR("Reference upload capture create failed: %s.\n", path);
++        return;
++    }
++    if (!WriteFile(file, resource->mem.cpu_address, (DWORD)resource->desc.Width, &written, NULL) ||
++            written != resource->desc.Width)
++        ERR("Reference upload capture write failed: %s.\n", path);
++    else
++        INFO("REFERENCE_UPLOAD resource=%p va=%016"PRIx64" size=%"PRIu64" file=%s\n",
++                resource, resource->res.va, resource->desc.Width, path);
++    CloseHandle(file);
++#endif
++}
++
+ static void STDMETHODCALLTYPE d3d12_resource_Unmap(d3d12_resource_iface *iface, UINT sub_resource,
+         const D3D12_RANGE *written_range)
+ {
+@@ -2636,6 +2671,7 @@ static void STDMETHODCALLTYPE d3d12_resource_Unmap(d3d12_resource_iface *iface,
+         return;
+     }
+ 
++    capture_upload_on_unmap(resource);
+     d3d12_resource_flush_range(resource, sub_resource, written_range);
+ }
+ 
