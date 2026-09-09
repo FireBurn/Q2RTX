@@ -10,6 +10,20 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- 2026-09-09 user reports no fullscreen 1440p/2160p speedup on RDNA2/RDNA4,
+  with FG sometimes worse. Do not claim performance benefit without paired
+  measurements. Code audit confirms FG request forces FIFO; generated/real
+  pairs consume two refresh slots. Added presentation policy and render pixel
+  load to fsr_diagnostics. This is diagnostic instrumentation, not a measured
+  cause or performance fix. Fullscreen benchmark matrix remains outstanding.
+- Menu work in progress: separate frame-generation page and provider-conditional
+  tuning page; top-level scaling/upscaling navigation consolidated. Layout
+  verifier passes. Resolution-controller applicability and live visibility
+  checks remain before calling menu consistency complete. The borrowed-image
+  readback probe is also uncommitted and compiled but not live-tested after
+  the old /tmp runtime directory disappeared; new prefix preparation began
+  at `/tmp/q2rtx-provider.mquWaB/prefix`.
+
 - Vulkan-owned image creation/binding/export and DX12 borrowed wrapping pass.
   New 8x8 RGBA8 sampled/storage/transfer image uses queried requirements:
   4,096-byte dedicated allocation, type 0 (not guessed 64 KiB heap size).

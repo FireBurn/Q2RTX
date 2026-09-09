@@ -7,6 +7,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## Immediate visual-correctness follow-up
 
+- [ ] Investigate user-reported absent fullscreen 1440p/2160p upscaling benefit
+  and FG slowdown on RDNA2/RDNA4. Compare resolved provider, render pixels,
+  GPU timing, rendered/presented cadence and refresh limits. FIFO FG policy
+  and pixel-load diagnostics added; no performance fix verified yet.
+- [-] Consolidate resolution/upscaling and frame-generation menus; hide other
+  providers' tuning controls. Split pages and initial layout checks pass;
+  controller applicability and live interaction still need verification.
+
 - [x] Reproduce and repair generated/real strobing from the generated target
   itself, rather than inferring correctness from a real-slot screenshot.
   `flt_frame_generation_debug_capture` proved that SDK-3.1.6 FI/OF produced a

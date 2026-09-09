@@ -71,10 +71,10 @@ def verify(menu_path: Path) -> None:
     video_rtx_end = video.index("endif", video_rtx_start)
     navigation = video[video_rtx_start + 1:video_rtx_end]
     expected = (
-        "resolution scaling options...",
         "HDR options...",
         "image tuning...",
-        "temporal upscaling...",
+        "upscaling and resolution...",
+        "frame generation...",
         "ray tracing features...",
     )
     if tuple(line.split('"')[1] for line in navigation if line.startswith("action ")) != expected:
@@ -84,9 +84,10 @@ def verify(menu_path: Path) -> None:
         "image_tuning": ("fallback anti-aliasing",),
         "temporal_settings": (
             "temporal upscaler",
-            "FSR3 frame generation",
             "temporal diagnostics...",
         ),
+        "upscaler_tuning": ("FSR3 sharpening", "FSR4 sharpening"),
+        "frame_generation_settings": ("frame generation", "FSR3 FG scheduler"),
         "ray_tracing_settings": ("global illumination", "GPU profiler"),
     }
     for name, controls in pages.items():

@@ -1308,6 +1308,17 @@ void vkpt_fsr_print_diagnostics(void)
         fsr_diagnostic_provider_name(requested), requested,
         fsr_diagnostic_provider_name(active), active);
     Com_Printf("  status: %s\n", reason);
+    Com_Printf("  presentation: mode=%u vsync_requested=%u framegen_fifo=%u; "
+               "FIFO pairs consume two refresh slots per rendered frame\n",
+        (unsigned)qvk.present_mode, qvk.surf_vsync ? 1u : 0u,
+        qvk.surf_framegen_fifo ? 1u : 0u);
+    if (qvk.extent_unscaled.width && qvk.extent_unscaled.height)
+        Com_Printf("  render pixel load: %.1f%% of display (%ux%u -> %ux%u); "
+                   "upscaler and frame-generation cost is additional\n",
+            100.0 * (double)qvk.extent_render.width * qvk.extent_render.height /
+                ((double)qvk.extent_unscaled.width * qvk.extent_unscaled.height),
+            qvk.extent_render.width, qvk.extent_render.height,
+            qvk.extent_unscaled.width, qvk.extent_unscaled.height);
     Com_Printf("  temporal contract: v%u stage=%u frame=%llu flags=0x%x "
                "history=%u reset=0x%x\n",
         frame ? frame->contract_version : 0u, frame ? frame->stage : 0u,

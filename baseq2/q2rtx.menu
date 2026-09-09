@@ -141,10 +141,10 @@ begin video
     // at 16:9 960x540 and other low-height modes. The prior all-in-one page
     // could force the UI scaler to squeeze every control vertically.
     ifeq vid_rtx 1
-        action "resolution scaling options..." pushmenu resolution
         action "HDR options..." pushmenu hdr
         action "image tuning..." pushmenu image_tuning
-        action "temporal upscaling..." pushmenu temporal_settings
+        action "upscaling and resolution..." pushmenu temporal_settings
+        action "frame generation..." pushmenu frame_generation_settings
         action "ray tracing features..." pushmenu ray_tracing_settings
     endif
 
@@ -183,7 +183,7 @@ begin image_tuning
 end
 
 begin temporal_settings
-    title "Temporal Upscaling"
+    title "Upscaling and Resolution"
     background #212F3CD0
     style --compact
     pairs --status "FSR3 is native Vulkan. FSR4 v07 is an experimental source model for Vulkan/RDNA2, distinct from AMD's signed DX12-only FSR4.1.1 provider. Choose its matching quality model below." \
@@ -192,17 +192,44 @@ begin temporal_settings
     pairs --status "Selects Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, or Ultra Performance 33%. FSR4 rebuilds its matching model graph and resets history." \
         "FSR quality" flt_fsr_quality \
         "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
-    toggle --status "Uses FSR4 v07's dedicated dynamic-resolution model and the Dynamic Resolution Scaling menu. It replaces FSR4's fixed quality model and is ignored by FSR3." \
+    action "upscaler tuning..." pushmenu upscaler_tuning
+    action --status "Legacy fixed scale and dynamic resolution. Fixed FSR quality models override these controls." \
+        "resolution controller..." pushmenu resolution
+    action "temporal diagnostics..." pushmenu temporal_diagnostics
+    action "back" popmenu
+end
+
+begin upscaler_tuning
+    title "Upscaler Tuning"
+    background #212F3CD0
+    style --compact
+    ifeq flt_upscaler 2
+    toggle --status "Uses FSR4 v07's dedicated dynamic-resolution model and the resolution controller. It replaces FSR4's fixed quality model." \
         "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
-    range -f "%.2f" --status "FSR3 RCAS amount (0 disables it); it is independent from the experimental FSR4 control below" \
-        "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
     range -f "%.2f" --status "experimental FSR4 v07 RCAS amount (0 disables it) after the selected model output." \
         "FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
     toggle --status "experimental FSR4 v07 SPD auto exposure. Off uses the validated explicit identity exposure; changing it resets temporal history." \
         "FSR4 auto exposure" flt_fsr4_auto_exposure
+    endif
+    ifeq flt_upscaler 1
+        range -f "%.2f" "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
+    endif
+    ifeq flt_upscaler 3
+        range -f "%.2f" "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
+    endif
+    ifeq flt_upscaler 0
+        pairs "fallback anti-aliasing" flt_taa "none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
+    endif
+    action "back" popmenu
+end
+
+begin frame_generation_settings
+    title "Frame Generation"
+    background #212F3CD0
+    style --compact
     pairs --status "Experimental analytical FSR3 Optical Flow + Frame Interpolation. It requires an active temporal upscaler, rectilinear single-GPU rendering, and a focused FIFO swapchain; diagnostics report its real status and cadence." \
-        "FSR3 frame generation" flt_frame_generation \
-        "Off" 0 "Analytical (experimental)" 1
+        "frame generation" flt_frame_generation \
+        "Off" 0 "FSR3 analytical (experimental)" 1
     pairs --status "SDK 3.1.6 is the newer reusable Vulkan FI/OF scheduler and the default. Legacy 1.1.4 remains available for compatibility comparison." \
         "FSR3 FG scheduler" flt_frame_generation_backend \
         "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
