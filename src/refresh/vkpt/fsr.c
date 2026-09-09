@@ -1308,6 +1308,12 @@ void vkpt_fsr_print_diagnostics(void)
         fsr_diagnostic_provider_name(requested), requested,
         fsr_diagnostic_provider_name(active), active);
     Com_Printf("  status: %s\n", reason);
+    size_t gpu_frame_samples = 0, gpu_fsr_samples = 0;
+    const double gpu_frame_ms = vkpt_get_profiler_average(PROFILER_FRAME_TIME, &gpu_frame_samples);
+    const double gpu_fsr_ms = vkpt_get_profiler_average(PROFILER_FSR, &gpu_fsr_samples);
+    Com_Printf("  GPU rolling averages: frame=%.3f ms (%zu samples), "
+               "FSR scope=%.3f ms (%zu samples); zero samples means unavailable\n",
+        gpu_frame_ms, gpu_frame_samples, gpu_fsr_ms, gpu_fsr_samples);
     Com_Printf("  presentation: mode=%u vsync_requested=%u framegen_fifo=%u; "
                "FIFO pairs consume two refresh slots per rendered frame\n",
         (unsigned)qvk.present_mode, qvk.surf_vsync ? 1u : 0u,

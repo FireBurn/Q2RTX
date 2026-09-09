@@ -564,6 +564,7 @@ VkResult vkpt_profiler_query(VkCommandBuffer cmd_buf, int idx, VKPTProfilerActio
 VkResult vkpt_profiler_next_frame(VkCommandBuffer cmd_buf);
 void draw_profiler(int enable_asvgf);
 double vkpt_get_profiler_result(int idx);
+double vkpt_get_profiler_average(int idx, size_t *sample_count);
 
 VkResult vkpt_readback(ReadbackBuffer* dst);
 

@@ -359,3 +359,13 @@ double vkpt_get_profiler_result(int idx)
 	double ms = (double)(end - begin) * 1e-6 * qvk.timestampPeriod;
 	return ms;
 }
+
+double vkpt_get_profiler_average(int idx, size_t *sample_count)
+{
+	if (sample_count) *sample_count = 0;
+	if (idx < 0 || idx >= NUM_PROFILER_ENTRIES) return 0.0;
+	const profiler_entry_samples_t *entry = &profiler_data.samples[idx];
+	if (!entry->num_samples) return 0.0;
+	if (sample_count) *sample_count = entry->num_samples;
+	return (double)entry->accumulated / entry->num_samples * 1e-6 * qvk.timestampPeriod;
+}

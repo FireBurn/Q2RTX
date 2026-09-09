@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-08, Europe/London.  Update this file at every meaningful
+Last updated: 2026-09-09, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -9,6 +9,13 @@ The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
 reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
+
+- Matched-shader FSR4 Quality full-colour capture inspected at quake005.png
+  under `/tmp/q2rtx-perf.2Hd3sG/quake2rtx/baseq2/screenshots/`; prior black
+  borders are absent. Camera differs from fallback quake004, so timings must
+  not be compared as a speedup measurement. Need deterministic replay/camera.
+  Added rolling GPU frame/FSR-scope averages and sample counts to diagnostics
+  to avoid reading tiny screenshot overlays; zero samples means unavailable.
 
 - Grey fallback scene resolved in isolated test: development executable had
   defaulted to `/usr/share/quake2rtx` and its differing shaders.pkz. Adding a

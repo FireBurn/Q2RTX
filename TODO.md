@@ -19,6 +19,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Grey fallback fixed by loading checkout shaders instead of installed
   archive with development executable. Matched full-colour fallback captured;
   repeat FSR cases and enforce matching assets in benchmark/package workflow.
+  Matched FSR4 capture is full colour without borders. Camera differs from
+  baseline: deterministic replay still required. GPU averages/sample counts
+  are now exposed through fsr_diagnostics for machine-readable comparisons.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
