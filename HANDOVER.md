@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Recovery=120 at floor30 is the hardcoded 4x minimum, not solely learned
+  FI cost. Unrestricted floor0 run reports active=yes, GPU frame66.824 ms,
+  FSR7.202 ms, FG recording4.417 ms (60 samples). This does not isolate the
+  cause of the much larger overall cost; repeat paired runs needed.
+  `fg-unrestricted-console.log` preserved under existing perf directory.
+  Found/fixed floor0 telemetry bypass: it returned before publishing rates,
+  yielding rendered/generated=0 despite activity. Now publishes once per
+  logical frame while bypassing the safety gate. Live revalidation pending.
+
 - FG-on pilot found a concrete degraded state: after 360 warmup frames the
   request remained on/FIFO, but active=no, generated=0, gate blocked=yes and
   re-enable=120 FPS (threshold=30). Reported rendered=27.8, logical=58.8;

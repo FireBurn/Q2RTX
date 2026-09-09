@@ -2166,11 +2166,18 @@ static bool fsr3_frame_generation_rate_is_eligible(void)
     bool was_active;
 
     if (minimum_fps <= 0.0f) {
+        /* Disabling the safety gate must not disable cadence telemetry.
+         * Count completed logical frames once, just as the gated path does. */
+        if (frame && frame->frame_time_ms > 0.0f && frame->frame_time_ms <= 1000.0f &&
+            (!fsr3_fg_rate_frame_seen || fsr3_fg_last_rate_frame_id != frame->frame_id)) {
+            fsr3_fg_last_rate_frame_id = frame->frame_id;
+            fsr3_fg_rate_frame_seen = true;
+            fsr3_frame_generation_publish_logical_rate(1000.0f / frame->frame_time_ms,
+                fsr3_fg_rate_admitted_previous_frame);
+        }
         fsr3_fg_low_rate_frames = 0;
         fsr3_fg_recovery_frames = 0;
         fsr3_fg_rate_blocked = false;
-        fsr3_fg_rate_frame_seen = false;
-        fsr3_fg_rate_admitted_previous_frame = false;
         fsr3_fg_enable_baseline_fps = 0.0f;
         fsr3_fg_active_input_fps = 0.0f;
         fsr3_fg_recovery_required_fps = 0.0f;

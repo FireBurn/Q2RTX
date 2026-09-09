@@ -28,6 +28,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FG-on pilot ends safety-gated with zero generated FPS, forced FIFO and
   recovery threshold 120 FPS. Investigate this inactive-but-FIFO state and
   learned recovery cost; dedicated FG GPU scope added for follow-up.
+  120 FPS is hardcoded 4x floor. Unrestricted active run:66.824 ms overall,
+  4.417 ms FG scope; isolate broader regression with repeated paired runs.
+  Fixed floor0 bypass skipping cadence updates; live validation still pending.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.
