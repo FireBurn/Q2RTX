@@ -2277,6 +2277,14 @@ void vkpt_fsr_frame_generation_publish_status(bool active, const char *reason)
      * fallback and are not a completed-WSI timing estimate. */
     if (!active) {
         fsr3_frame_generation_reset_next = true;
+        /* Keep the last logical input rate to explain a gated fallback, but
+         * never advertise generated cadence while no generated frame is
+         * active. This must run before the unchanged-status early return. */
+        if (cvar_flt_frame_generation_generated_fps)
+            Cvar_SetByVar(cvar_flt_frame_generation_generated_fps, "0", FROM_CODE);
+        if ((!cvar_flt_frame_generation || !cvar_flt_frame_generation->integer) &&
+            cvar_flt_frame_generation_rendered_fps)
+            Cvar_SetByVar(cvar_flt_frame_generation_rendered_fps, "0", FROM_CODE);
     }
 
     if (!cvar_flt_frame_generation_active || !cvar_flt_frame_generation_reason)

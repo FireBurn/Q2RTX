@@ -31,6 +31,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   120 FPS is hardcoded 4x floor. Unrestricted active run:66.824 ms overall,
   4.417 ms FG scope; isolate broader regression with repeated paired runs.
   Fixed floor0 bypass skipping cadence updates; live validation still pending.
+  Off/on/off run exposes stale off-state rates (fixed in status publication)
+  and cadence/GPU-scope disagreement. Audit frame_time_ms before interpreting
+  doubled cadence as displayed FPS; performance cause still unresolved.
 - [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction still need verification.

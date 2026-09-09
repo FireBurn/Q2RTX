@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Off/on/off unrestricted pilot completed: GPU averages21.278/28.545/28.292
+  ms; FG scope0/2.965/0 ms. Last off phase did not return to initial timing,
+  so broader variability remains. Cadence reported76.9/153.9 despite28.545ms
+  GPU scope: investigate timing source before claiming displayed FPS.
+  Off state retained those stale rates; publish_status(false) now clears
+  generated cadence, and explicit FG off clears its rendered estimate too.
+  Live revalidation pending. Log `fg-off-on-off-console.log` preserved under
+  `/tmp/q2rtx-perf.2Hd3sG/`. Next audit temporal frame_time_ms source.
+
 - Recovery=120 at floor30 is the hardcoded 4x minimum, not solely learned
   FI cost. Unrestricted floor0 run reports active=yes, GPU frame66.824 ms,
   FSR7.202 ms, FG recording4.417 ms (60 samples). This does not isolate the
