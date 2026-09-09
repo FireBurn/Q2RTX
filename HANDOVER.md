@@ -10,6 +10,26 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Actual official 4.1.1 command trace recovered: 112 direct dispatch calls
+  across four completed checker frames, using 28 unique kernels, each four
+  times. The previously inspected INT8/DOT4 module `0cf0c70309ac947e` is
+  bound and dispatched at (3,90,1), not merely created. Full ordered trace,
+  translated shaders and output checks are local at
+  `/tmp/q2rtx-native411-dispatch.8XORtK/{vkd3d.log,probe.log}`.
+  All 30 modules in the previous capture pass `spirv-val --target-env vulkan1.3`.
+  This proves submitted kernel identity/dimensions and completed final pixels,
+  not intermediate correctness or a complete portable resource/model graph.
+  Next recover constants (ordinary trace logs bulk-constant pointers, not
+  bytes), descriptor/resource mappings, and initialization uploads.
+- Trace runtime built in `build/vkd3d-native411-trace-build` from isolated
+  `build/vkd3d-native411-reference`, pinned to `634d341a5a312a3` with recursive
+  submodules. Meson cross-file `build-win64.txt`, release, enable_trace=true,
+  enable_renderdoc=true, enable_profiling=false. Optional profiling failed
+  compilation because `device_profiled.h` uses Device12 versus Device15;
+  do not suppress the incompatible-vtable errors. Trace-only build succeeds.
+  Its two DLLs now occupy only the isolated reference prefix's system32.
+  Use VKD3D_DEBUG=trace and VKD3D_LOG_FILE to reproduce; ordinary game unchanged.
+
 - Provider probe now requires `--interop` for resource-sharing experiments;
   ordinary native-port reference captures no longer depend on them. Strict
   MinGW build and forced-4.1.1 four-frame pixel run pass without that flag:

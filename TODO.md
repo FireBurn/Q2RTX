@@ -640,9 +640,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 - [x] Isolate provider capture from optional shared-resource experiments using
   `--interop`; strict build and four-frame forced-provider pixel run pass.
-- [ ] Obtain a dispatch-capable capture runtime: installed prebuilt trace and
-  breadcrumbs attempts emit no per-dispatch evidence. Build with explicit
-  trace/profiling or use a capture layer; do not infer execution from PSOs.
+- [x] Obtain a dispatch-capable capture runtime: pinned trace-enabled build
+  now records 112 dispatches/28 kernels across four completed reference frames.
+  See HANDOVER for source/build/capture paths. Profiling remains disabled due
+  to an upstream stale device-vtable wrapper; ordinary trace works.
+- [ ] Recover constant bytes, descriptors/resources and model initialization
+  uploads for those 28 kernels, then implement native replay. Trace includes
+  bulk-constant pointers rather than their contents, so is not yet sufficient.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
