@@ -10,6 +10,21 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- View-to-resource identity joins now survive descriptor copies in the index;
+  a recreated/default view invalidates old captured bytes. Five focused tests
+  pass. `/tmp/q2rtx-native411-ranges.WcQn41/resource-index.json` resolves first
+  pass u0/u1/u2 to 1x1 R32_UINT counter, 40x23 R32_FLOAT reduction, 2x1
+  R32_FLOAT exposure; t0 is the probe's colour input. First 32 constant bytes
+  decode as u32 (9,60,0,0), then f32 (1/640,1/360,1,0). Module
+  996136f00380aba8 is SPD, 256 local threads, dispatch (10,6,1).
+  No OpTypeSampler or OpImageSample exists in its captured SPIR-V: no sampler
+  is needed for this first replay. Push block is 16 bytes: constant-buffer
+  device address at byte0, UAV table index byte8, SRV table index byte12.
+  Its four image-array variables alias set1/binding1 using vkd3d's mutable
+  descriptor scheme. Native replay must preserve that compatible scheme or
+  deliberately remap/reflection-validate the descriptors, not assume ordinary
+  one-type-per-binding layouts. No native dispatch recorded yet.
+
 - Root ranges and descriptor-copy joins implemented in dispatch_trace.py.
   New trace patch `vkd3d-reference-ranges.patch` records resolved table offsets,
   counts, register spaces and types from the pinned runtime's parsed signature.

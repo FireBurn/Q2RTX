@@ -13,7 +13,14 @@ def index_trace(lines):
     heaps = {}
     ranges = {}
     views = {}
+    view_resources = {}
     for number, line in enumerate(lines, 1):
+        created = re.search(r"Create(?:ShaderResourceView|UnorderedAccessView)_\w+: .*?resource ([0-9a-f]+),.*?descriptor (0x[0-9a-f]+)", line)
+        if created:
+            handle = int(created[2], 16)
+            view_resources[handle] = created[1]
+            views.pop(handle, None)  # A default/uncaptured replacement must not retain old bytes.
+            continue
         declared = re.search(r"REFERENCE_RANGE root=(\w+) parameter=(\d+) range=(\d+) type=(\d+) count=(\d+) register=(\d+) space=(\d+) offset=(\d+)", line)
         if declared:
             root, parameter, index, kind, count, register, space, offset = declared.groups()
@@ -27,7 +34,8 @@ def index_trace(lines):
             kind, handle, size, offset, word = view.groups()
             handle, size, offset = int(handle, 0), int(size), int(offset)
             if offset == 0:
-                views[handle] = dict(kind=kind, size=size, words={})
+                views[handle] = dict(kind=kind, size=size, words={},
+                    resource=view_resources.get(handle), source_descriptor=hex(handle))
             if handle not in views or views[handle]["size"] != size or offset + 4 > size:
                 raise ValueError(f"line {number}: malformed view capture")
             views[handle]["words"][str(offset)] = word

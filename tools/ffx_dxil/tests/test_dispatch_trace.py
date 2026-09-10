@@ -52,6 +52,7 @@ class TraceTests(unittest.TestCase):
     def test_range_copy_retains_dispatch_snapshot(self):
         rows = ["REFERENCE_HEAP iface=0003 cpu=0x1000 gpu=0x300000000 count=8 stride=64 type=0",
                 "REFERENCE_RANGE root=0004 parameter=0 range=0 type=0 count=1 register=7 space=2 offset=0",
+                "0024:trace:d3d12_device_CreateShaderResourceView_embedded: iface 0010, resource 00abcd, desc 0030, descriptor 0x2000.",
                 "REFERENCE_VIEW kind=SRV descriptor=0x2000 size=4 offset=0 word=0000002a",
                 "0024:trace:d3d12_device_CopyDescriptorsSimple_embedded: iface 0010, descriptor_count 1, dst_descriptor_range_offset 0x1000, src_descriptor_range_offset 0x2000, descriptor_heap_type 0.",
                 line("SetPipelineState", "iface 0001, pipeline_state 0002."),
@@ -63,3 +64,4 @@ class TraceTests(unittest.TestCase):
         entry = tool.index_trace(rows)["dispatches"][0]["resource_views"]["0"][0]
         self.assertEqual((entry["register"], entry["space"]), (7, 2))
         self.assertEqual(entry["view"]["words"], {"0": "0000002a"})
+        self.assertEqual(entry["view"]["resource"], "00abcd")

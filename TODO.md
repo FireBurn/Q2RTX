@@ -662,6 +662,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   aggregate 228/2,372 declared slots resolve. Distinguish unused slots from
   capture gaps before claiming complete graph bindings. Native first-pass
   replay, resource identity and constant/static-sampler recovery remain.
+  Update: first SPD view identities and 32 constant bytes recovered; shader
+  uses image fetches, no sampler. Native first-pass implementation still
+  required; preserve/remap its mutable-descriptor aliases and 16-byte push ABI.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
