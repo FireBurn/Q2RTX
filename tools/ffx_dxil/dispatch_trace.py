@@ -11,7 +11,41 @@ def index_trace(lines):
     binding_thread = {}
     dispatches = []
     heaps = {}
+    ranges = {}
+    views = {}
     for number, line in enumerate(lines, 1):
+        declared = re.search(r"REFERENCE_RANGE root=(\w+) parameter=(\d+) range=(\d+) type=(\d+) count=(\d+) register=(\d+) space=(\d+) offset=(\d+)", line)
+        if declared:
+            root, parameter, index, kind, count, register, space, offset = declared.groups()
+            if int(count) > 4096:
+                raise ValueError(f"line {number}: unbounded/oversized descriptor range")
+            ranges.setdefault(root, {}).setdefault(parameter, {})[index] = dict(
+                type=int(kind), count=int(count), register=int(register), space=int(space), offset=int(offset))
+            continue
+        view = re.search(r"REFERENCE_VIEW kind=(\w+) descriptor=(\w+) size=(\d+) offset=(\d+) word=(\w+)", line)
+        if view:
+            kind, handle, size, offset, word = view.groups()
+            handle, size, offset = int(handle, 0), int(size), int(offset)
+            if offset == 0:
+                views[handle] = dict(kind=kind, size=size, words={})
+            if handle not in views or views[handle]["size"] != size or offset + 4 > size:
+                raise ValueError(f"line {number}: malformed view capture")
+            views[handle]["words"][str(offset)] = word
+            continue
+        copied = re.search(r"CopyDescriptorsSimple_\w+: .*descriptor_count (\d+), dst_descriptor_range_offset (\w+), src_descriptor_range_offset (\w+),", line)
+        if copied:
+            count, destination, source = int(copied[1]), int(copied[2], 0), int(copied[3], 0)
+            def stride_at(address):
+                candidates = [h["stride"] for h in heaps.values()
+                    if h["cpu"] <= address < h["cpu"] + h["count"] * h["stride"]]
+                if len(candidates) != 1:
+                    raise ValueError(f"line {number}: unresolved CPU descriptor heap")
+                return candidates[0]
+            ds, ss = (stride_at(destination), stride_at(source)) if count > 1 else (0, 0)
+            snapshots = [copy.deepcopy(views.get(source + i * ss)) for i in range(count)]
+            for i, snapshot in enumerate(snapshots):
+                views[destination + i * ds] = snapshot
+            continue
         heap = re.search(r"REFERENCE_HEAP iface=(\w+) cpu=(\w+) gpu=(\w+) count=(\d+) stride=(\d+) type=(\d+)", line)
         if heap:
             identity, cpu, gpu, count, stride, kind = heap.groups()
@@ -64,6 +98,7 @@ def index_trace(lines):
             if not groups or not state.get("shader"):
                 raise ValueError(f"line {number}: dispatch has unresolved shader/dimensions")
             table_bases = {}
+            resource_views = {}
             for parameter, address in state.get("tables", {}).items():
                 address = int(address, 16)
                 candidates = [(identity, h) for identity, h in heaps.items()
@@ -78,7 +113,19 @@ def index_trace(lines):
                     table_bases[parameter] = dict(heap=identity,
                         cpu=hex(h["cpu"] + offset), index=offset // h["stride"],
                         stride=h["stride"])
+                    definitions = ranges.get(state.get("root_signature"), {}).get(parameter, {})
+                    entries = []
+                    for definition in definitions.values():
+                        for element in range(definition["count"]):
+                            cpu = h["cpu"] + offset + (definition["offset"] + element) * h["stride"]
+                            if cpu >= h["cpu"] + h["count"] * h["stride"]:
+                                raise ValueError(f"line {number}: descriptor range exceeds heap")
+                            entries.append(dict(register=definition["register"] + element,
+                                space=definition["space"], type=definition["type"], cpu=hex(cpu),
+                                view=copy.deepcopy(views.get(cpu))))
+                    resource_views[parameter] = entries
             dispatches.append(dict(line=number, command_list=key, table_bases=table_bases,
+                resource_views=resource_views,
                 groups=[int(v) for v in groups.groups()], **copy.deepcopy(state)))
         elif function in ("ExecuteIndirect", "ExecuteBundle"):
             raise ValueError(f"line {number}: {function} is not supported by this indexer")

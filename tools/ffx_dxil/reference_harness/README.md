@@ -37,6 +37,14 @@ using that runtime's D3D12 headers, not a guessed portable C layout. Descriptor
 copies and GPU table handles must still be correlated separately. Logs can
 include union padding; retain them only as private capture artifacts.
 
+`vkd3d-reference-ranges.patch` logs parsed root-table ranges with resolved
+append offsets. The indexer joins these to captured view definitions through
+`CopyDescriptorsSimple` and snapshots the resulting entries at each direct
+dispatch. Missing definitions remain null in the **index**, meaning unknown,
+not a known D3D12 null descriptor. This still lacks resource identity joins,
+static samplers and shader-access analysis; broad unused ranges may coexist
+with genuinely missing captures. Do not treat the index as an executable ABI.
+
 fsr_provider_probe.cpp is a deliberately small Windows/DX12 program for
 observing the public AMD FFX API under Wine/Proton. It does not contain,
 extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model

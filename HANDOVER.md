@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Root ranges and descriptor-copy joins implemented in dispatch_trace.py.
+  New trace patch `vkd3d-reference-ranges.patch` records resolved table offsets,
+  counts, register spaces and types from the pinned runtime's parsed signature.
+  Fresh run `/tmp/q2rtx-native411-ranges.WcQn41` exits 0, four pixel checks pass.
+  Index expands 2,372 declared slots across 112 dispatches; 228 have captured
+  view definitions. First SPD dispatch has all four slots resolved. Many
+  broad-range entries remain unresolved; do not silently interpret them as
+  null or unused without checking shader access and copy/create logs.
+  Five indexer tests pass, including copy snapshot retention. Next correlate
+  view handles to resource identities, inspect first SPD's constant slice and
+  static sampler, then build its native Vulkan replay as the first graph pass.
+
 - Heap-address correlation now resolves all 172 bound table bases across
   the 112 dispatches in `/tmp/q2rtx-native411-heaps.A3F1IK/dispatch-index.json`.
   Fresh reference run exits 0 with four passing pixel checks. Upload patch

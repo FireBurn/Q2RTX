@@ -657,6 +657,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Update: all 172 table bases resolve through measured heap bases/strides in
   the latest 112-dispatch run. Range lengths and descriptor-copy/view joins
   remain; resolved table starts alone are not executable bindings.
+  Update: parsed root ranges now expand to per-register entries and descriptor
+  copies retain view snapshots. First dispatch resolves all four view slots;
+  aggregate 228/2,372 declared slots resolve. Distinguish unused slots from
+  capture gaps before claiming complete graph bindings. Native first-pass
+  replay, resource identity and constant/static-sampler recovery remain.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
