@@ -665,6 +665,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Update: first SPD view identities and 32 constant bytes recovered; shader
   uses image fetches, no sampler. Native first-pass implementation still
   required; preserve/remap its mutable-descriptor aliases and 16-byte push ABI.
+  Update: standalone native SPD dispatch now completes on RX 6800M, exposure
+  0.471642/previous0, validation log clean. Reference intermediate equality,
+  history testing and remaining 27 passes are outstanding; full native FSR4.1.1
+  remains incomplete.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.

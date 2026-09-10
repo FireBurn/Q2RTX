@@ -10,6 +10,20 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- FIRST NATIVE OFFICIAL-PROVIDER PASS EXECUTED. New standalone Linux
+  `tools/ffx_dxil/reference_harness/native_spd_replay.cpp` dispatches captured
+  SPD directly through Vulkan on RX 6800M, without Wine/DX12. Uses mutable
+  descriptor binding, captured first32 CB bytes, captured 640x360 checker input,
+  zero initialization, 256 local threads and (10,6,1) groups. Result exposure
+  0.471642, previous0, finite=1; validation-enabled log has no messages:
+  `/tmp/q2rtx-native411-ranges.WcQn41/native-spd.log`.
+  Binary `/tmp/q2rtx-native-spd-replay`; input colour upload00000004 at VA
+  ffff800102e40000 and CB upload0000001d at VA ffff800103290000 in that directory;
+  shader from `/tmp/q2rtx-native411-capture.Jfqzte/996136f00380aba8.spv`.
+  This is a positive finite smoke result, NOT intermediate reference equality
+  or full FSR4.1.1. Next read reference SPD exposure before later passes alter
+  it, compare output, then replay pre/neural passes with verified bindings.
+
 - View-to-resource identity joins now survive descriptor copies in the index;
   a recreated/default view invalidates old captured bytes. Five focused tests
   pass. `/tmp/q2rtx-native411-ranges.WcQn41/resource-index.json` resolves first

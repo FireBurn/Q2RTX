@@ -1,5 +1,26 @@
 # Official FSR provider probe
 
+### First native pass replay
+
+`native_spd_replay.cpp` is a standalone Linux/Vulkan experiment for captured
+SPD module `996136f00380aba8`, fixed 640x360 input and (10,6,1) dispatch.
+Build with `g++ -std=c++17 -O2 -Wall -Wextra -Werror
+-Wno-missing-field-initializers native_spd_replay.cpp -lvulkan -o native_spd_replay`.
+Run with the captured SPIR-V, constant-ring upload and tightly packed
+640x360 RGBA16F colour upload as its three arguments. Use
+`VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation` and inspect the full log.
+It requires an AMD discrete GPU, Vulkan 1.3, buffer device addresses, runtime
+descriptor arrays, formatless storage image access and mutable descriptors.
+No Wine, DX12, model payload or proprietary shader is linked or distributed.
+
+This test clears counter/reduction/exposure to zero, uses the first 32 ring
+bytes and reads the 2x1 exposure result. A positive finite exposure is only a
+smoke check, not a reference-output match. It is not a generic graph runner,
+does not validate arbitrary input shader bindings, and does not yet replay
+history or the neural passes. Supply only the identified capture. Failure
+paths rely on process exit for GPU-object cleanup; normal completion destroys
+its resources. Native/reference intermediate comparison remains required.
+
 The deliverable is a native Vulkan provider, without Wine/DX12 at runtime.
 This executable is a reference for recovering and verifying that provider's
 graph. Shared-resource experiments run only with `--interop`; omit it for
