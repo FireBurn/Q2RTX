@@ -10,6 +10,18 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Descriptor capture added as `vkd3d-reference-views.patch`, against the same
+  pinned runtime and opt-in upload-path variable. It covers explicit SRV/UAV
+  structs in the embedded descriptor implementation actually used here, not
+  all vkd3d descriptor backends. Fresh local capture
+  `/tmp/q2rtx-native411-views.FQcEKT` retains 26 SRV (40-byte) and 24 UAV
+  (48-byte) records and all four passing output checks with selected 4.1.1.
+  Next decode those structs, follow CopyDescriptorsSimple into shader-visible
+  heaps, and resolve GPU table handles to per-dispatch views. Four kernels
+  per frame have no CBV-setting calls; inspected module 2b94cdfc6f11de60 has
+  a two-word push-constant block for its table state, so absence of a CBV
+  must not be treated automatically as missing trace data.
+
 - `tools/ffx_dxil/dispatch_trace.py` now indexes the captured direct compute
   sequence, preserving per-command-list shader/root-signature/CBV/table state
   and rejecting unresolved dispatches or unsupported indirect/bundle calls.

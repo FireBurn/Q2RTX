@@ -24,6 +24,15 @@ already have overwritten earlier constants. Check address reuse and lifetime
 before using any snapshot for replay. Resources never unmapped, GPU-local
 contents, and buffers above the bound are not captured by this hook.
 
+`vkd3d-reference-views.patch` adds raw SRV/UAV descriptor records to the same
+opt-in capture on that pinned runtime's **embedded** descriptor path. It emits
+`REFERENCE_VIEW` words with descriptor handle, kind, structure size and byte
+offset. Other descriptor implementations and null/default view descriptions
+are not covered. The tested x64 ABI uses 40-byte SRVs and 48-byte UAVs; decode
+using that runtime's D3D12 headers, not a guessed portable C layout. Descriptor
+copies and GPU table handles must still be correlated separately. Logs can
+include union padding; retain them only as private capture artifacts.
+
 fsr_provider_probe.cpp is a deliberately small Windows/DX12 program for
 observing the public AMD FFX API under Wine/Proton. It does not contain,
 extract, or redistribute SDK DLLs, DXIL, SPIR-V, neural weights, or model

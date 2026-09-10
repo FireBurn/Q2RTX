@@ -1,0 +1,43 @@
+diff --git a/libs/vkd3d/device.c b/libs/vkd3d/device.c
+index 54ab1a2b..0aab8986 100644
+--- a/libs/vkd3d/device.c
++++ b/libs/vkd3d/device.c
+@@ -6650,6 +6650,22 @@ static void STDMETHODCALLTYPE d3d12_device_CreateConstantBufferView_default(d3d1
+     d3d12_desc_create_cbv(descriptor.ptr, device, desc);
+ }
+ 
++/* Raw descriptor bytes are private reference-capture data, not a portable ABI. */
++static void capture_reference_view(const char *kind, SIZE_T handle, const void *desc, size_t size)
++{
++    char directory[VKD3D_PATH_MAX];
++    size_t offset;
++    uint32_t word;
++    if (!desc || !vkd3d_get_env_var("VKD3D_REFERENCE_UPLOAD_PATH", directory, sizeof(directory)))
++        return;
++    for (offset = 0; offset + sizeof(word) <= size; offset += sizeof(word))
++    {
++        memcpy(&word, (const char *)desc + offset, sizeof(word));
++        INFO("REFERENCE_VIEW kind=%s descriptor=%#zx size=%zu offset=%zu word=%08x\n",
++                kind, handle, size, offset, word);
++    }
++}
++
+ static void STDMETHODCALLTYPE d3d12_device_CreateShaderResourceView_heap(d3d12_device_iface *iface,
+         ID3D12Resource *resource, const D3D12_SHADER_RESOURCE_VIEW_DESC *desc,
+         D3D12_CPU_DESCRIPTOR_HANDLE descriptor)
+@@ -6671,6 +6687,7 @@ static void STDMETHODCALLTYPE d3d12_device_CreateShaderResourceView_embedded(d3d
+     TRACE("iface %p, resource %p, desc %p, descriptor %#zx.\n",
+             iface, resource, desc, descriptor.ptr);
+ 
++    capture_reference_view("SRV", descriptor.ptr, desc, sizeof(*desc));
+     d3d12_desc_create_srv_embedded(descriptor.ptr, device, impl_from_ID3D12Resource(resource), desc);
+ }
+ 
+@@ -6740,6 +6757,7 @@ static void STDMETHODCALLTYPE d3d12_device_CreateUnorderedAccessView_embedded(d3
+     TRACE("iface %p, resource %p, counter_resource %p, desc %p, descriptor %#zx.\n",
+             iface, resource, counter_resource, desc, descriptor.ptr);
+ 
++    capture_reference_view("UAV", descriptor.ptr, desc, sizeof(*desc));
+     d3d12_desc_create_uav_embedded(descriptor.ptr,
+             device, d3d12_resource_,
+             impl_from_ID3D12Resource(counter_resource), desc);

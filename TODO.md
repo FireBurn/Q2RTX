@@ -651,6 +651,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   constant ring. Direct-call index now associates 112 dispatches with shader,
   root-signature, CBV and table addresses. Descriptor contents and historical
   byte/size validation remain; the index deliberately marks replay_ready=false.
+  Update: explicit embedded-path SRV/UAV definitions are now captured (26/24
+  records in a four-frame passing run). Decode the pinned ABI and track
+  descriptor copies/CPU-to-GPU heap mapping before attempting native binding.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
