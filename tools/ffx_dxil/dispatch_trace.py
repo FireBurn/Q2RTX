@@ -10,7 +10,16 @@ def index_trace(lines):
     lists = {}
     binding_thread = {}
     dispatches = []
+    heaps = {}
     for number, line in enumerate(lines, 1):
+        heap = re.search(r"REFERENCE_HEAP iface=(\w+) cpu=(\w+) gpu=(\w+) count=(\d+) stride=(\d+) type=(\d+)", line)
+        if heap:
+            identity, cpu, gpu, count, stride, kind = heap.groups()
+            heaps[identity] = dict(cpu=int(cpu, 0), gpu=int(gpu, 0),
+                count=int(count), stride=int(stride), type=int(kind))
+            if not int(stride):
+                raise ValueError(f"line {number}: zero descriptor stride")
+            continue
         match = re.search(r"([0-9a-f]+):trace:d3d12_command_list_(\w+): (.*)", line)
         if not match:
             continue
@@ -54,7 +63,22 @@ def index_trace(lines):
             groups = re.search(r"x (\d+), y (\d+), z (\d+)", message)
             if not groups or not state.get("shader"):
                 raise ValueError(f"line {number}: dispatch has unresolved shader/dimensions")
-            dispatches.append(dict(line=number, command_list=key,
+            table_bases = {}
+            for parameter, address in state.get("tables", {}).items():
+                address = int(address, 16)
+                candidates = [(identity, h) for identity, h in heaps.items()
+                    if h["gpu"] and h["gpu"] <= address < h["gpu"] + h["count"] * h["stride"]]
+                if len(candidates) > 1:
+                    raise ValueError(f"line {number}: ambiguous GPU descriptor heap")
+                if candidates:
+                    identity, h = candidates[0]
+                    offset = address - h["gpu"]
+                    if offset % h["stride"]:
+                        raise ValueError(f"line {number}: unaligned descriptor table")
+                    table_bases[parameter] = dict(heap=identity,
+                        cpu=hex(h["cpu"] + offset), index=offset // h["stride"],
+                        stride=h["stride"])
+            dispatches.append(dict(line=number, command_list=key, table_bases=table_bases,
                 groups=[int(v) for v in groups.groups()], **copy.deepcopy(state)))
         elif function in ("ExecuteIndirect", "ExecuteBundle"):
             raise ValueError(f"line {number}: {function} is not supported by this indexer")

@@ -654,6 +654,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Update: explicit embedded-path SRV/UAV definitions are now captured (26/24
   records in a four-frame passing run). Decode the pinned ABI and track
   descriptor copies/CPU-to-GPU heap mapping before attempting native binding.
+  Update: all 172 table bases resolve through measured heap bases/strides in
+  the latest 112-dispatch run. Range lengths and descriptor-copy/view joins
+  remain; resolved table starts alone are not executable bindings.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.

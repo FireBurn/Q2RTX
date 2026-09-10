@@ -1,5 +1,5 @@
 diff --git a/libs/vkd3d/resource.c b/libs/vkd3d/resource.c
-index 35e3dc8f..af0a3ae2 100644
+index 35e3dc8f..c0e0ceda 100644
 --- a/libs/vkd3d/resource.c
 +++ b/libs/vkd3d/resource.c
 @@ -2620,6 +2620,41 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface,
@@ -52,3 +52,14 @@ index 35e3dc8f..af0a3ae2 100644
      d3d12_resource_flush_range(resource, sub_resource, written_range);
  }
  
+@@ -9157,6 +9193,10 @@ static D3D12_CPU_DESCRIPTOR_HANDLE * STDMETHODCALLTYPE d3d12_descriptor_heap_Get
+     TRACE("iface %p, descriptor %p.\n", iface, descriptor);
+ 
+     *descriptor = heap->cpu_va;
++    TRACE("REFERENCE_HEAP iface=%p cpu=%#zx gpu=%#"PRIx64" count=%u stride=%u type=%u\n",
++            iface, heap->cpu_va.ptr, heap->gpu_va, heap->desc.NumDescriptors,
++            d3d12_device_get_descriptor_handle_increment_size(heap->device, heap->desc.Type),
++            heap->desc.Type);
+ 
+     return descriptor;
+ }

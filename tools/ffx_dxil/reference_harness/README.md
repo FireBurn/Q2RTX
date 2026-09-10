@@ -23,6 +23,10 @@ snapshots are not dispatch-time snapshots: a persistently mapped ring may
 already have overwritten earlier constants. Check address reuse and lifetime
 before using any snapshot for replay. Resources never unmapped, GPU-local
 contents, and buffers above the bound are not captured by this hook.
+The patch also adds `REFERENCE_HEAP` trace records to CPU-heap-handle queries,
+reporting CPU/GPU bases, count, type and stride. `dispatch_trace.py` uses these
+to resolve GPU table starts to CPU descriptor addresses; table lengths and
+the copy chain still require separate recovery.
 
 `vkd3d-reference-views.patch` adds raw SRV/UAV descriptor records to the same
 opt-in capture on that pinned runtime's **embedded** descriptor path. It emits

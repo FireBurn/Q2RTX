@@ -10,6 +10,15 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Heap-address correlation now resolves all 172 bound table bases across
+  the 112 dispatches in `/tmp/q2rtx-native411-heaps.A3F1IK/dispatch-index.json`.
+  Fresh reference run exits 0 with four passing pixel checks. Upload patch
+  additionally traces actual heap CPU/GPU bases, counts and strides; indexer
+  computes aligned CPU table starts and rejects overlapping/ambiguous mappings.
+  Four indexer tests pass. This maps table starts, NOT their descriptor ranges
+  or contents: next follow CopyDescriptorsSimple source/destination records,
+  recover root-signature range lengths, and join the existing view-byte logs.
+
 - Descriptor capture added as `vkd3d-reference-views.patch`, against the same
   pinned runtime and opt-in upload-path variable. It covers explicit SRV/UAV
   structs in the embedded descriptor implementation actually used here, not
