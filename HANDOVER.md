@@ -10,6 +10,16 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- `tools/ffx_dxil/dispatch_trace.py` now indexes the captured direct compute
+  sequence, preserving per-command-list shader/root-signature/CBV/table state
+  and rejecting unresolved dispatches or unsupported indirect/bundle calls.
+  Three synthetic tests pass; actual upload-run trace indexes 112 dispatches
+  and 28 kernels at `/tmp/q2rtx-native411-upload.TmZOJV/dispatch-index.json`.
+  This is explicitly NOT replay-ready: view descriptors, resource lifetimes,
+  barriers and constant sizes still need recovery. The 128 KiB upload contains
+  none of the older source-v07 initializer files verbatim; do not substitute
+  v07 weights. Next capture descriptor contents and correlate ring offsets.
+
 - Upload capture now works with opt-in `vkd3d-reference-upload.patch` against
   the pinned reference runtime. Run `/tmp/q2rtx-native411-upload.TmZOJV`
   exits 0 and retains four passing pixel checks, the 128 KiB upload, and

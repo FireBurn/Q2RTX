@@ -69,6 +69,15 @@ dump outside source control.
 
 ## 3. Record orchestration, not only shaders
 
+For a trace-enabled vkd3d reference runtime, `dispatch_trace.py TRACE OUTPUT`
+indexes direct compute calls with retained shader, root-signature, constant
+buffer addresses and descriptor-table addresses. OUTPUT must not exist.
+It rejects unresolved shaders and indirect/bundle execution rather than
+silently making an incomplete direct-call sequence look complete. Its JSON
+is explicitly not replay-ready: it does not recover descriptor contents,
+resource lifetimes, synchronization, or constant sizes/bytes. Keep the index
+beside the private capture, not in distributable shader assets.
+
 For every dispatch, record these fields in execution order:
 
 - vkd3d shader hash, root-signature hash, and `Dispatch(x, y, z)` dimensions;

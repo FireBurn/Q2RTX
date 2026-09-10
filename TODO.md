@@ -647,6 +647,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [ ] Recover constant bytes, descriptors/resources and model initialization
   uploads for those 28 kernels, then implement native replay. Trace includes
   bulk-constant pointers rather than their contents, so is not yet sufficient.
+  Update: opt-in Unmap snapshots retain the 128 KiB upload and 819,200-byte
+  constant ring. Direct-call index now associates 112 dispatches with shader,
+  root-signature, CBV and table addresses. Descriptor contents and historical
+  byte/size validation remain; the index deliberately marks replay_ready=false.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
