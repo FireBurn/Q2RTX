@@ -21,6 +21,15 @@ history or the neural passes. Supply only the identified capture. Failure
 paths rely on process exit for GPU-object cleanup; normal completion destroys
 its resources. Native/reference intermediate comparison remains required.
 
+The SDK probe's optional `--read-exposure` identifies the measured effect
+0x14 2x1 R32_FLOAT exposure allocation, rejects an ambiguous duplicate, and
+copies it after the graph with its measured NON_PIXEL_SHADER_RESOURCE state
+restored. It fails if that resource is absent. Use it only for this pinned
+SDK graph: shape/state assumptions are not a general provider ABI. Both
+reference and native replay log exact float bits. The controlled reset-frame
+comparison on RX 6800M matched `3ef17b10,00000000` exactly; this proves only
+the two exposure values for that input, not all SPD intermediates or FSR4.
+
 The deliverable is a native Vulkan provider, without Wine/DX12 at runtime.
 This executable is a reference for recovering and verifying that provider's
 graph. Shared-resource experiments run only with `--interop`; omit it for

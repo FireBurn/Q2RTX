@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <cmath>
 #include "probe_pixels.h"
 #include "probe_interop.h"
 
@@ -160,6 +161,8 @@ struct ProviderSelection {
 };
 
 ID3D12Device* g_provider_allocation_device = nullptr;
+bool g_read_exposure = false;
+ID3D12Resource* g_exposure = nullptr; // Borrowed until the allocation callback releases it.
 
 void print_hr(const char* operation, HRESULT hr)
 {
@@ -191,6 +194,14 @@ ffxReturnCode_t provider_resource_allocate(uint32_t effect_id,
         print_hr("FFX provider resource allocation", hr);
         return FFX_API_RETURN_ERROR_RUNTIME_ERROR;
     }
+    if (g_read_exposure && effect_id == 0x14 && description->Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        description->Width == 2 && description->Height == 1 && description->Format == DXGI_FORMAT_R32_FLOAT) {
+        if (g_exposure) {
+            (*resource)->Release(); *resource = nullptr;
+            return FFX_API_RETURN_ERROR_RUNTIME_ERROR;
+        }
+        g_exposure = *resource;
+    }
     std::printf("provider resource: effect=0x%08" PRIx32
         " %llux%u format=%u mips=%u flags=0x%x state=0x%x"
         " resource=%p dimension=%u heap=%u gpu_va=0x%016" PRIx64 "\n",
@@ -208,6 +219,7 @@ ffxReturnCode_t provider_resource_allocate(uint32_t effect_id,
 ffxReturnCode_t provider_resource_deallocate(uint32_t effect_id,
     ID3D12Resource* resource)
 {
+    if (resource == g_exposure) g_exposure = nullptr;
     std::printf("provider resource release: effect=0x%08" PRIx32 " resource=%p\n",
         effect_id, static_cast<void*>(resource));
     if (resource)
@@ -401,6 +413,7 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
     constexpr uint32_t output_height = 720;
     DispatchResources resources;
     ProbePixels pixels;
+    ProbePixels exposure;
     ID3D12CommandQueue* queue = nullptr;
     ID3D12CommandAllocator* allocator = nullptr;
     ID3D12GraphicsCommandList* command_list = nullptr;
@@ -502,6 +515,13 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
 
     if (!pixels.copy_output(device, command_list, resources.output))
         goto cleanup;
+    if (g_read_exposure) {
+        if (!g_exposure) goto cleanup;
+        // Measured SDK 2.3 graph ends with exposure in NON_PIXEL_SHADER_RESOURCE.
+        exposure.transition(command_list, g_exposure, read_state, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        if (!exposure.copy_output(device, command_list, g_exposure)) goto cleanup;
+        exposure.transition(command_list, g_exposure, D3D12_RESOURCE_STATE_COPY_SOURCE, read_state);
+    }
     {
         HRESULT hr = command_list->Close();
         if (FAILED(hr)) {
@@ -541,6 +561,17 @@ bool dispatch_once(const FfxFunctions& functions, ffxContext* context,
     }
     std::printf("FFX_DISPATCH_COMPLETION fence=1 device_ok=1 (pixel contents unverified)\n");
     success = pixels.verify();
+    if (g_read_exposure) {
+        void* mapped = nullptr;
+        if (FAILED(exposure.readback->Map(0, nullptr, &mapped))) { success = false; goto cleanup; }
+        float values[2];
+        std::memcpy(values, static_cast<char*>(mapped) + exposure.output_layout.Offset, sizeof(values));
+        D3D12_RANGE no_writes{0, 0}; exposure.readback->Unmap(0, &no_writes);
+        uint32_t bits[2]; std::memcpy(bits, values, sizeof(bits));
+        std::printf("FFX_EXPOSURE frame=%u current=%.9g previous=%.9g bits=%08x,%08x\n",
+            frame_index, values[0], values[1], bits[0], bits[1]);
+        success = success && std::isfinite(values[0]) && std::isfinite(values[1]);
+    }
 
 cleanup:
     if (fence_event)
@@ -835,7 +866,7 @@ void print_selection_summary(const char* effect, const ProviderSelection& select
 void print_usage(const wchar_t* executable)
 {
     ::fwprintf(stderr,
-        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N] [--force-int8] [--interop]\n",
+        L"Usage: %ls <amd_fidelityfx_loader_dx12.dll> [--create|--dispatch|--create-framegeneration|--create-denoiser|--create-radiancecache] [--provider-index N] [--force-int8] [--interop] [--read-exposure]\n",
         executable);
 }
 
@@ -857,7 +888,9 @@ int wmain(int argc, wchar_t** argv)
     bool create_radiancecache = false;
     uint64_t provider_index = UINT64_MAX;
     for (int index = 2; index < argc; ++index) {
-        if (wcscmp(argv[index], L"--force-int8") == 0) {
+        if (wcscmp(argv[index], L"--read-exposure") == 0) {
+            g_read_exposure = true;
+        } else if (wcscmp(argv[index], L"--force-int8") == 0) {
             force_int8 = true;
         } else if (wcscmp(argv[index], L"--interop") == 0) {
             interop = true;

@@ -156,7 +156,8 @@ int main(int argc,char** argv) try {
     check(vkEndCommandBuffer(cmd)); VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO}; submit.commandBufferCount=1; submit.pCommandBuffers=&cmd;
     check(vkQueueSubmit(queue,1,&submit,VK_NULL_HANDLE)); check(vkQueueWaitIdle(queue));
     float result[2]; std::memcpy(result,output.mapped,8);
-    std::printf("NATIVE_SPD exposure=%g previous=%g finite=%u (reference comparison pending)\n",result[0],result[1],unsigned(std::isfinite(result[0])&&std::isfinite(result[1])));
+    uint32_t result_bits[2]; std::memcpy(result_bits,result,sizeof(result_bits));
+    std::printf("NATIVE_SPD exposure=%.9g previous=%.9g bits=%08x,%08x finite=%u\n",result[0],result[1],result_bits[0],result_bits[1],unsigned(std::isfinite(result[0])&&std::isfinite(result[1])));
     vkDestroyCommandPool(device,commands,nullptr);
     vkDestroyPipeline(device,pipeline,nullptr); vkDestroyShaderModule(device,module,nullptr);
     vkDestroyPipelineLayout(device,layout,nullptr); vkDestroyDescriptorPool(device,pool,nullptr);

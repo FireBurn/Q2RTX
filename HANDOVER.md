@@ -10,6 +10,19 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation.
 
 Current truth:
 
+- Native first-pass exposure now matches reference frame0 BIT-FOR-BIT:
+  current 0.471642017 / previous0, bits `3ef17b10,00000000`.
+  `--read-exposure` added to the reference probe, observing the measured SDK
+  exposure allocation after the graph and restoring its read state. Reference
+  frames1-3 show previous=current, all four final pixel checks still pass.
+  In the decoded first-frame graph, SPD is the sole captured UAV binding to
+  this exposure resource. Logs under `/tmp/q2rtx-native411-ranges.WcQn41/`:
+  `reference-exposure.log`, `native-spd-exact.log`; native validation log clean.
+  This is exact equality for two output floats on one static reset-frame input,
+  not all reduction intermediates, motion/history correctness or full FSR4.
+  Next implement the pre-pass and neural graph using the recovered bindings,
+  and broaden per-pass readback comparisons as those passes become runnable.
+
 - FIRST NATIVE OFFICIAL-PROVIDER PASS EXECUTED. New standalone Linux
   `tools/ffx_dxil/reference_harness/native_spd_replay.cpp` dispatches captured
   SPD directly through Vulkan on RX 6800M, without Wine/DX12. Uses mutable

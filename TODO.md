@@ -669,6 +669,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   0.471642/previous0, validation log clean. Reference intermediate equality,
   history testing and remaining 27 passes are outstanding; full native FSR4.1.1
   remains incomplete.
+  Update: reference exposure readback and native replay match frame0's two
+  float bits exactly (3ef17b10,00000000), native validation clean. Remaining
+  reduction intermediates/history and the other 27 passes are still unverified.
 
 - [ ] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
