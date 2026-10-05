@@ -231,6 +231,59 @@ else()
         -Wall -Wextra -Wpedantic)
 endif()
 
+# Provider-neutral Vulkan contract for Intel XeSS 2 / 3 Super Resolution.
+# Models the 14-dispatch U-Net convolutional pipeline, 13 neural weight layers,
+# and DP4a cross-vendor execution path.
+add_library(ffx_vulkan_xess_contract STATIC
+    src/ffx_vk_xess_contract.c)
+add_library(ffx-vulkan::xess-contract ALIAS
+    ffx_vulkan_xess_contract)
+set_property(TARGET ffx_vulkan_xess_contract PROPERTY
+    EXPORT_NAME xess-contract)
+target_compile_features(ffx_vulkan_xess_contract PUBLIC c_std_11)
+target_include_directories(ffx_vulkan_xess_contract PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+target_link_libraries(ffx_vulkan_xess_contract
+    PUBLIC ffx-vulkan::portable)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(ffx_vulkan_xess_contract PUBLIC m)
+endif()
+if(MSVC)
+    target_compile_options(ffx_vulkan_xess_contract PRIVATE /W4)
+else()
+    target_compile_options(ffx_vulkan_xess_contract PRIVATE
+        -Wall -Wextra -Wpedantic)
+endif()
+
+# Unified Super Resolution umbrella API. Automatically queries GPU vendor and
+# feature tier, auto-selects optimal upscaler (DLSS/d4r, FSR4, XeSS, FSR3),
+# and provides a 1-line integration path for any Vulkan engine.
+add_library(ffx_vulkan_unified_sr STATIC
+    src/ffx_vk_unified_sr.c)
+add_library(ffx-vulkan::unified-sr ALIAS
+    ffx_vulkan_unified_sr)
+set_property(TARGET ffx_vulkan_unified_sr PROPERTY
+    EXPORT_NAME unified-sr)
+target_compile_features(ffx_vulkan_unified_sr PUBLIC c_std_11)
+target_include_directories(ffx_vulkan_unified_sr PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+target_link_libraries(ffx_vulkan_unified_sr
+    PUBLIC
+        ffx-vulkan::portable
+        ffx-vulkan::dlss-contract
+        ffx-vulkan::xess-contract)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(ffx_vulkan_unified_sr PUBLIC m)
+endif()
+if(MSVC)
+    target_compile_options(ffx_vulkan_unified_sr PRIVATE /W4)
+else()
+    target_compile_options(ffx_vulkan_unified_sr PRIVATE
+        -Wall -Wextra -Wpedantic)
+endif()
+
 
 if(FFX_VK_PORTABLE_BUILD_FSR3_HOST)
     set(FFX_1_1_4_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/upstream/ffx-1.1.4/sdk")
@@ -589,6 +642,8 @@ target_link_libraries(ffx_vulkan_effects INTERFACE
     ffx-vulkan::rayregeneration-contract
     ffx-vulkan::radiancecache-contract
     ffx-vulkan::dlss-contract
+    ffx-vulkan::xess-contract
+    ffx-vulkan::unified-sr
     ffx-vulkan::fsr4-v07-assets
     ffx-vulkan::framegeneration-presenter-policy
     ffx-vulkan::temporal-lifecycle)
@@ -679,6 +734,8 @@ if(FFX_VK_PORTABLE_INSTALL)
         ffx_vulkan_rayregeneration_contract
         ffx_vulkan_radiancecache_contract
         ffx_vulkan_dlss_contract
+        ffx_vulkan_xess_contract
+        ffx_vulkan_unified_sr
         ffx_vulkan_fsr4_v07_assets
         ffx_vulkan_framegeneration_presenter_policy
         ffx_vulkan_temporal_lifecycle
@@ -768,6 +825,20 @@ if(FFX_VK_PORTABLE_BUILD_TESTS)
         ffx-vulkan::dlss-contract)
     add_test(NAME ffx_vk_dlss_contract
         COMMAND ffx_vk_dlss_contract_test)
+
+    add_executable(ffx_vk_xess_contract_test
+        tests/xess_contract_test.c)
+    target_link_libraries(ffx_vk_xess_contract_test PRIVATE
+        ffx-vulkan::xess-contract)
+    add_test(NAME ffx_vk_xess_contract
+        COMMAND ffx_vk_xess_contract_test)
+
+    add_executable(ffx_vk_unified_sr_test
+        tests/unified_sr_test.c)
+    target_link_libraries(ffx_vk_unified_sr_test PRIVATE
+        ffx-vulkan::unified-sr)
+    add_test(NAME ffx_vk_unified_sr
+        COMMAND ffx_vk_unified_sr_test)
 
     add_executable(ffx_vk_temporal_lifecycle_test
         tests/temporal_lifecycle_test.c)

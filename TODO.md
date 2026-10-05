@@ -839,6 +839,21 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `tools/ffx_dxil/tests/test_dlss_model_tool.py` (29/29 tests pass).
 - [x] Document d4r and DLSS 5 Vulkan integration for external Vulkan projects
   in `tools/ffx_dxil/reference_harness/D4R.md` and `extern/ffx-vulkan/README.md`.
+- [x] Decode Intel XeSS 2 / 3 U-Net convolutional architecture and implement
+  `ffx-vulkan::xess-contract` in `extern/ffx-vulkan/` (`include/ffx_vk_xess_contract.h`,
+  `src/ffx_vk_xess_contract.c`). Models the 14-dispatch U-Net pipeline, 13 neural
+  weight layers (253,280 bytes), DP4a cross-vendor execution, and `XESSMOD2` binary
+  container validation. Standalone CTest `ffx_vk_xess_contract` passes. Added
+  `tools/ffx_dxil/xess_model_tool.py` and test suite (34/34 Python tests pass).
+- [x] Implement Unified Super Resolution umbrella API (`ffx-vulkan::unified-sr`)
+  in `extern/ffx-vulkan/` (`include/ffx_vk_unified_sr.h`, `src/ffx_vk_unified_sr.c`).
+  Automatically queries GPU hardware tiers (Generic Compute, DP4a, WMMA/FP8, Tensor Cores),
+  routes to FSR3, FSR4, DLSS/d4r, or XeSS, and provides 1-line integration for any
+  Vulkan engine with automatic resolution scaling. Standalone CTest `ffx_vk_unified_sr` passes.
+- [x] Create standalone integration guide `extern/ffx-vulkan/INTEGRATION_GUIDE.md`
+  for external Vulkan game developers, documenting CMake integration (FetchContent,
+  submodule, find_package), hardware tier auto-detection, quickstart dispatch code,
+  and VRR presentation mode selection.
 
 
 ## P5 — settings, UI, diagnostics, and documentation

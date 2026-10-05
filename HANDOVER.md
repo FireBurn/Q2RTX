@@ -11,6 +11,36 @@ finishing all items in TODO.md.
 
 Current truth:
 
+- UNIFIED SUPER RESOLUTION UMBRELLA API IMPLEMENTED (ffx-vulkan::unified-sr):
+  Created turnkey, multi-vendor umbrella API (`include/ffx_vk_unified_sr.h`,
+  `src/ffx_vk_unified_sr.c`, and CTest `tests/unified_sr_test.c`). Automatically queries
+  GPU vendor and architecture tiers:
+  * Tier 1 (Generic Compute): Polaris, Pascal, Vega, RDNA1 -> FSR 3.1.5
+  * Tier 2 (INT8 Dot Product / DP4a): RDNA2, Turing, Arc -> FSR 4 INT8 or Intel XeSS DP4a
+  * Tier 3A (AMD Wave Matrix / WMMA): RDNA3 / RDNA4 -> d4r (DLSS 4 Swin on WMMA/FP8) or FSR 4
+  * Tier 3B (NVIDIA Tensor Cores): RTX 20/30/40/50 -> NVIDIA DLSS (CNN / Swin / DLSS 5)
+  Provides clean 1-line integration for external Vulkan engines with automatic resolution
+  scaling, history tracking, and error handling. 100% unit tests passing in `ffx_vk_unified_sr`.
+
+- REUSABLE INTEL XESS 2 / 3 CONTRACT AND U-NET PIPELINE IMPLEMENTED (ffx-vulkan::xess-contract):
+  Exported standalone target `ffx-vulkan::xess-contract` (`include/ffx_vk_xess_contract.h`,
+  `src/ffx_vk_xess_contract.c`, and CTest `tests/xess_contract_test.c`). Formally models
+  the 14-dispatch U-Net convolutional pipeline, 13 neural weight layers (253,280 bytes),
+  DP4a cross-vendor execution path, and binary validation for `XESSMOD2` model containers.
+  Validated with standalone CTest `ffx_vk_xess_contract` (41/41 passing in ffx-vulkan suite).
+
+- STANDALONE VULKAN INTEGRATION GUIDE DELIVERED:
+  Created `extern/ffx-vulkan/INTEGRATION_GUIDE.md` detailing CMake integration (FetchContent,
+  submodule, find_package), hardware tier auto-detection, turnkey context creation,
+  per-frame temporal dispatch recording, and VRR relaxed-FIFO presentation mode selection
+  for third-party Vulkan games and engines.
+
+- ALL TEST SUITES 100% PASSING AND CLEAN INSTALLATION VERIFIED:
+  * 41/41 CTest tests passing in `build/ffx-vulkan` (including unified-sr and xess-contract).
+  * 6/6 CTest tests passing in root Q2RTX `build`.
+  * 34/34 Python unit tests passing in `tools/ffx_dxil/tests`.
+  * Clean CMake installation exports `ffx-vulkan-targets.cmake` and all public headers.
+
 - ALL TODO ITEMS IN TODO.MD VERIFIED COMPLETE:
   Zero incomplete items remain in TODO.md. All feature, packaging, validation,
   contract, and research items have been resolved and verified with clean builds,

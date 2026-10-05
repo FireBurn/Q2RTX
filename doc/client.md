@@ -939,6 +939,19 @@ Generation additionally require compatible RX 9000-class hardware. They are
 shown in the Video menu's **temporal diagnostics...** page and are not
 selectable settings.
 
+For third-party Vulkan developers, `extern/ffx-vulkan` exports standalone,
+zero-dependency Vulkan targets:
+- `ffx-vulkan::unified-sr`: Unified Super Resolution umbrella API that queries
+  GPU vendor/tier (Generic Compute, DP4a, WMMA/FP8, Tensor Cores) and selects
+  the optimal upscaler (see `extern/ffx-vulkan/INTEGRATION_GUIDE.md`).
+- `ffx-vulkan::xess-contract`: Intel XeSS 2/3 contract modeling the 14-dispatch
+  U-Net convolutional pipeline and DP4a cross-vendor execution.
+- `ffx-vulkan::dlss-contract`: NVIDIA DLSS and AMD `countervolts/d4r` contract
+  supporting native Swin WMMA layers, FP8 math, and zero-copy external VRAM handles.
+- `ffx-vulkan::framegeneration-presenter-policy`: VRR presentation policy
+  selecting `VK_PRESENT_MODE_FIFO_RELAXED_KHR` when VSync is off to avoid
+  frametime quantization drops on Adaptive Sync / VRR monitors.
+
 #### `flt_temporal_debug_view`
 
 Selects a presentation-only visualization of the exact dense temporal input

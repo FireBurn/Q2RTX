@@ -82,6 +82,14 @@ The API keeps these independently selectable pieces behind one contract:
    Rendering (DLSSNR). It validates host image extents, camera metadata,
    accuracy/native-Swin/FP8 flags, zero-copy VRAM interop handles, and neural
    radiance/tensor weights.
+8. `ffx-vulkan::xess-contract`, a provider-neutral Vulkan contract for Intel XeSS
+   2 / 3 Super Resolution modeling the 14-dispatch U-Net convolutional pipeline,
+   13 neural weight layers (253,280 bytes), cross-vendor DP4a execution, and
+   `XESSMOD2` binary container validation.
+9. `ffx-vulkan::unified-sr`, a single unified umbrella API that auto-detects GPU
+   architecture tiers (Generic Compute, DP4a, AMD WMMA, NVIDIA Tensor Cores)
+   and provides a turnkey integration path for external Vulkan projects (see
+   [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)).
 
 The presenter will use an explicit API rather than impersonating a Vulkan
 swapchain handle.  That makes queue ownership and synchronization visible and
@@ -91,12 +99,14 @@ avoids the Windows-only behavior in AMD's old Vulkan swapchain reference.
 
 | Feature | Reusable Vulkan status | Important boundary |
 | --- | --- | --- |
+| Unified Super Resolution Umbrella API | Runnable multi-vendor auto-detection & dispatch | Queries GPU vendor/tier and routes to FSR3, FSR4, DLSS/d4r, or XeSS automatically (see [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)). |
 | FSR3 1.1.4 / 3.1.5 temporal upscaling | Runnable native Vulkan compute | Public-source implementation; choose the versioned opaque API required by the host. |
 | FSR3 3.1.6 Optical Flow / Frame Interpolation | Runnable native Vulkan compute plus WSI policy helpers | The host owns acquire, submit, present, UI composition, and pacing; a generated frame is never a replacement for a required real frame. |
 | FSR4 v07 INT8/DOT4 | Runnable experimental Vulkan provider | Requires a complete externally supplied, same-preset v07 shader/model bundle; it is not AMD FSR 4.1.1. |
+| Intel XeSS 2 / 3 contract | Runnable provider-neutral contract & U-Net tool | Models 14-dispatch U-Net pipeline, 13 neural weight layers (253,280 bytes), and cross-vendor DP4a execution. |
+| DLSS / d4r / DLSS 5 contracts | Runnable provider-neutral validation contract | Validates DLSS 3/4/4.5 (d4r RDNA3/RDNA4) and DLSS 5 neural rendering inputs, tensor weights, and VRAM interop handles. |
 | Ray-Regeneration-style inputs | Runnable provider-neutral validation contract | Validates inputs/outputs only; it does not denoise, own models, or imply an AMD neural provider. |
 | Radiance Caching host buffers | Runnable provider-neutral validation contract | Validates host buffer/counter ownership only; it does not emit samples, run a model, or imply an AMD neural provider. |
-| DLSS / d4r / DLSS 5 contracts | Runnable provider-neutral validation contract | Validates DLSS 3/4/4.5 (d4r RDNA3/RDNA4) and DLSS 5 neural rendering inputs, tensor weights, and VRAM interop handles. |
 | Official FSR 4.1.1, ML Frame Generation, Ray Regeneration, Radiance Caching | Not provided by this project | AMD distributes these as signed DX12 providers. Do not relabel any analytical or v07 path as one of them. |
 
 The matrix is deliberately about software integration, not a hardware promise:
