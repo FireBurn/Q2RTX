@@ -707,11 +707,19 @@ create_swapchain(void)
 		(!cvar_flt_temporal_debug_view ||
 		 cvar_flt_temporal_debug_view->integer == VKPT_TEMPORAL_DEBUG_OFF);
 
-	qvk.present_mode = ffxVkFrameGenerationSelectPresentMode(
-		qvk.surf_framegen_fifo, qvk.surf_vsync, avail_present_modes,
+	FfxVkFrameGenerationSyncPolicy sync_policy = (qvk.surf_vsync == 0)
+		? FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO
+		: FFX_VK_FRAME_GENERATION_SYNC_POLICY_STRICT_FIFO;
+
+	qvk.present_mode = ffxVkFrameGenerationSelectPresentModeEx(
+		qvk.surf_framegen_fifo, qvk.surf_vsync, sync_policy, avail_present_modes,
 		num_present_modes);
-	if (qvk.surf_framegen_fifo)
-		Com_Printf("FSR3 FG: FIFO presentation pacing selected for generated-real pairs.\n");
+	if (qvk.surf_framegen_fifo) {
+		if (qvk.present_mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+			Com_Printf("FSR3 FG: Relaxed FIFO / VRR presentation pacing selected for generated-real pairs.\n");
+		else
+			Com_Printf("FSR3 FG: FIFO presentation pacing selected for generated-real pairs.\n");
+	}
 
 	if(surf_capabilities.currentExtent.width != ~0u) {
 		qvk.extent_unscaled = surf_capabilities.currentExtent;

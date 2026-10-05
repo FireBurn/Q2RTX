@@ -34,6 +34,28 @@ Current truth:
   Automated in-game live run verified all 37 menus register and navigate cleanly
   without VUIDs or layout collisions under Vulkan validation.
 
+- REMOTE SYNCHRONIZATION AND SUBTREE SPLIT COMPLETED:
+  Pushed local commits `5807f8c8` and `41ed9f37` to `github.com:FireBurn/Q2RTX.git`.
+  Executed `git subtree split --prefix=extern/ffx-vulkan -b ffx-vulkan-release` to
+  maintain the standalone distribution branch (`749f77c20957971daf2299dac52419501669caee`)
+  ready for independent packaging or upstreaming.
+
+- XESS ENCODER-DECODER U-NET ARCHITECTURE DECODED AND BUNDLED:
+  Decoded the complete 14-dispatch U-Net convolutional pipeline from trace logs
+  and upload provenance. Identified all 13 neural weight layers (`XeSS_i8` through
+  `XeSS_i23`, totaling 253,280 bytes of INT8 weights, per-channel FP32 scale, and
+  per-channel FP32 bias). Created standalone `tools/ffx_dxil/xess_model_tool.py`
+  for topology verification and binary bundling (`XESSMOD2`), validated with 5
+  new unit tests in `tools/ffx_dxil/tests/test_xess_model_tool.py` (34/34 passing).
+
+- ADAPTIVE RELAXED FIFO / VRR PRESENTATION POLICY IMPLEMENTED:
+  Extended `ffx-vulkan::framegeneration-presenter-policy` with
+  `ffxVkFrameGenerationSelectPresentModeEx` and `FfxVkFrameGenerationSyncPolicy`.
+  Q2RTX `main.c` connects this policy to allow `VK_PRESENT_MODE_FIFO_RELAXED_KHR`
+  when VSync is disabled (`vid_vsync 0`), preventing hard framerate quantization
+  drops on VRR / Adaptive Sync displays during frame generation. Validated with
+  extended CTest `ffx_vk_framegeneration_presenter_policy_test`.
+
 - REUSABLE NATIVE VULKAN DLSS (INCLUDING d4r) AND DLSS 5 CONTRACT IMPLEMENTED.
   Exported target `ffx-vulkan::dlss-contract` (`include/ffx_vk_dlss_contract.h`,
   `src/ffx_vk_dlss_contract.c`) provides a clean, provider-neutral C/C++ interface

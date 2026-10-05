@@ -38,6 +38,9 @@ int main(void)
     const VkPresentModeKHR mailbox[] = { VK_PRESENT_MODE_FIFO_KHR,
                                          VK_PRESENT_MODE_MAILBOX_KHR };
 
+    const VkPresentModeKHR relaxed[] = { VK_PRESENT_MODE_FIFO_KHR,
+                                          VK_PRESENT_MODE_FIFO_RELAXED_KHR };
+
     CHECK(ffxVkFrameGenerationSelectPresentMode(true, false, immediate, 2) ==
           VK_PRESENT_MODE_FIFO_KHR);
     CHECK(ffxVkFrameGenerationSelectPresentMode(false, true, immediate, 2) ==
@@ -46,6 +49,20 @@ int main(void)
           VK_PRESENT_MODE_IMMEDIATE_KHR);
     CHECK(ffxVkFrameGenerationSelectPresentMode(false, false, mailbox, 2) ==
           VK_PRESENT_MODE_MAILBOX_KHR);
+
+    /* Relaxed FIFO / VRR policy tests */
+    CHECK(ffxVkFrameGenerationSelectPresentModeEx(
+              true, false, FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO,
+              relaxed, 2) == VK_PRESENT_MODE_FIFO_RELAXED_KHR);
+    CHECK(ffxVkFrameGenerationSelectPresentModeEx(
+              true, true, FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO,
+              relaxed, 2) == VK_PRESENT_MODE_FIFO_KHR);
+    CHECK(ffxVkFrameGenerationSelectPresentModeEx(
+              true, false, FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO,
+              immediate, 2) == VK_PRESENT_MODE_FIFO_KHR);
+    CHECK(ffxVkFrameGenerationSelectPresentModeEx(
+              true, false, FFX_VK_FRAME_GENERATION_SYNC_POLICY_STRICT_FIFO,
+              relaxed, 2) == VK_PRESENT_MODE_FIFO_KHR);
 
     CHECK(ffxVkFrameGenerationRequiredImageCount(3, true) == 5);
     CHECK(ffxVkFrameGenerationRequiredImageCount(3, false) == 3);

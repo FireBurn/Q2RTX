@@ -168,6 +168,33 @@ GPU (Renoir) under Linux:
 - Generated packed INT8 weights (`0xb6b6b6b6`) and zero-point biases (`0x80808080`)
   match neural input formatting.
 
+### U-Net topology and neural weights bundle
+
+Analysis of all 14 dispatches in `dispatch-index.json` and upload copies in
+`upload-copy-provenance.json` revealed the full encoder-decoder U-Net
+convolutional architecture:
+
+- **14 Dispatches per Frame:**
+  - Dispatch 00: prepare input pass (`753x424` -> `640x360x1` feature tensor)
+  - Dispatches 01-04: encoder downsampling path (`640x360` -> `320x180` -> `160x90` -> `80x45` -> `40x23x8`)
+  - Dispatch 05: bottleneck convolution layer (`40x23x8` -> `40x23x4`)
+  - Dispatches 06-12: decoder upsampling path with residual skip connections (`40x23` -> `80x45` -> `160x90` -> `320x180` -> `640x360`)
+  - Dispatch 13: final resolve pass (`640x360` neural features -> `1280x720` RGBA16F)
+
+- **13 Neural Weight Layers (253,280 bytes total):**
+  Each layer consists of quantized INT8 weights, per-channel FP32 scale, and
+  per-channel FP32 bias:
+  `XeSS_i10` (2432 B), `XeSS_i12` (4864 B), `XeSS_i13` (18944 B), `XeSS_i14` (74752 B),
+  `XeSS_i15` (74240 B), `XeSS_i16` (37376 B), `XeSS_i17` (18688 B), `XeSS_i18` (9472 B),
+  `XeSS_i19` (4736 B), `XeSS_i20` (2432 B), `XeSS_i21` (2432 B), `XeSS_i23` (2432 B),
+  and resolve layer `XeSS_i8` (480 B).
+
+- **Tooling:**
+  `tools/ffx_dxil/xess_model_tool.py` parses provenance records, validates U-Net
+  topology, extracts all 13 layers, and bundles them into an aligned binary container
+  (`XESSMOD2`) with 256-byte offset alignment suitable for Vulkan storage buffers.
+  Verified with 34 tests in `tools/ffx_dxil/tests/test_xess_model_tool.py`.
+
 ## DLSS scope
 
 No `nvngx` runtime files were found in the supplied OptiScaler checkout.
