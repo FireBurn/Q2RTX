@@ -7,6 +7,34 @@ implementation can be reused by other Vulkan applications.
 Standalone source: <https://github.com/FireBurn/FSR-Vulkan>. The same tree is
 vendored by Q2RTX for its reference integration.
 
+The project direction is a reusable native Vulkan reconstruction library for
+FSR, XeSS and DLSS, with Q2RTX as one consumer. XeSS and DLSS are currently
+extraction/replay research, **not available backends**. A broader project name
+and API naming migration can follow verified implementations; the current
+`ffx-vulkan` targets and public symbols remain the integration contract.
+Future backends must accept application-owned Vulkan objects, record native
+SPIR-V compute work, report their actual device requirements, and keep
+capture-time DirectX/Proton tooling out of the distributed runtime. Provider
+selection must distinguish super resolution, ray reconstruction, neural
+rendering and frame generation rather than treating them as interchangeable.
+
+### Experimental shader conversion
+
+`tools/normalize_spirv_bindings.py INPUT OUTPUT --manifest MAP.json` assigns
+each directly decorated descriptor variable a separate binding in set zero.
+It preserves descriptor array indices, push constants and all executable
+instructions, and validates input/output with `spirv-val` for Vulkan 1.3.
+Use `--uniform-buffer-standard-layout` only with that Vulkan feature enabled.
+The output map specifies how a backend must repopulate the descriptor arrays;
+the converted shader does not work with the original descriptor layout.
+Runtime descriptor arrays and other capabilities remain required. This tool
+does not reconstruct resources, model contents, temporal history or dispatch
+sequencing, and does not establish execution equivalence by itself.
+
+The tool has no Q2RTX dependency. Its tests run with
+`python3 -m unittest discover -s tests -p test_normalize_spirv_bindings.py -v`
+from this directory. Generated provider artifacts remain caller-supplied.
+
 Current status: the public C contract, validation layer, device capability
 probe, pinned AMD 1.1.4 host scheduler, native Vulkan FSR 3 Upscaler, and
 analytical Optical Flow/Frame Interpolation compute backends are implemented
@@ -49,6 +77,11 @@ The API keeps these independently selectable pieces behind one contract:
    public Radiance Caching inference/training buffers and its two atomic
    counters. It does not generate path-tracer samples or implement neural
    inference/training.
+7. `ffx-vulkan::dlss-contract`, a provider-neutral validator and bridge for
+   NVIDIA DLSS (including d4r on AMD Radeon RDNA3/RDNA4) and DLSS 5 Neural
+   Rendering (DLSSNR). It validates host image extents, camera metadata,
+   accuracy/native-Swin/FP8 flags, zero-copy VRAM interop handles, and neural
+   radiance/tensor weights.
 
 The presenter will use an explicit API rather than impersonating a Vulkan
 swapchain handle.  That makes queue ownership and synchronization visible and
@@ -63,6 +96,7 @@ avoids the Windows-only behavior in AMD's old Vulkan swapchain reference.
 | FSR4 v07 INT8/DOT4 | Runnable experimental Vulkan provider | Requires a complete externally supplied, same-preset v07 shader/model bundle; it is not AMD FSR 4.1.1. |
 | Ray-Regeneration-style inputs | Runnable provider-neutral validation contract | Validates inputs/outputs only; it does not denoise, own models, or imply an AMD neural provider. |
 | Radiance Caching host buffers | Runnable provider-neutral validation contract | Validates host buffer/counter ownership only; it does not emit samples, run a model, or imply an AMD neural provider. |
+| DLSS / d4r / DLSS 5 contracts | Runnable provider-neutral validation contract | Validates DLSS 3/4/4.5 (d4r RDNA3/RDNA4) and DLSS 5 neural rendering inputs, tensor weights, and VRAM interop handles. |
 | Official FSR 4.1.1, ML Frame Generation, Ray Regeneration, Radiance Caching | Not provided by this project | AMD distributes these as signed DX12 providers. Do not relabel any analytical or v07 path as one of them. |
 
 The matrix is deliberately about software integration, not a hardware promise:

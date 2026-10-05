@@ -13,6 +13,40 @@ def line(function, message):
 
 
 class TraceTests(unittest.TestCase):
+    def test_root_constant_partial_writes_and_unknown_bytes(self):
+        rows = [line("SetPipelineState", "iface 0001, pipeline_state 0002."),
+                line("SetPipelineState", "Binding compute module with hash: 0123456789abcdef."),
+                line("SetComputeRootSignature", "iface 0001, root_signature 0004."),
+                line("SetComputeRoot32BitConstants", "iface 0001, root_parameter_index 2, constant_count 2, data 0010, dst_offset 0."),
+                "REFERENCE_ROOT_CONSTANT list=0001 parameter=2 offset=0 word=3f800000",
+                "REFERENCE_ROOT_CONSTANT list=0001 parameter=2 offset=1 word=00000007",
+                line("Dispatch", "iface 0001, x 1, y 1, z 1."),
+                line("SetComputeRoot32BitConstants", "iface 0001, root_parameter_index 2, constant_count 1, data 0010, dst_offset 1."),
+                line("Dispatch", "iface 0001, x 1, y 1, z 1."),
+                line("SetComputeRootSignature", "iface 0001, root_signature 0005."),
+                line("Dispatch", "iface 0001, x 1, y 1, z 1.")]
+        ds = tool.index_trace(rows)["dispatches"]
+        self.assertEqual(ds[0]["constants"], {"2": {"0": "3f800000", "1": "00000007"}})
+        self.assertEqual(ds[1]["constants"], {"2": {"0": "3f800000", "1": None}})
+        self.assertEqual(ds[2]["constants"], {})
+
+    def test_cbv_snapshot_and_uncaptured_replacement(self):
+        rows = ["REFERENCE_HEAP iface=0003 cpu=0x1000 gpu=0x300000000 count=8 stride=64 type=0",
+                "REFERENCE_RANGE root=0004 parameter=0 range=0 type=2 count=1 register=0 space=0 offset=0",
+                "REFERENCE_CBV descriptor=0x1000 address=0xffff800000001000 size=256",
+                line("SetPipelineState", "iface 0001, pipeline_state 0002."),
+                line("SetPipelineState", "Binding compute module with hash: 0123456789abcdef."),
+                line("SetComputeRootSignature", "iface 0001, root_signature 0004."),
+                line("SetComputeRootDescriptorTable_embedded_64_16", "iface 0001, root_parameter_index 0, base_descriptor 0x300000000."),
+                line("Dispatch", "iface 0001, x 1, y 1, z 1."),
+                "0024:trace:d3d12_device_CreateConstantBufferView_embedded: iface 0010, desc 0000, descriptor 0x1000.",
+                line("Dispatch", "iface 0001, x 1, y 1, z 1.")]
+        result = tool.index_trace(rows)["dispatches"]
+        first = result[0]["resource_views"]["0"][0]["view"]
+        self.assertEqual(first["address"], "0xffff800000001000")
+        self.assertEqual(first["size"], 256)
+        self.assertIsNone(result[1]["resource_views"]["0"][0]["view"])
+
     def test_binding_and_snapshot(self):
         rows = [line("SetPipelineState", "iface 0001, pipeline_state 0002."),
                 line("SetPipelineState", "Binding compute module with hash: 0123456789abcdef."),

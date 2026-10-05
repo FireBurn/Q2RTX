@@ -44,6 +44,8 @@ struct ProbeBorrowedDevice : IUnknown {
     virtual HRESULT STDMETHODCALLTYPE CreateResourceFromBorrowedHandle(const D3D12_RESOURCE_DESC1*, UINT64, ID3D12Resource**) = 0;
 };
 
+static bool test_interop_buffer(ID3D12Device*, bool texture = false, bool shared = false, ID3D12Resource* borrowed = nullptr);
+
 static bool test_owned_export_allocation(ID3D12Device* d3d, ProbeInteropDevice* interop, UINT64 size, UINT32 type)
 {
     void *instance = nullptr, *physical = nullptr, *logical = nullptr;
@@ -124,6 +126,7 @@ static bool test_owned_export_allocation(ID3D12Device* d3d, ProbeInteropDevice* 
         wrap = bridge->CreateResourceFromBorrowedHandle(&desc, reinterpret_cast<UINT64>(image), &borrowed);
     }
     const bool valid = result == VK_SUCCESS && handle && SUCCEEDED(wrap) && borrowed;
+    const bool pixels = valid && test_interop_buffer(d3d, true, false, borrowed);
     std::printf("FFX_OWNED_IMAGE_WRAP status=0x%08lx valid=%u\n", static_cast<unsigned long>(wrap), valid ? 1u : 0u);
     std::printf("FFX_OWNED_VULKAN_EXPORT valid=%u result=%d size=%llu memory_type=%u\n",
         valid ? 1u : 0u, result, static_cast<unsigned long long>(size), type);
@@ -133,7 +136,7 @@ static bool test_owned_export_allocation(ID3D12Device* d3d, ProbeInteropDevice* 
     if (image) destroy_image(device, image, nullptr);
     if (memory) release(device, memory, nullptr);
     FreeLibrary(vulkan);
-    return valid;
+    return valid && pixels;
 }
 
 static bool inspect_shared_heap(ID3D12Device* device)
@@ -186,7 +189,7 @@ static bool inspect_shared_heap(ID3D12Device* device)
     return valid && owned_export;
 }
 
-static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool shared = false)
+static bool test_interop_buffer(ID3D12Device* device, bool texture, bool shared, ID3D12Resource* borrowed)
 {
     const GUID iid = {0x90ecf26e,0xb212,0x43f5,{0xb6,0x2a,0x82,0x5a,0xd7,0xb1,0x38,0x5e}};
     ProbeInteropDevice1* interop = nullptr;
@@ -232,7 +235,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
         using Fill = void (WINAPI*)(void*, UINT64, UINT64, UINT64, UINT32);
         auto fill = gdpa ? reinterpret_cast<Fill>(gdpa(logical, "vkCmdFillBuffer")) : nullptr;
         ProbePixels memory;
-        if (!fill || !memory.buffer(device, 256, false, &buffer)) goto cleanup;
+        if (!fill || !memory.buffer(device, borrowed ? 2048 : 256, false, &buffer)) goto cleanup;
         UINT64 handle = 0, offset = 0;
         void* vkcommands = nullptr;
         if (FAILED(interop->GetVulkanResourceInfo(buffer, &handle, &offset)) || !handle ||
@@ -250,7 +253,8 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             desc.DepthOrArraySize = desc.MipLevels = desc.SampleDesc.Count = 1;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            if (FAILED(device->CreateCommittedResource(&heap,
+            if (borrowed) { image = borrowed; image->AddRef(); }
+            else if (FAILED(device->CreateCommittedResource(&heap,
                 shared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE, &desc,
                 D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&image)))) goto cleanup;
             if (shared) {
@@ -287,7 +291,7 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             color.float32[0] = color.float32[3] = 1.0f;
             clear(cb, img, b.newLayout, &color, 1, &b.subresourceRange);
             b.oldLayout = b.newLayout;
-            b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            b.newLayout = borrowed ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             b.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -296,9 +300,27 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             region.bufferOffset = offset;
             region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             region.imageExtent = {8, 8, 1};
-            copy(cb, img, b.newLayout, reinterpret_cast<VkBuffer>(handle), 1, &region);
+            if (!borrowed) copy(cb, img, b.newLayout, reinterpret_cast<VkBuffer>(handle), 1, &region);
         }
-        if (FAILED(interop->EndVkCommandBufferInterop(commands)) || FAILED(commands->Close()) ||
+        if (FAILED(interop->EndVkCommandBufferInterop(commands))) goto cleanup;
+        if (borrowed) {
+            D3D12_RESOURCE_BARRIER transition{};
+            transition.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            transition.Transition.pResource = image;
+            transition.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            transition.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+            transition.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            commands->ResourceBarrier(1, &transition);
+            D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+            src.pResource = image;
+            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            dst.pResource = buffer;
+            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            const auto desc = image->GetDesc();
+            device->GetCopyableFootprints(&desc, 0, 1, 0, &dst.PlacedFootprint, nullptr, nullptr, nullptr);
+            commands->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+        }
+        if (FAILED(commands->Close()) ||
             FAILED(device->CreateFence(0, shared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
                 IID_PPV_ARGS(&fence))))
             goto cleanup;
@@ -322,16 +344,17 @@ static bool test_interop_buffer(ID3D12Device* device, bool texture = false, bool
             FAILED(device->GetDeviceRemovedReason()) || fence->GetCompletedValue() != 1)
             goto cleanup;
         void* mapped = nullptr;
-        D3D12_RANGE range{0, 256};
+        D3D12_RANGE range{0, borrowed ? 2048u : 256u};
         if (FAILED(buffer->Map(0, &range, &mapped))) goto cleanup;
         unsigned matched = 0;
         for (unsigned i = 0; i < 64; ++i)
-            matched += static_cast<const UINT32*>(mapped)[i] == (texture ? 0xff0000ffu : 0x1234abcdu);
+            matched += static_cast<const UINT32*>(mapped)[borrowed ? (i / 8) * 64 + i % 8 : i] ==
+                (texture ? 0xff0000ffu : 0x1234abcdu);
         D3D12_RANGE no_writes{0, 0};
         buffer->Unmap(0, &no_writes);
         success = matched == 64;
         std::printf("FFX_VULKAN_%s_ROUNDTRIP matched=%u expected=64\n",
-            shared ? "SHARED_TEXTURE" : texture ? "TEXTURE" : "BUFFER", matched);
+            borrowed ? "BORROWED_DX12_COPY" : shared ? "SHARED_TEXTURE" : texture ? "TEXTURE" : "BUFFER", matched);
     }
 cleanup:
     if (!success) std::fprintf(stderr, "Vulkan/DX12 buffer round trip failed.\n");

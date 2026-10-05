@@ -1,0 +1,18 @@
+--- a/libs/vkd3d/resource.c
++++ b/libs/vkd3d/resource.c
+@@ -4302,6 +4302,15 @@
+     vkd3d_descriptor_debug_register_resource_cookie(device->descriptor_qa_global_info,
+             object->res.cookie, desc);
+ 
++    {
++        char directory[VKD3D_PATH_MAX];
++        if (vkd3d_get_env_var("VKD3D_REFERENCE_UPLOAD_PATH", directory, sizeof(directory)))
++            INFO("REFERENCE_RESOURCE resource=%p dimension=%u width=%"PRIu64" height=%u depth_or_layers=%u mips=%u format=%u samples=%u flags=%u heap=%u initial_state=%u\n",
++                    object, object->desc.Dimension, object->desc.Width, object->desc.Height,
++                    object->desc.DepthOrArraySize, object->desc.MipLevels, object->desc.Format,
++                    object->desc.SampleDesc.Count, object->desc.Flags, object->heap_properties.Type,
++                    initial_state);
++    }
+     *resource = object;
+     return S_OK;
+ }

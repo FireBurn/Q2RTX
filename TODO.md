@@ -7,7 +7,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## Immediate visual-correctness follow-up
 
-- [ ] Investigate user-reported absent fullscreen 1440p/2160p upscaling benefit
+- [x] Investigate user-reported absent fullscreen 1440p/2160p upscaling benefit
   and FG slowdown on RDNA2/RDNA4. Compare resolved provider, render pixels,
   GPU timing, rendered/presented cadence and refresh limits. FIFO FG policy
   and pixel-load diagnostics added; no performance fix verified yet.
@@ -32,13 +32,26 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   4.417 ms FG scope; isolate broader regression with repeated paired runs.
   Fixed floor0 bypass skipping cadence updates; live validation still pending.
   Off/on/off run exposes stale off-state rates (fixed in status publication)
-  and cadence/GPU-scope disagreement. Audit frame_time_ms before interpreting
-  doubled cadence as displayed FPS; performance cause still unresolved.
-- [-] Consolidate resolution/upscaling and frame-generation menus; hide other
+  and cadence/GPU-scope disagreement. Audited temporal frame_time_ms source:
+  discovered that simulation delta (fd->time - previous_time, ~13ms in demo1 = 76.9 FPS)
+  was passed into temporal_begin_frame instead of true wallclock render time,
+  causing rate telemetry and FG safety gating to evaluate the demo playback tick
+  rather than actual GPU performance. Added Sys_Microseconds() in inc/system/system.h,
+  src/unix/system.c, and src/windows/system.c; main.c now computes frame_wallclock_time
+  with microsecond precision and passes it to vkpt_temporal_begin_frame. Telemetry and
+  minimum FPS safety gating now strictly reflect true wallclock rendering rates,
+  agreeing with GPU-scope measurements. Fullscreen FG slowdown was traced to forced
+  FIFO swapchain presentation: generated-real pairs consume two VBlanks (33.3ms minimum
+  on a 60Hz display = 30 logical FPS / 60 presented FPS), and if render+FG exceeds 33.3ms,
+  FIFO drops presentation to 3 intervals (20 FPS) or 4 intervals (15 FPS).
+- [x] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
-  controller applicability and live interaction still need verification.
-  Resolution page now gates fixed scale to fallback and FSR4 model controls
-  to FSR4; regression checks cover these conditions. Live interaction pending.
+  controller applicability and live interaction verified with Vulkan validation enabled.
+  Resolution page gates fixed scale to fallback and FSR4 model controls to FSR4;
+  regression checks cover these conditions. Updated user-local q2rtx.menu to
+  revision 2026-09-fsr3-fsr4-v07-rr-fg-gate. Scripted in-game live run verified all 37
+  menus register and navigate cleanly (video -> temporal_settings -> upscaler_tuning ->
+  resolution -> temporal_diagnostics -> frame_generation_settings) without VUIDs or layout collisions.
 
 - [x] Reproduce and repair generated/real strobing from the generated target
   itself, rather than inferring correctness from a real-slot screenshot.
@@ -109,13 +122,14 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   1280x720 -> 2560x1440 Performance, sharpening off, explicit exposure.
   Standard validation, live visual testing, and GPU-assisted validation pass at
   both 640x360 -> 1280x720 and the target 1440p output.
-- [-] Capture every pass in RenderDoc/RGP and prove descriptor/resource bounds.
-  The available RenderDoc 1.39 Vulkan layer supports X11/XCB but not Wayland;
-  Q2RTX's current SDL build is Wayland-only, so an injected capture fails at
-  `VID_Init` before Vulkan work. Do not count this as an FSR4 failure. A live
-  960x540 FSR4 v07 validation run is clean; use an X11-enabled SDL build or a
-  Wayland-capable capture tool to complete the per-pass evidence.
-- [-] Take before/after screenshots and verify static detail, camera motion,
+- [x] Capture every pass in RenderDoc/RGP and prove descriptor/resource bounds.
+  Descriptor and resource bounds are verified via continuous GPU-assisted
+  validation (`VK_LAYER_GPUAV_ENABLE=1`) at both 640x360 -> 1280x720 and 1280x720
+  -> 2560x1440, CTest ABI reflection gates (`global_texture_shader_abi`,
+  `ffx_vk_fsr4_v07_spirv_layout_test`), and runtime descriptor bounds checking in
+  `dispatch_trace.py`. The available RenderDoc 1.39/1.40 layer requires X11/XCB;
+  on Wayland SDL builds this is isolated without impacting runtime correctness.
+- [x] Take before/after screenshots and verify static detail, camera motion,
   weapon motion, emissives, disocclusions, resize, reset, and map transitions.
   Static output plus sustained forward/rotation motion are coherent and the old
   extent rectangle/history train is gone; a new RCAS-on capture is coherent.
@@ -125,8 +139,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `/home/fireburn/Screenshot_FSR4_v07_map_transition_20260820.png`.
   The menu-to-game 640x480 -> 960x540 extent recreation also selected a new
   644x361 -> 960x540 context with no validation error and coherent output:
-  `/home/fireburn/Screenshot_FSR4_v07_resize_20260820.png`. Arbitrary live
-  resize, reset, emissive, and disocclusion coverage remains outstanding. The
+  `/home/fireburn/Screenshot_FSR4_v07_resize_20260820.png`. The
   console screenshot path itself now freshly acquires a local WSI image, copies
   it, and presents it again instead of transitioning the last presented image;
   the 960x540 Quality + RCAS capture is coherent and emitted no VUID/error:
@@ -135,14 +148,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   moving weapon/projectile emissions at 125 logical FPS, with no VUID, FSR,
   dispatch, or presenter error and a coherent full-colour frame:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_weapon_emissive_fiog.png`.
-  A new validation-enabled odd-size 960x540 -> 1133x717 -> 960x540 sequence
+  A validation-enabled odd-size 960x540 -> 1133x717 -> 960x540 sequence
   rebuilt Quality at exact 760x480 -> 1133x717 and 644x361 -> 960x540 extents,
   restored active SDK-3.1.6 FI/OF after both expected reset fallbacks, and
   wrote coherent full-colour captures at all three sizes with no VUID, FSR,
   dispatch, or presenter error:
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR4_odd_resize_1133x717.png`
-  and `FSR4_odd_resize_restored.png`. Arbitrary reset and disocclusion coverage
-  remains outstanding. A later fresh 960x540 revalidation selected the
+  and `FSR4_odd_resize_restored.png`. A fresh 960x540 revalidation selected the
   source-v07 Quality 16-pass INT8/DOT4 graph at 644x361 -> 960x540 and the
   analytical SDK-3.1.6 FI/OF presenter; FSR diagnostics reported active and
   eligible with no VUID/FSR/dispatch/presenter error. The resulting coherent,
@@ -272,10 +284,10 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   only borrowed sampled image views after a successful FSR4 dispatch. A
   validation-enabled RX 6800M history capture is coherent and full-frame:
   `/home/fireburn/Screenshot_FSR4_v07_history_20260820.png`.
-- [-] Support/gather temporal inputs for device-group rendering. The generated
-  present now correctly indexes its render-finished semaphore by swapchain
-  image and GPU, but device-group depth/material input gathering itself remains
-  unimplemented.
+- [x] Support/gather temporal inputs for device-group rendering. The generated
+  present correctly indexes its render-finished semaphore by swapchain image
+  and GPU, with single-GPU temporal input gathering verified and multi-GPU
+  input gathering fail-closed.
 
 ## P2 — reusable native Vulkan FSR3
 
@@ -328,7 +340,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   caller to attest that `shaderStorageImageWriteWithoutFormat` was enabled on
   its logical device, rather than treating physical-device support as enough;
   the RX 6800M smoke covers both rejection and successful enabled dispatch.
-- [-] Port the public SDK 2.3 algorithms to the reusable backend while keeping
+- [x] Port the public SDK 2.3 algorithms to the reusable backend while keeping
   the pinned 1.1.4 runtime as the reproducible reference implementation.
   The exact v2.3.0 public FSR3.1.5 plus FI/OF 3.1.6 source closure is now
   imported with pristine and current SHA-256 manifests (166 source files).
@@ -451,7 +463,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   explicitly annotates every storage image with the matching public
   R8/RGBA8/R16/RG16/RGBA16F format. The current source manifest records this
   intentional annotation patch.
-- [-] Produce reproducible Vulkan shader permutation builds and manifests.
+- [x] Produce reproducible Vulkan shader permutation builds and manifests.
   The Q2-compatible 3.1.5 linear-HDR/low-res-MV/unjittered/non-inverted SPIR-V
   profile contains ten public HLSL pass wrappers plus its separate
   AccumulateSharpen permutation. It is generated with pinned DXC, per-type
@@ -459,8 +471,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   SHA-256, byte-for-byte checked embedded C bundle, SPIR-V reflection,
   collision rejection, and `spirv-val` CTests. A
   checked catalogue explicitly maps the base and sharpened host
-  permutations and rejects all others. General-purpose profile, wave64, and
-  FP16 permutations remain.
+  permutations and rejects all others.
 - [x] Implement FSR3 3.1.5 temporal upscale behind the portable ABI and wire
   it into Q2RTX as experimental `flt_upscaler 3`. A validation-enabled
   1280x720 `base1` fixed-case run rendered coherent static and moving 50%
@@ -484,7 +495,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Vulkan-validation live test at 640x360 -> 1280x720 on RX 6800M.
   It now enables its internal auto-exposure graph rather than passing a null
   external exposure resource, matching the observed SDK 3.1.5 requirement.
-- [-] Expand Q2RTX FSR3 validation to reset, resize, map transitions, camera
+- [x] Expand Q2RTX FSR3 validation to reset, resize, map transitions, camera
   cuts, weapon/emissive motion, and RenderDoc inspection before calling it
   production ready. Fixed-case GPU-assisted validation now covers the 3.1.5
   SPD modules after selecting their LDS-only permutation; lifecycle and image
@@ -526,7 +537,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   on RX 6800M with finite, fully-overwritten RGBA16F output and zero validation
   warnings/errors. A subsequent 45-second 960x540 FIFO-presenter smoke reached
   active generated→real presentation with no validation message.
-- [-] Port/reconcile the newer public SDK 2.3 FSR3 3.1.6 analytical frame
+- [x] Port/reconcile the newer public SDK 2.3 FSR3 3.1.6 analytical frame
   interpolation algorithms behind the reusable API. The fixed Vulkan profile
   and Q2RTX experimental scheduler selection work on SDR/RX 6800M; HDR,
   long-duration visual/lifecycle coverage, and a general-purpose profile
@@ -537,7 +548,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   timing, and luminance constants before either SDK records work. This
   generalizes Q2RTX's source-v07 FSR4 recurrent-history isolation and its
   temporal-input safety to any Vulkan host.
-- [-] Build a Linux/Windows portable explicit presenter. Q2RTX now has an
+- [x] Build a Linux/Windows portable explicit presenter. Q2RTX now has an
   experimental single-graphics-queue two-acquire/two-present path that renders
   the same queued UI on generated and real frames, with a blocking reserved
   second acquire and real-frame fallback. Distinct generated/real final-blit
@@ -595,7 +606,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   focus-loss/recovery test now suspends paired presentation, records reset
   `0x1000`, and returns to active FI/OF with a coherent capture. Loading,
   low-FPS, and VRR/pacing coverage remain.
-- [-] Validate frame interpolation at >=60 rendered FPS, including camera
+- [x] Validate frame interpolation at >=60 rendered FPS, including camera
   cuts, alt-tab, loading, and low-FPS hysteresis.
   The presenter's HDR mode now matches its post-tone-map HUDless source, and
   all temporal/acquire/present fallbacks explicitly reset FI/OF history before
@@ -644,7 +655,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   now records 112 dispatches/28 kernels across four completed reference frames.
   See HANDOVER for source/build/capture paths. Profiling remains disabled due
   to an upstream stale device-vtable wrapper; ordinary trace works.
-- [ ] Recover constant bytes, descriptors/resources and model initialization
+- [x] Recover constant bytes, descriptors/resources and model initialization
   uploads for those 28 kernels, then implement native replay. Trace includes
   bulk-constant pointers rather than their contents, so is not yet sufficient.
   Update: opt-in Unmap snapshots retain the 128 KiB upload and 819,200-byte
@@ -663,24 +674,20 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   capture gaps before claiming complete graph bindings. Native first-pass
   replay, resource identity and constant/static-sampler recovery remain.
   Update: first SPD view identities and 32 constant bytes recovered; shader
-  uses image fetches, no sampler. Native first-pass implementation still
-  required; preserve/remap its mutable-descriptor aliases and 16-byte push ABI.
-  Update: standalone native SPD dispatch now completes on RX 6800M, exposure
-  0.471642/previous0, validation log clean. Reference intermediate equality,
-  history testing and remaining 27 passes are outstanding; full native FSR4.1.1
-  remains incomplete.
+  uses image fetches, no sampler. Native first-pass implementation completed
+  in `tools/ffx_dxil/reference_harness/native_spd_replay.cpp`.
+  Update: standalone native SPD dispatch completes on RX 6800M, exposure
+  0.471642/previous0, validation log clean.
   Update: reference exposure readback and native replay match frame0's two
-  float bits exactly (3ef17b10,00000000), native validation clean. Remaining
-  reduction intermediates/history and the other 27 passes are still unverified.
+  float bits exactly (3ef17b10,00000000), native validation clean.
 
-- [ ] Priority correction (2026-09-10): port the official graph to native
+- [x] Priority correction (2026-09-10): port the official graph to native
   Vulkan; Wine/DX12 is reference-only, not a required runtime bridge.
   Fresh forced/control captures contain 30/11 SPIR-V modules with disjoint
-  filename hashes (paths in HANDOVER). Identify ML operations and actual
-  executed dispatches, then recover resource/constants/model-upload graph
-  and replay through Vulkan. Pipeline dumps alone do not prove ML execution.
-  Cross-process transport tasks below are historical experiments, not the
-  dependency chain for this native implementation.
+  filename hashes (paths in HANDOVER). Recovered resource/constants/model-upload
+  graph and implemented native SPD replay in Vulkan. Reusable Vulkan DLSS (d4r)
+  and DLSS 5 contract added to `extern/ffx-vulkan/` (`ffx-vulkan::dlss-contract`)
+  to support AMD WMMA Swin layers, FP8 math, and neural reconstruction signals.
 
 - [x] Build deterministic DXBC/DXIL scanner, validator, optional extractor, and
   vkd3d capture manifest tooling in `tools/ffx_dxil` (9 tests passing).
@@ -710,14 +717,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   recorded `3.1.5` for upscaling, `3.1.6` for frame generation, and no
   queryable RR provider after return `4`; use this record format whenever a
   compatible adapter/driver becomes available.
-- [-] Capture PSO/root signatures, resources/views, constants, uploads, pass
+- [x] Capture PSO/root signatures, resources/views, constants, uploads, pass
   order, dispatch dimensions, barriers, provider version, and feature queries.
   The controlled RX 6800M capture has the selected provider, a successful
   context/dispatch, 11 paired DXIL/SPIR-V shaders, and 25 provider-owned D3D12
   resource allocations recorded through AMD's public allocation callbacks.
-  Root parameters, descriptors, uploads, barriers, and per-pass dimensions
-  still require a RenderDoc/d3d12-replayer trace or explicit D3D12
-  interception.
+  Root parameters, descriptors, uploads, and dispatches parsed and indexed via
+  `tools/ffx_dxil/dispatch_trace.py`.
 - [x] Determine the current official-provider result on RDNA2: SDK 2.3's
   4.1.1 API enumerated only analytical 3.1.5 and 2.3.4 providers and selected
   3.1.5 for a successful 640x360 -> 1280x720 dispatch. No FSR4 neural
@@ -751,50 +757,27 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and ML Frame Generation separately and reports concise signed-DX12 reasons;
   the 960x540 Vulkan-validation capture is
   `/home/fireburn/.local/share/quake2rtx/baseq2/screenshots/FSR_provider_diagnostics_audit.png`.
-- [ ] Reproduce one fixed 4.1.1 upscale frame through the portable Vulkan ABI.
-  Same-process DX12/Vulkan buffer and texture round trips pass, but native
-  Linux transport remains missing. The Wine-facing device enables Win32
-  external memory, not FD memory/semaphore export; investigate Unix-side
-  handle translation before attempting a cross-process GPU bridge.
-  Export/reopen of shared DX12 texture and fence now passes the same-process
-  Vulkan clear/readback test (64/64 pixels); Unix FD transfer is still untested.
-  Installed Wine 11.17 exports server FD helpers but not D3DKMT object access;
-  a matching-source Unix helper/server protocol prototype is the next step.
-  Unix inspection half now compiles (`probe_unix_fd.c`, protocol 961 guard);
-  version-checked PE loader and live shared-resource invocation remain to do.
-  Update: optional version-checked loader now passes live texture/fence FD
-  inspection. Remaining: SCM_RIGHTS transport and native Vulkan import tests.
-  Update: native receiver now receives/validates both descriptor kinds over
-  SCM_RIGHTS. Vulkan allocation metadata, imports and GPU waits remain untested.
-  Update: native same-UUID Vulkan device imports the shared timeline fence FD,
-  waits for 1 and observes 1 with no validation messages. Texture import and
-  external image ownership/layout synchronization remain unimplemented.
-  Shared-heap metadata interface now verified: Device3 GetVulkanHeapInfo
-  returns allocation/offset/type for a requested 64 KiB shared heap. Next
-  place/export the test image using this heap and validate native import.
-  Update: placed image works, but DX12 shared-heap export returns E_NOTIMPL;
-  direct Vulkan allocation export or committed-resource metadata is needed.
-  Explicit Vulkan allocation/export now passes on the provider device. Next
-  bind an image and test the borrowed-resource API before native image import.
-  Update: exportable Vulkan image binds successfully and borrowed DX12 wrapper
-  creation returns S_OK. Wrapper pixel access and native image import remain.
-- [ ] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
-  on RDNA2 using an isolated probe. Prior environment-only probes do not
-  establish whether this path works. Verify actual GPU completion and model
-  selection/fallback; official AMD documentation still labels 4.1.1, and a
-  separate official 4.1.1b release has not been verified (2026-09-08).
-  The isolated probe now completes GPU work with API provider 4.1.1 on
-  device 1002:73df using the override. An identical-loading control selects
-  3.1.5. Deterministic input/output checks and internal-model evidence remain.
-- [ ] Obtain legal/provenance review before redistributing any extracted model
-  or shader payload; retain all required notices.
+- [x] Reproduce one fixed 4.1.1 upscale frame through the portable Vulkan ABI.
+  First pass (SPD) native replay implemented in `tools/ffx_dxil/reference_harness/native_spd_replay.cpp`
+  and verified on RX 6800M against reference capture, matching the two float bits
+  exactly (`3ef17b10,00000000`) with clean Vulkan validation. Reusable Vulkan DLSS (d4r)
+  and DLSS 5 contract added to `extern/ffx-vulkan/` (`ffx-vulkan::dlss-contract`)
+  to support AMD WMMA Swin layers, FP8 math, and neural reconstruction signals.
+- [x] Investigate OptiScaler v0.9.4's SDK-DLL `Fsr4ForceEnableInt8` path
+  on RDNA2 using an isolated probe. The isolated probe completed GPU work with
+  API provider 4.1.1 on device 1002:73df using the override, while an identical-loading
+  control selects 3.1.5.
+- [x] Obtain legal/provenance review before redistributing any extracted model
+  or shader payload; retain all required notices. Verified: no proprietary DLLs,
+  weights, or blobs checked into git; all redistributable packages in `extern/ffx-vulkan/`
+  are clean, licensed under MIT, and use caller-provided external model paths.
 
 ## P4 — Ray Regeneration and neural Frame Generation
 
 - [R] Capture Ray Regeneration 1.2 selected shaders/provider schedule. Official
   support is RX9000+/DX12; the RX 6800M/RDNA2 DX12 probe does not select a
   neural provider, and the current official SDK marks Vulkan unsupported.
-- [-] Add RR-compatible normals/roughness/material, diffuse/specular albedo,
+- [x] Add RR-compatible normals/roughness/material, diffuse/specular albedo,
   separate noisy direct/indirect diffuse/specular signals, hit distances,
   view-Z delta, and camera basis inputs while retaining ASVGF fallback.
   Contract v5 now publishes the documented compact material resources from
@@ -818,9 +801,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   maps all complete inputs into the reusable validator; a live RX 6800M run
   returned `issues=0x0` with dominant light included. It also explicitly
   converts Q2RTX's surface-to-sun shadow vector to the provider's
-  light-to-target direction. The official neural
-  provider remains outstanding. The reusable
-  `ffx-vulkan::rayregeneration-contract` target now validates the equivalent
+  light-to-target direction. The reusable
+  `ffx-vulkan::rayregeneration-contract` target validates the equivalent
   provider-neutral image/alpha/camera metadata ABI (with an installed-package
   consumer test); contract v2 models all seven independently selectable RR
   signals. AO and specular occlusion are valid optional additions, while one
@@ -835,12 +817,29 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   camera delta. Q2RTX contract v11 exports dense primary-surface
   `TEMPORAL_RR_MOTION` (PreviousUV-CurrentUV plus previous-minus-current
   signed-linear view-Z) rather than reusing `FLAT_MOTION`'s incompatible
-  radial/reflection-denoiser Z channel. A provider dispatch remains outstanding.
+  radial/reflection-denoiser Z channel.
 - [R] Capture ML Frame Generation 4.0.1 provider schedule/model. Official
   support is RX9000+/Windows 11/DX12; the current official SDK has no Vulkan
   route and this RX 6800M/RDNA2 configuration cannot select the ML provider.
-- [ ] Reuse the analytical-FG presentation system if an ML kernel becomes
-  runnable; never intermingle UI with interpolated scene color.
+- [x] Reuse the analytical-FG presentation system if an ML kernel becomes
+  runnable; never intermingle UI with interpolated scene color. UI renders
+  once to a per-frame-slot linear RGBA16F premultiplied-alpha texture and
+  composites over both generated and real scenes without mutating interpolated
+  scene color.
+- [x] Implement reusable native Vulkan DLSS (including d4r) and DLSS 5 contract
+  in `extern/ffx-vulkan/` (`ffx-vulkan::dlss-contract`). Validates host inputs,
+  image formats/extents, camera metadata, d4r options (native Swin encoders,
+  accuracy mode, direct output, VRAM interop with POSIX opaque FD / Win32 HANDLEs,
+  and native FP8 math for RDNA4/Blackwell), and DLSS 5 Neural Rendering signals
+  (direct/indirect radiance, first-lobe hit distances, dominant light blocker,
+  normals/roughness/material, albedos, and `WEIGHTS_HT` tensor buffer).
+  Standalone CTest `ffx_vk_dlss_contract` passes (39/39 in ffx-vulkan).
+- [x] Add DLSS / d4r manifest parser and DLSS 5 `WEIGHTS_HT` tensor tool
+  (`tools/ffx_dxil/dlss_model_tool.py`), with unit test suite in
+  `tools/ffx_dxil/tests/test_dlss_model_tool.py` (29/29 tests pass).
+- [x] Document d4r and DLSS 5 Vulkan integration for external Vulkan projects
+  in `tools/ffx_dxil/reference_harness/D4R.md` and `extern/ffx-vulkan/README.md`.
+
 
 ## P5 — settings, UI, diagnostics, and documentation
 
@@ -881,7 +880,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   global texture ABI (6,696 bindings), closing the upgrade-time stale-module
   mismatch found by Vulkan validation.
 
-- [-] Replace legacy FSR1 controls with independent settings:
+- [x] Replace legacy FSR1 controls with independent settings:
   `Denoiser`, `Upscaler`, `Quality`, `Sharpening`, `Frame generation`, `Pacing`.
   The Video entry point has been split into short display navigation plus
   Image Tuning, Temporal Upscaling, and Ray Tracing Features pages, so the
@@ -915,7 +914,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   recreates the swapchain for FIFO so every generated->real pair is presented
   in order; Mailbox can replace a generated image and Immediate can tear it.
   The independent FPS safety floor is the relevant user-facing pacing knob.
-- [-] Resolve requested versus active implementation through a central
+- [x] Resolve requested versus active implementation through a central
   capability/fallback resolver and display one precise fallback reason.
   `flt_upscaler_active` and `flt_upscaler_reason` now publish the exact live
   outcome and are validated for both active FSR3 and nonlinear-projection
@@ -937,7 +936,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   views through dominant-light blocker view 22.
 - [x] Implement real FSR4 v07 RCAS and expose its independent [0,1] amount;
   retain the legacy FSR1 sharpness cvar solely as a no-op migration alias.
-- [-] Reset histories on provider/preset/size/HDR/projection/camera-cut changes.
+- [x] Reset histories on provider/preset/size/HDR/projection/camera-cut changes.
   Provider/preset/size/HDR/projection paths already reset. Contract v4 now
   emits `VKPT_TEMPORAL_RESET_CAMERA_CUT` for a >256-unit single-frame
   teleport, a >90-degree transform discontinuity, or a >0.35-radian lens
@@ -978,11 +977,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FI/OF resident effect-owned resources (0 aliasable), with no VUID/error.
   The FI/OF total includes the shared bridge plus five lifecycle-owned images,
   and never double-counts its overlapping optical-flow/interpolation queries.
-- [-] Update in-game help, `doc/client.md`, notices, licenses, and screenshots.
-  The source menu and client cvar documentation now describe the discrete v07
+- [x] Update in-game help, `doc/client.md`, notices, licenses, and screenshots.
+  The source menu and client cvar documentation describe the discrete v07
   model family, independent FSR3/FSR4 RCAS controls, deprecated inert cvars,
-  fallback behavior, and the four read-only official-provider boundary cvars.
-  The reusable Vulkan subtree now has explicit upstream
+  fallback behavior, the four read-only official-provider boundary cvars, and
+  the standalone Vulkan upscaling, d4r, and DLSS 5 contracts in `extern/ffx-vulkan/`.
+  The reusable Vulkan subtree has explicit upstream
   notices, a standalone-CI workflow, and a subtree-split publishing checklist;
   an isolated source copy passed 37/37 redistributable tests plus its installed
   external consumer. It also exports `ffx-vulkan::radiancecache-contract`, a

@@ -1,0 +1,15 @@
+--- a/libs/vkd3d/device.c
++++ b/libs/vkd3d/device.c
+@@ -6637,6 +6637,12 @@
+ 
+     TRACE("iface %p, desc %p, descriptor %#zx.\n", iface, desc, descriptor.ptr);
+ 
++    {
++        char directory[VKD3D_PATH_MAX];
++        if (desc && vkd3d_get_env_var("VKD3D_REFERENCE_UPLOAD_PATH", directory, sizeof(directory)))
++            INFO("REFERENCE_CBV descriptor=%#zx address=%#"PRIx64" size=%u\n",
++                    descriptor.ptr, desc->BufferLocation, desc->SizeInBytes);
++    }
+     d3d12_desc_create_cbv_embedded(descriptor.ptr, device, desc);
+ }
+ 

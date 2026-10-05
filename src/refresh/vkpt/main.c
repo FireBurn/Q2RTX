@@ -3136,10 +3136,12 @@ R_RenderFrame_RTX(refdef_t *fd)
 
 	vkpt_freecam_update(cls.frametime);
 
-	static unsigned previous_wallclock_time = 0;
-	unsigned current_wallclock_time = Sys_Milliseconds();
-	float frame_wallclock_time = (previous_wallclock_time != 0) ? (float)(current_wallclock_time - previous_wallclock_time) * 1e-3f : 0.f;
-	previous_wallclock_time = current_wallclock_time;
+	static uint64_t previous_wallclock_us = 0;
+	uint64_t current_wallclock_us = Sys_Microseconds();
+	float frame_wallclock_time = (previous_wallclock_us != 0) ? (float)(current_wallclock_us - previous_wallclock_us) * 1e-6f : 0.f;
+	previous_wallclock_us = current_wallclock_us;
+	if (frame_wallclock_time > 1.0f)
+		frame_wallclock_time = 0.016667f;
 
 	if (!temporal_frame_valid)
 	{
@@ -3235,7 +3237,7 @@ R_RenderFrame_RTX(refdef_t *fd)
 	vkpt_physical_sky_update_ubo(ubo, &sun_light, render_world);
 	vkpt_bloom_update(ubo, frame_time, ubo->medium != MEDIUM_NONE, qvk.frame_menu_mode);
 	vkpt_temporal_begin_frame(
-		frame_time <= 0.f ? frame_wallclock_time : frame_time,
+		frame_wallclock_time > 0.f ? frame_wallclock_time : (frame_time > 0.f ? frame_time : 0.016667f),
 		temporal_frame_valid, render_world, ref_mode.enable_denoiser);
 	{
 		vec3_t resolved_sun_color = { 0.0f, 0.0f, 0.0f };

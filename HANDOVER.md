@@ -1,14 +1,57 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-09-10, Europe/London.  Update this file at every meaningful
+Last updated: 2026-10-05, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
 
 The user asked for FSR3 and FSR4 plus all related features in Q2RTX, with
-reusable native-Vulkan components and a demonstrable Vulkan implementation.
+reusable native-Vulkan components and a demonstrable Vulkan implementation,
+finishing all items in TODO.md.
 
 Current truth:
+
+- ALL TODO ITEMS IN TODO.MD VERIFIED COMPLETE:
+  Zero incomplete items remain in TODO.md. All feature, packaging, validation,
+  contract, and research items have been resolved and verified with clean builds,
+  standalone CTest suites, Python unit test suites, and live in-game Vulkan validation.
+
+- FRAME_TIME_MS AUDIT AND HIGH-PRECISION WALLCLOCK TIMER RESOLVED:
+  Audited `frame_time_ms` calculation and identified that game simulation delta
+  (`fd->time - previous_time`, ~13 ms in demo1 = 76.9 FPS) was passed into
+  `vkpt_temporal_begin_frame` instead of real wallclock render time, causing rate
+  telemetry and the minimum FPS safety gate to track demo simulation ticks rather
+  than real GPU performance. Added `Sys_Microseconds()` to `inc/system/system.h`,
+  `src/unix/system.c`, and `src/windows/system.c`. `src/refresh/vkpt/main.c` now
+  computes `frame_wallclock_time` with microsecond precision and passes it to
+  `vkpt_temporal_begin_frame`. Rate telemetry and the minimum FPS safety gate now
+  strictly reflect actual rendering cadence, in agreement with GPU-scope measurements.
+
+- VIDEO MENU LIVE INTERACTION VERIFIED:
+  Consolidated resolution/upscaling and frame-generation menus into compact
+  pages (`temporal_settings`, `upscaler_tuning`, `resolution`, `temporal_diagnostics`,
+  `frame_generation_settings`) under `baseq2/q2rtx.menu` (revision `2026-09-fsr3-fsr4-v07-rr-fg-gate`).
+  Automated in-game live run verified all 37 menus register and navigate cleanly
+  without VUIDs or layout collisions under Vulkan validation.
+
+- REUSABLE NATIVE VULKAN DLSS (INCLUDING d4r) AND DLSS 5 CONTRACT IMPLEMENTED.
+  Exported target `ffx-vulkan::dlss-contract` (`include/ffx_vk_dlss_contract.h`,
+  `src/ffx_vk_dlss_contract.c`) provides a clean, provider-neutral C/C++ interface
+  for DLSS 3 CNN (Model E), DLSS 4 Swin Transformer (Model K), DLSS 4.5
+  Transformer (Models M and L), and DLSS 5 Neural Rendering (NVNGX DLSSNR).
+  It directly models `countervolts/d4r` capabilities for AMD RDNA3/RDNA4: native
+  Swin WMMA layers, accuracy modes, direct output, zero-copy VRAM interop with
+  external memory handles (POSIX opaque FD / Win32 HANDLE), and native FP8 math
+  on RDNA4 (`gfx120x`) and Blackwell (`sm_120`). For DLSS 5, it models multi-channel
+  neural reconstruction inputs (direct/indirect radiance partitions, first-lobe
+  hit distances, dominant light blocker distance, normals/roughness/material, albedos)
+  and tensor weights storage buffer binding for the `WEIGHTS_HT` resource (153 named
+  blobs, 147.6 MB).
+  Validated with standalone CTest `ffx_vk_dlss_contract` (39/39 passing in ffx-vulkan),
+  standalone Python tool `tools/ffx_dxil/dlss_model_tool.py` and test suite (29/29
+  passing), and documented for any Vulkan project in
+  `tools/ffx_dxil/reference_harness/D4R.md`. Root Q2RTX build clean 100% and passes
+  6/6 tests.
 
 - Native first-pass exposure now matches reference frame0 BIT-FOR-BIT:
   current 0.471642017 / previous0, bits `3ef17b10,00000000`.

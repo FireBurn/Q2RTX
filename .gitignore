@@ -52,3 +52,7 @@ baseq2/**/*.txt
 !baseq2/maps/sky/*.txt
 !baseq2/fsr4_shaders/LICENSE-FSR4-v07.txt
 !baseq2/pics/flashlight_profile.png
+
+__pycache__/
+*.py[cod]
+vkd3d-proton.cache*

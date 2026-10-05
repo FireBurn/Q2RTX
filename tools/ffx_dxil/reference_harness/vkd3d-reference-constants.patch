@@ -1,0 +1,19 @@
+--- a/libs/vkd3d/command.c
++++ b/libs/vkd3d/command.c
+@@ -14872,6 +14872,16 @@
+     memcpy(&bindings->root_constants[c->constant_index + offset], data, count * sizeof(uint32_t));
+ 
+     bindings->root_constant_dirty_mask |= 1ull << index;
++
++    if (bindings == &list->compute_bindings)
++    {
++        char directory[VKD3D_PATH_MAX];
++        if (vkd3d_get_env_var("VKD3D_REFERENCE_UPLOAD_PATH", directory, sizeof(directory)))
++            for (i = 0; i < count; ++i)
++                INFO("REFERENCE_ROOT_CONSTANT list=%p parameter=%u offset=%u word=%08x\n",
++                        &list->ID3D12GraphicsCommandList_iface, index, offset + i,
++                        ((const uint32_t *)data)[i]);
++    }
+ 
+ #ifdef VKD3D_ENABLE_BREADCRUMBS
+     for (i = 0; i < count; i++)

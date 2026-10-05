@@ -989,6 +989,15 @@ no effect on either current provider. FSR3 and FSR4 v07 each have a separately
 implemented, opt-in RCAS pass controlled by their respective 0-to-1 sharpening
 cvar.
 
+### Reusable Vulkan Upscaling, d4r, and DLSS 5 Architecture
+
+Q2RTX's vendor-neutral reconstruction architecture is split into standalone CMake components under `extern/ffx-vulkan/` suitable for any Vulkan 1.2+ engine:
+
+- **`ffx-vulkan::dlss-contract`**: Public C11/C++ contract (`ffx_vk_dlss_contract.h`) modeling DLSS 3 CNN (Model E), DLSS 4 Swin Transformer (Model K), DLSS 4.5 Transformer (Models M & L), and DLSS 5 Neural Rendering (DLSSNR). Supports [countervolts/d4r](https://github.com/countervolts/d4r) RDNA3/RDNA4 execution (AMD WMMA acceleration, native Swin encoders, accuracy mode, zero-copy VRAM interop with POSIX opaque FD and Win32 HANDLEs, and native FP8 arithmetic on RDNA4 `gfx120x` and Blackwell `sm_120`), and DLSS 5 multi-channel neural signals (direct/indirect radiance, first-lobe hit distances, dominant blocker distance, and `WEIGHTS_HT` tensor storage buffers).
+- **`ffx-vulkan::effects`**: Consolidated export of FSR 3.1.4, FSR 3.1.5, FSR 3.1.6 Optical Flow + Frame Interpolation, and experimental source-v07 FSR4 INT8/DOT4 upscaling.
+- **`ffx-vulkan::rayregeneration-contract`**: Provider-neutral validation and specification of dense and checkerboard radiance, hit distances, dominant light blocker distances, and material signals for neural denoising.
+- **`ffx-vulkan::framegeneration-presenter-policy`**: Swapchain pacing, multi-acquire coordination, and immutable present plans for paired generated-real presentation.
+
 #### `gr_enable`
 Enables the god rays (volumetric lighting) effect. Default value is 1.
 

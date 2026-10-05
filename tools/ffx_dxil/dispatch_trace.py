@@ -14,7 +14,31 @@ def index_trace(lines):
     ranges = {}
     views = {}
     view_resources = {}
+    resources = {}
     for number, line in enumerate(lines, 1):
+        resource = re.search(r"REFERENCE_RESOURCE resource=(\w+) dimension=(\d+) width=(\d+) height=(\d+) depth_or_layers=(\d+) mips=(\d+) format=(\d+) samples=(\d+) flags=(\d+) heap=(\d+) initial_state=(\d+)", line)
+        if resource:
+            names = ("dimension", "width", "height", "depth_or_layers", "mips", "format", "samples", "flags", "heap", "initial_state")
+            resources[resource[1]] = dict(zip(names, map(int, resource.groups()[1:])), declaration_line=number)
+            continue
+        constant = re.search(r"REFERENCE_ROOT_CONSTANT list=(\w+) parameter=(\d+) offset=(\d+) word=([0-9a-f]{8})", line)
+        if constant:
+            identity, parameter, offset, word = constant.groups()
+            lists.setdefault(identity, {}).setdefault("constants", {}).setdefault(parameter, {})[offset] = word
+            continue
+        cbv_created = re.search(r"CreateConstantBufferView_\w+: .*?descriptor (0x[0-9a-f]+)", line)
+        if cbv_created:
+            handle = int(cbv_created[1], 16)
+            views.pop(handle, None)
+            view_resources.pop(handle, None)
+            continue
+        cbv = re.search(r"REFERENCE_CBV descriptor=(\w+) address=(\w+) size=(\d+)", line)
+        if cbv:
+            handle, address, size = int(cbv[1], 0), int(cbv[2], 0), int(cbv[3])
+            views[handle] = dict(kind="CBV", address=hex(address), size=size,
+                resource=None, source_descriptor=hex(handle))
+            view_resources.pop(handle, None)
+            continue
         created = re.search(r"Create(?:ShaderResourceView|UnorderedAccessView)_\w+: .*?resource ([0-9a-f]+),.*?descriptor (0x[0-9a-f]+)", line)
         if created:
             handle = int(created[2], 16)
@@ -35,7 +59,8 @@ def index_trace(lines):
             handle, size, offset = int(handle, 0), int(size), int(offset)
             if offset == 0:
                 views[handle] = dict(kind=kind, size=size, words={},
-                    resource=view_resources.get(handle), source_descriptor=hex(handle))
+                    resource=view_resources.get(handle), source_descriptor=hex(handle),
+                    resource_description=copy.deepcopy(resources.get(view_resources.get(handle))))
             if handle not in views or views[handle]["size"] != size or offset + 4 > size:
                 raise ValueError(f"line {number}: malformed view capture")
             views[handle]["words"][str(offset)] = word
@@ -91,6 +116,20 @@ def index_trace(lines):
                 state["root_signature"] = signature[1]
                 state["cbv"] = {}
                 state["tables"] = {}
+                state["constants"] = {}
+        elif function in ("SetComputeRoot32BitConstant", "SetComputeRoot32BitConstants"):
+            parameter = re.search(r"root_parameter_index (\d+)", message)
+            offset = re.search(r"dst_offset (\d+)", message)
+            count = re.search(r"constant_count (\d+)", message)
+            if not parameter or not offset or (function.endswith("Constants") and not count):
+                raise ValueError(f"line {number}: malformed root constants")
+            values = state.setdefault("constants", {}).setdefault(parameter[1], {})
+            for index in range(int(offset[1]), int(offset[1]) + (int(count[1]) if count else 1)):
+                values[str(index)] = None  # Pointer-only trace cannot supply bytes.
+            if function.endswith("Constant"):
+                word = re.search(r"data 0x([0-9a-f]{8})", message)
+                if word:
+                    values[offset[1]] = word[1]
         elif function == "SetComputeRootConstantBufferView":
             value = re.search(r"root_parameter_index (\d+), address (0x[0-9a-f]+)", message)
             if not value:
