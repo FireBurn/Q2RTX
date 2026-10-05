@@ -90,6 +90,10 @@ The API keeps these independently selectable pieces behind one contract:
    architecture tiers (Generic Compute, DP4a, AMD WMMA, NVIDIA Tensor Cores)
    and provides a turnkey integration path for external Vulkan projects (see
    [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)).
+10. `ffx-vulkan::mlframegen-contract`, a provider-neutral Vulkan contract for AMD
+   ML Frame Generation 4.0.1 modeling bidirectional neural motion vectors,
+   multi-frame interpolation multipliers (2x, 3x, 4x), hardware execution tiers
+   (Generic Compute, DP4a, WMMA/FP8, Tensor Cores), and WSI presentation contracts.
 
 The presenter will use an explicit API rather than impersonating a Vulkan
 swapchain handle.  That makes queue ownership and synchronization visible and
@@ -105,6 +109,7 @@ avoids the Windows-only behavior in AMD's old Vulkan swapchain reference.
 | FSR4 v07 INT8/DOT4 | Runnable experimental Vulkan provider | Requires a complete externally supplied, same-preset v07 shader/model bundle; it is not AMD FSR 4.1.1. |
 | Intel XeSS 2 / 3 contract | Runnable provider-neutral contract & U-Net tool | Models 14-dispatch U-Net pipeline, 13 neural weight layers (253,280 bytes), and cross-vendor DP4a execution. |
 | DLSS / d4r / DLSS 5 contracts | Runnable provider-neutral validation contract | Validates DLSS 3/4/4.5 (d4r RDNA3/RDNA4) and DLSS 5 neural rendering inputs, tensor weights, and VRAM interop handles. |
+| ML Frame Generation 4.0.1 contract | Runnable provider-neutral validation contract | Validates neural bidirectional motion vectors, multi-frame interpolation multipliers (2x, 3x, 4x), and hardware execution tiers. |
 | Ray-Regeneration-style inputs | Runnable provider-neutral validation contract | Validates inputs/outputs only; it does not denoise, own models, or imply an AMD neural provider. |
 | Radiance Caching host buffers | Runnable provider-neutral validation contract | Validates host buffer/counter ownership only; it does not emit samples, run a model, or imply an AMD neural provider. |
 | Official FSR 4.1.1, ML Frame Generation, Ray Regeneration, Radiance Caching | Not provided by this project | AMD distributes these as signed DX12 providers. Do not relabel any analytical or v07 path as one of them. |
