@@ -53,6 +53,16 @@ Current truth:
   `tools/ffx_dxil/reference_harness/D4R.md`. Root Q2RTX build clean 100% and passes
   6/6 tests.
 
+- FIRST NATIVE XESS PREPARE PASS EXECUTED ON VULKAN. Standalone Linux
+  `tools/ffx_dxil/reference_harness/native_xess_prepare.cpp` dispatches the
+  normalized prepare-pass module `40553fb1ea6dd6f3.spv` directly through Vulkan
+  without Wine/DX12. Tested on both discrete GPU (AMD Radeon RX 6800M, Navi 22)
+  and integrated GPU (AMD Renoir) with `VK_LAYER_KHRONOS_validation` enabled (0
+  warnings, 0 errors). The 120-byte push constants from dispatch 0 (28 root
+  constants + 2 table base words) were bound; all 921,600 output buffer sentinel
+  words (`0xdeadbeef`) were overwritten with valid packed neural features
+  (`0xb6b6b6b6`, `0x80808080`).
+
 - Native first-pass exposure now matches reference frame0 BIT-FOR-BIT:
   current 0.471642017 / previous0, bits `3ef17b10,00000000`.
   `--read-exposure` added to the reference probe, observing the measured SDK

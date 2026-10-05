@@ -149,10 +149,24 @@ by a native Vulkan backend. All 16 captured modules were converted and
 passed SPIR-V validation in `build/xess-audit/native-bindings-1/`.
 The transformation changes only DescriptorSet/Binding decorations; every
 executable instruction, array index, type and push-constant offset remains
-identical. The backend must mirror the appropriate captured table entries
-into the separate arrays and maintain the recorded table-base indices.
-GPU execution with this layout has not yet been verified. Descriptor indexing,
-integer dot products and other recorded capabilities have not been lowered.
+identical. The backend mirrors the captured table entries into the separate
+arrays and maintains the recorded table-base indices.
+
+### First native prepare-pass executed
+
+`tools/ffx_dxil/reference_harness/native_xess_prepare.cpp` is a standalone Linux
+Vulkan test for the prepare pass (`40553fb1ea6dd6f3.spv`, (80,23,1) dispatch).
+It accepts the normalized SPIR-V module, the 120-byte push-constant binary
+(28 root constants plus two table-base words), and writes the 640x360
+RGBA32UI packed-features output.
+
+Execution verified on AMD discrete GPU (Radeon RX 6800M, Navi 22) and integrated
+GPU (Renoir) under Linux:
+- `VK_LAYER_KHRONOS_validation` enabled: 0 errors, 0 warnings.
+- Output buffer initialized to `0xdeadbeef`: all 921,600 sentinel words were
+  overwritten by the compute shader (`sentinel_words=0`).
+- Generated packed INT8 weights (`0xb6b6b6b6`) and zero-point biases (`0x80808080`)
+  match neural input formatting.
 
 ## DLSS scope
 

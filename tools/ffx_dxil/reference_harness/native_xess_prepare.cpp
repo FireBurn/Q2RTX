@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Native XeSS prepare-pass experiment. Does not execute the full upscaler.
+// Build: g++ -std=c++17 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers native_xess_prepare.cpp -lvulkan -o native_xess_prepare
 #include <vulkan/vulkan.h>
 #include <array>
 #include <cmath>
