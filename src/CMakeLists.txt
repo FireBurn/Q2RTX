@@ -630,6 +630,11 @@ IF (TARGET client)
             TARGET_LINK_LIBRARIES(client
                 ffx-vulkan::portable
                 ffx-vulkan::rayregeneration-contract
+                ffx-vulkan::radiancecache-contract
+                ffx-vulkan::dlss-contract
+                ffx-vulkan::xess-contract
+                ffx-vulkan::mlframegen-contract
+                ffx-vulkan::unified-sr
                 ffx-vulkan::temporal-lifecycle
                 ffx-vulkan::fsr4-v07-vulkan
                 ffx-vulkan::fsr3-vk-backend-3.1.5

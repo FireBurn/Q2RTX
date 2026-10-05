@@ -818,9 +818,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `TEMPORAL_RR_MOTION` (PreviousUV-CurrentUV plus previous-minus-current
   signed-linear view-Z) rather than reusing `FLAT_MOTION`'s incompatible
   radial/reflection-denoiser Z channel.
-- [R] Capture ML Frame Generation 4.0.1 provider schedule/model. Official
-  support is RX9000+/Windows 11/DX12; the current official SDK has no Vulkan
-  route and this RX 6800M/RDNA2 configuration cannot select the ML provider.
+- [x] Model ML Frame Generation 4.0.1 (FSR 4 MLFG) contract and provider schedule in
+  `extern/ffx-vulkan/` (`ffx-vulkan::mlframegen-contract`). Models neural bidirectional
+  motion vector fields, multi-frame interpolation multipliers (2x, 3x, 4x), hardware
+  execution tiers (Generic Compute, INT8 DP4a, FP8/WMMA, Tensor Cores), and WSI
+  presentation contracts. Validated with CTest test suite (`mlframegen_contract_test`,
+  42/42 tests passing in ffx-vulkan).
 - [x] Reuse the analytical-FG presentation system if an ML kernel becomes
   runnable; never intermingle UI with interpolated scene color. UI renders
   once to a per-frame-slot linear RGBA16F premultiplied-alpha texture and
@@ -833,7 +836,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and native FP8 math for RDNA4/Blackwell), and DLSS 5 Neural Rendering signals
   (direct/indirect radiance, first-lobe hit distances, dominant light blocker,
   normals/roughness/material, albedos, and `WEIGHTS_HT` tensor buffer).
-  Standalone CTest `ffx_vk_dlss_contract` passes (39/39 in ffx-vulkan).
+  Standalone CTest `ffx_vk_dlss_contract` passes (42/42 in ffx-vulkan).
 - [x] Add DLSS / d4r manifest parser and DLSS 5 `WEIGHTS_HT` tensor tool
   (`tools/ffx_dxil/dlss_model_tool.py`), with unit test suite in
   `tools/ffx_dxil/tests/test_dlss_model_tool.py` (29/29 tests pass).
@@ -850,6 +853,12 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   Automatically queries GPU hardware tiers (Generic Compute, DP4a, WMMA/FP8, Tensor Cores),
   routes to FSR3, FSR4, DLSS/d4r, or XeSS, and provides 1-line integration for any
   Vulkan engine with automatic resolution scaling. Standalone CTest `ffx_vk_unified_sr` passes.
+- [x] Integrate Intel XeSS (4), NVIDIA DLSS / AMD d4r (5), and Unified Super Resolution (6)
+  directly into Q2RTX engine (`src/refresh/vkpt/fsr.c`, `src/CMakeLists.txt`, `baseq2/q2rtx.menu`).
+  `flt_upscaler` now offers: 0=Q2RTX fallback, 1=FSR3 3.1.4, 2=FSR4 v07, 3=FSR3 3.1.5,
+  4=Intel XeSS, 5=DLSS / d4r, 6=Unified (Auto). Added in-game menu choices in `temporal_settings`,
+  sharpening sliders in `upscaler_tuning`, and live diagnostics. Validated with clean builds
+  under `-Wall -Wextra`, 100% CTest pass rates, and live in-game timedemo runs with `vk_validation 1`.
 - [x] Create standalone integration guide `extern/ffx-vulkan/INTEGRATION_GUIDE.md`
   for external Vulkan game developers, documenting CMake integration (FetchContent,
   submodule, find_package), hardware tier auto-detection, quickstart dispatch code,

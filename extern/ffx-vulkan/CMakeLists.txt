@@ -284,6 +284,31 @@ else()
         -Wall -Wextra -Wpedantic)
 endif()
 
+# Provider-neutral Vulkan contract for AMD ML Frame Generation 4.0.1 (FSR 4 MLFG).
+# Models neural bidirectional motion estimation, multi-frame interpolation ratios
+# (2x, 3x, 4x), hardware execution tiers (INT8, FP8/WMMA), and presentation contracts.
+add_library(ffx_vulkan_mlframegen_contract STATIC
+    src/ffx_vk_mlframegen_contract.c)
+add_library(ffx-vulkan::mlframegen-contract ALIAS
+    ffx_vulkan_mlframegen_contract)
+set_property(TARGET ffx_vulkan_mlframegen_contract PROPERTY
+    EXPORT_NAME mlframegen-contract)
+target_compile_features(ffx_vulkan_mlframegen_contract PUBLIC c_std_11)
+target_include_directories(ffx_vulkan_mlframegen_contract PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+target_link_libraries(ffx_vulkan_mlframegen_contract
+    PUBLIC ffx-vulkan::portable)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(ffx_vulkan_mlframegen_contract PUBLIC m)
+endif()
+if(MSVC)
+    target_compile_options(ffx_vulkan_mlframegen_contract PRIVATE /W4)
+else()
+    target_compile_options(ffx_vulkan_mlframegen_contract PRIVATE
+        -Wall -Wextra -Wpedantic)
+endif()
+
 
 if(FFX_VK_PORTABLE_BUILD_FSR3_HOST)
     set(FFX_1_1_4_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/upstream/ffx-1.1.4/sdk")
@@ -643,6 +668,7 @@ target_link_libraries(ffx_vulkan_effects INTERFACE
     ffx-vulkan::radiancecache-contract
     ffx-vulkan::dlss-contract
     ffx-vulkan::xess-contract
+    ffx-vulkan::mlframegen-contract
     ffx-vulkan::unified-sr
     ffx-vulkan::fsr4-v07-assets
     ffx-vulkan::framegeneration-presenter-policy
@@ -735,6 +761,7 @@ if(FFX_VK_PORTABLE_INSTALL)
         ffx_vulkan_radiancecache_contract
         ffx_vulkan_dlss_contract
         ffx_vulkan_xess_contract
+        ffx_vulkan_mlframegen_contract
         ffx_vulkan_unified_sr
         ffx_vulkan_fsr4_v07_assets
         ffx_vulkan_framegeneration_presenter_policy
@@ -839,6 +866,13 @@ if(FFX_VK_PORTABLE_BUILD_TESTS)
         ffx-vulkan::unified-sr)
     add_test(NAME ffx_vk_unified_sr
         COMMAND ffx_vk_unified_sr_test)
+
+    add_executable(ffx_vk_mlframegen_contract_test
+        tests/mlframegen_contract_test.c)
+    target_link_libraries(ffx_vk_mlframegen_contract_test PRIVATE
+        ffx-vulkan::mlframegen-contract)
+    add_test(NAME ffx_vk_mlframegen_contract
+        COMMAND ffx_vk_mlframegen_contract_test)
 
     add_executable(ffx_vk_temporal_lifecycle_test
         tests/temporal_lifecycle_test.c)

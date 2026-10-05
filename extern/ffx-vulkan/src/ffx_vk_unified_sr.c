@@ -280,7 +280,90 @@ VkResult ffxVkUnifiedSrDispatch(
         !dispatchInfo->outputExtent.width || !dispatchInfo->outputExtent.height)
         return VK_ERROR_INITIALIZATION_FAILED;
 
-    /* In a live engine, this dispatches the active backend (FSR3, FSR4, DLSS/d4r, or XeSS) */
+    /* Route dispatch according to active upscaler */
+    switch (ctx->activeUpscaler) {
+    case FFX_VK_UPSCALER_XESS: {
+        FfxVkXessCreateInfo xInfo;
+        memset(&xInfo, 0, sizeof(xInfo));
+        xInfo.structSize = sizeof(xInfo);
+        xInfo.contractVersion = FFX_VK_XESS_CONTRACT_VERSION;
+        xInfo.path = FFX_VK_XESS_PATH_DP4A;
+        xInfo.maxInputExtent = ctx->createInfo.maxInputExtent;
+        xInfo.maxOutputExtent = ctx->createInfo.maxOutputExtent;
+
+        FfxVkXessDispatchInfo xDsp;
+        memset(&xDsp, 0, sizeof(xDsp));
+        xDsp.structSize = sizeof(xDsp);
+        xDsp.contractVersion = FFX_VK_XESS_CONTRACT_VERSION;
+        xDsp.commandBuffer = dispatchInfo->commandBuffer;
+        xDsp.colorIn = dispatchInfo->colorIn;
+        xDsp.velocity = dispatchInfo->motionVectors;
+        xDsp.depth = dispatchInfo->depth;
+        xDsp.colorOut = dispatchInfo->colorOut;
+        xDsp.inputExtent = dispatchInfo->inputExtent;
+        xDsp.outputExtent = dispatchInfo->outputExtent;
+        xDsp.jitterOffsetX = dispatchInfo->jitterOffsetX;
+        xDsp.jitterOffsetY = dispatchInfo->jitterOffsetY;
+        xDsp.sharpness = dispatchInfo->sharpness;
+        xDsp.resetHistory = dispatchInfo->resetHistory;
+
+        if (dispatchInfo->colorIn.image != VK_NULL_HANDLE) {
+            uint64_t issues = ffxVkXessValidateDispatchInfo(&xInfo, &xDsp);
+            if (issues != FFX_VK_XESS_VALIDATION_NONE)
+                return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+        break;
+    }
+    case FFX_VK_UPSCALER_DLSS: {
+        FfxVkDlssCreateInfo dInfo;
+        memset(&dInfo, 0, sizeof(dInfo));
+        dInfo.structSize = sizeof(dInfo);
+        dInfo.contractVersion = FFX_VK_DLSS_CONTRACT_VERSION;
+        dInfo.model = FFX_VK_DLSS_MODEL_4_SWIN_K;
+        dInfo.preset = FFX_VK_DLSS_PRESET_PERFORMANCE;
+        dInfo.flags = FFX_VK_DLSS_FLAG_AUTO_EXPOSURE | FFX_VK_DLSS_FLAG_HDR_INPUT;
+        dInfo.gpuArch = (ctx->capabilities.tier == FFX_VK_GPU_TIER_TENSOR_CORES)
+            ? FFX_VK_DLSS_ARCH_NVIDIA_TENSOR
+            : ((ctx->capabilities.tier == FFX_VK_GPU_TIER_TENSOR_WMMA)
+                ? FFX_VK_DLSS_ARCH_RDNA3
+                : FFX_VK_DLSS_ARCH_GENERIC_VULKAN);
+        dInfo.maxRenderSize = (FfxVkPortableExtent2D){ ctx->createInfo.maxInputExtent.width, ctx->createInfo.maxInputExtent.height };
+        dInfo.displaySize = (FfxVkPortableExtent2D){ ctx->createInfo.maxOutputExtent.width, ctx->createInfo.maxOutputExtent.height };
+
+        FfxVkDlssDispatchInfo dDsp;
+        memset(&dDsp, 0, sizeof(dDsp));
+        dDsp.structSize = sizeof(dDsp);
+        dDsp.contractVersion = FFX_VK_DLSS_CONTRACT_VERSION;
+        dDsp.renderSize = (FfxVkPortableExtent2D){ dispatchInfo->inputExtent.width, dispatchInfo->inputExtent.height };
+        dDsp.color = dispatchInfo->colorIn;
+        dDsp.depth = dispatchInfo->depth;
+        dDsp.motionVectors = dispatchInfo->motionVectors;
+        dDsp.output = dispatchInfo->colorOut;
+        dDsp.jitterOffset = (FfxVkPortableFloat2){ dispatchInfo->jitterOffsetX, dispatchInfo->jitterOffsetY };
+        dDsp.motionVectorScale = (FfxVkPortableFloat2){
+            (float)(dispatchInfo->inputExtent.width > 0 ? dispatchInfo->inputExtent.width : 1),
+            (float)(dispatchInfo->inputExtent.height > 0 ? dispatchInfo->inputExtent.height : 1)
+        };
+        dDsp.verticalFov = 1.0f;
+        dDsp.nearZ = 0.1f;
+        dDsp.farZ = 1000.0f;
+        dDsp.preExposure = 1.0f;
+        dDsp.frameReset = dispatchInfo->resetHistory ? VK_TRUE : VK_FALSE;
+
+        if (dispatchInfo->colorIn.image != VK_NULL_HANDLE) {
+            uint64_t issues = 0;
+            FfxVkPortableResult res = ffxVkDlssValidateDispatchInfo(&dInfo, &dDsp, &issues);
+            if (res != FFX_VK_PORTABLE_OK || issues != 0)
+                return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+        break;
+    }
+    case FFX_VK_UPSCALER_FSR3:
+    case FFX_VK_UPSCALER_FSR4:
+    default:
+        break;
+    }
+
     return VK_SUCCESS;
 }
 

@@ -141,6 +141,7 @@ bool ffxVkUnifiedSrGetRenderResolution(
 VkResult ffxVkUnifiedSrCreate(
     FfxVkUnifiedSrContext *ctx,
     const FfxVkUnifiedSrCreateInfo *info);
+#define ffxVkUnifiedSrCreateContext ffxVkUnifiedSrCreate
 
 /* Dispatch active upscaler */
 VkResult ffxVkUnifiedSrDispatch(

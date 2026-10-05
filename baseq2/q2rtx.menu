@@ -207,9 +207,9 @@ begin temporal_settings
     title "Upscaling and Resolution"
     background #212F3CD0
     style --compact
-    pairs --status "FSR3 is native Vulkan. FSR4 v07 is an experimental source model for Vulkan/RDNA2, distinct from AMD's signed DX12-only FSR4.1.1 provider. Choose its matching quality model below." \
+    pairs --status "Select temporal upscaler: FSR3 3.1.4, FSR4 v07 INT8, FSR3 3.1.5 public SDK, Intel XeSS, NVIDIA DLSS / AMD d4r, or Unified Super Resolution (Auto-detect)." \
         "temporal upscaler" flt_upscaler \
-        "Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3
+        "Q2RTX fallback" 0 "FSR3 3.1.4" 1 "FSR4 v07 (experimental)" 2 "FSR3 3.1.5 (experimental)" 3 "Intel XeSS" 4 "DLSS / d4r" 5 "Unified (Auto)" 6
     action "upscaler tuning..." pushmenu upscaler_tuning
     action "resolution scaling..." pushmenu resolution
     action "temporal diagnostics..." pushmenu temporal_diagnostics
@@ -231,6 +231,15 @@ begin upscaler_tuning
     endif
     ifeq flt_upscaler 3
         range -f "%.2f" "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
+    endif
+    ifeq flt_upscaler 4
+        range -f "%.2f" "XeSS sharpening" flt_fsr3_sharpening 0 1 0.05
+    endif
+    ifeq flt_upscaler 5
+        range -f "%.2f" "DLSS sharpening" flt_fsr3_sharpening 0 1 0.05
+    endif
+    ifeq flt_upscaler 6
+        range -f "%.2f" "Unified SR sharpening" flt_fsr3_sharpening 0 1 0.05
     endif
     ifeq flt_upscaler 0
         pairs "fallback anti-aliasing" flt_taa "none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2

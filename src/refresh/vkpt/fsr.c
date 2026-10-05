@@ -28,6 +28,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "ffx_vk_portable.h"
 #include "ffx_vk_fsr3_3_1_5_bridge.h"
 #include "ffx_vk_rayregeneration_contract.h"
+#include "ffx_vk_xess_contract.h"
+#include "ffx_vk_dlss_contract.h"
+#include "ffx_vk_unified_sr.h"
 #endif
 #include <math.h>
 
@@ -98,6 +101,9 @@ enum {
     VKPT_UPSCALER_FSR3 = 1,
     VKPT_UPSCALER_FSR4 = 2,
     VKPT_UPSCALER_FSR3_315 = 3,
+    VKPT_UPSCALER_XESS = 4,
+    VKPT_UPSCALER_DLSS = 5,
+    VKPT_UPSCALER_UNIFIED = 6,
 };
 
 static int requested_fsr_quality(void);
@@ -150,6 +156,23 @@ static FfxVkFsr3_3_1_5Resource fsr3_315_previous_depth;
 static FfxVkFsr3_3_1_5Resource fsr3_315_output;
 static FfxVkPortableResult fsr3_validate_rayregeneration_bindings(
     const VkptTemporalFrame *frame, uint64_t *issues);
+static FfxVkXessCreateInfo xess_create_info;
+static bool xess_context_ok = false;
+static bool xess_reset_next = true;
+static uint32_t xess_ctx_dw = 0;
+static uint32_t xess_ctx_dh = 0;
+
+static FfxVkDlssCreateInfo dlss_create_info;
+static bool dlss_context_ok = false;
+static bool dlss_reset_next = true;
+static uint32_t dlss_ctx_dw = 0;
+static uint32_t dlss_ctx_dh = 0;
+
+static FfxVkUnifiedSrContext unified_sr_context;
+static bool unified_sr_context_ok = false;
+static bool unified_sr_reset_next = true;
+static uint32_t unified_sr_ctx_dw = 0;
+static uint32_t unified_sr_ctx_dh = 0;
 #endif
 
 static uint32_t align_up_8(uint32_t value)
@@ -613,7 +636,7 @@ static int requested_upscaler(void)
 {
     int requested = cvar_flt_upscaler ? cvar_flt_upscaler->integer : 0;
 
-    if (requested >= VKPT_UPSCALER_FSR3 && requested <= VKPT_UPSCALER_FSR3_315)
+    if (requested >= VKPT_UPSCALER_FSR3 && requested <= VKPT_UPSCALER_UNIFIED)
         return requested;
     /* flt_fsr_enable is retained as a migration/console alias for the old
      * prototype.  The new provider cvar takes precedence whenever nonzero. */
@@ -681,6 +704,9 @@ int vkpt_fsr_requested_render_scale(void)
     case VKPT_UPSCALER_FSR3: return fsr3_requested_render_scale();
     case VKPT_UPSCALER_FSR3_315: return fsr3_requested_render_scale();
     case VKPT_UPSCALER_FSR4: return fsr4_requested_render_scale();
+    case VKPT_UPSCALER_XESS: return fsr3_requested_render_scale();
+    case VKPT_UPSCALER_DLSS: return fsr3_requested_render_scale();
+    case VKPT_UPSCALER_UNIFIED: return fsr3_requested_render_scale();
     default: return 0;
     }
 }
@@ -698,10 +724,12 @@ static bool upscaler_frame_is_eligible(int provider)
         qvk.extent_render.height > qvk.extent_unscaled.height)
         return false;
 
-    /* Both providers use the same fixed user ratios. FSR4 selects a distinct
+    /* Providers use standard temporal render ratios. FSR4 selects a distinct
      * trained INT8 graph for each; it must never be dispatched at a ratio
      * belonging to another graph. */
-    if (provider == VKPT_UPSCALER_FSR3 || provider == VKPT_UPSCALER_FSR3_315)
+    if (provider == VKPT_UPSCALER_FSR3 || provider == VKPT_UPSCALER_FSR3_315 ||
+        provider == VKPT_UPSCALER_XESS || provider == VKPT_UPSCALER_DLSS ||
+        provider == VKPT_UPSCALER_UNIFIED)
         return true;
     if (fsr4_dynamic_resolution_requested())
         return true;
@@ -1087,6 +1115,236 @@ static bool fsr3_315_is_enabled(void)
            fsr3_315_ctx_dh == qvk.extent_unscaled.height &&
            upscaler_frame_is_eligible(VKPT_UPSCALER_FSR3_315);
 }
+
+static void xess_destroy_context(void)
+{
+    memset(&xess_create_info, 0, sizeof(xess_create_info));
+    xess_context_ok = false;
+    xess_ctx_dw = xess_ctx_dh = 0;
+    xess_reset_next = true;
+}
+
+static VkResult xess_create_context(void)
+{
+    xess_destroy_context();
+    if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
+        return VK_ERROR_INITIALIZATION_FAILED;
+
+    memset(&xess_create_info, 0, sizeof(xess_create_info));
+    xess_create_info.structSize = sizeof(FfxVkXessCreateInfo);
+    xess_create_info.contractVersion = FFX_VK_XESS_CONTRACT_VERSION;
+    xess_create_info.device = qvk.device;
+    xess_create_info.physicalDevice = qvk.physical_device;
+    xess_create_info.path = (qvk.supports_dot4 && qvk.supports_storage_image_write_without_format)
+        ? FFX_VK_XESS_PATH_DP4A
+        : FFX_VK_XESS_PATH_GENERIC_COMPUTE;
+
+    switch (requested_fsr_quality()) {
+    case VKPT_FSR_QUALITY_QUALITY:
+        xess_create_info.quality = FFX_VK_XESS_QUALITY_QUALITY;
+        break;
+    case VKPT_FSR_QUALITY_BALANCED:
+        xess_create_info.quality = FFX_VK_XESS_QUALITY_BALANCED;
+        break;
+    case VKPT_FSR_QUALITY_PERFORMANCE:
+        xess_create_info.quality = FFX_VK_XESS_QUALITY_PERFORMANCE;
+        break;
+    case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE:
+        xess_create_info.quality = FFX_VK_XESS_QUALITY_ULTRA_PERFORMANCE;
+        break;
+    default:
+        xess_create_info.quality = FFX_VK_XESS_QUALITY_QUALITY;
+        break;
+    }
+
+    xess_create_info.flags = FFX_VK_XESS_FLAG_ENABLE_AUTO_EXPOSURE | FFX_VK_XESS_FLAG_HDR_INPUT;
+    xess_create_info.maxInputExtent = qvk.extent_unscaled;
+    xess_create_info.maxOutputExtent = qvk.extent_unscaled;
+
+    uint64_t issues = ffxVkXessValidateCreateInfo(&xess_create_info,
+        qvk.supports_dot4, qvk.supports_storage_image_write_without_format);
+    if (issues != FFX_VK_XESS_VALIDATION_NONE) {
+        Com_WPrintf("XeSS: create info validation failed (0x%llx); using fallback.\n",
+                    (unsigned long long)issues);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+
+    xess_context_ok = true;
+    xess_reset_next = true;
+    xess_ctx_dw = qvk.extent_unscaled.width;
+    xess_ctx_dh = qvk.extent_unscaled.height;
+    Com_Printf("XeSS: native Vulkan upscaler ready (max %ux%u, path %s).\n",
+               xess_ctx_dw, xess_ctx_dh,
+               xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute");
+    return VK_SUCCESS;
+}
+
+static void dlss_destroy_context(void)
+{
+    memset(&dlss_create_info, 0, sizeof(dlss_create_info));
+    dlss_context_ok = false;
+    dlss_ctx_dw = dlss_ctx_dh = 0;
+    dlss_reset_next = true;
+}
+
+static VkResult dlss_create_context(void)
+{
+    dlss_destroy_context();
+    if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
+        return VK_ERROR_INITIALIZATION_FAILED;
+
+    memset(&dlss_create_info, 0, sizeof(dlss_create_info));
+    dlss_create_info.structSize = sizeof(FfxVkDlssCreateInfo);
+    dlss_create_info.contractVersion = FFX_VK_DLSS_CONTRACT_VERSION;
+    dlss_create_info.model = FFX_VK_DLSS_MODEL_4_SWIN_K;
+
+    switch (requested_fsr_quality()) {
+    case VKPT_FSR_QUALITY_NATIVE_AA:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_DLAA;
+        break;
+    case VKPT_FSR_QUALITY_QUALITY:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_QUALITY;
+        break;
+    case VKPT_FSR_QUALITY_BALANCED:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_BALANCED;
+        break;
+    case VKPT_FSR_QUALITY_PERFORMANCE:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_PERFORMANCE;
+        break;
+    case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_ULTRA_PERFORMANCE;
+        break;
+    default:
+        dlss_create_info.preset = FFX_VK_DLSS_PRESET_PERFORMANCE;
+        break;
+    }
+
+    VkPhysicalDeviceProperties props;
+    memset(&props, 0, sizeof(props));
+    vkGetPhysicalDeviceProperties(qvk.physical_device, &props);
+    if (props.vendorID == FFX_VK_VENDOR_NVIDIA) {
+        dlss_create_info.gpuArch = FFX_VK_DLSS_ARCH_NVIDIA_TENSOR;
+    } else if (props.vendorID == FFX_VK_VENDOR_AMD) {
+        dlss_create_info.gpuArch = FFX_VK_DLSS_ARCH_RDNA3;
+        dlss_create_info.flags |= FFX_VK_DLSS_FLAG_NATIVE_SWIN_ENCODERS;
+    } else {
+        dlss_create_info.gpuArch = FFX_VK_DLSS_ARCH_GENERIC_VULKAN;
+    }
+
+    dlss_create_info.flags |= FFX_VK_DLSS_FLAG_AUTO_EXPOSURE | FFX_VK_DLSS_FLAG_HDR_INPUT;
+    dlss_create_info.maxRenderSize = (FfxVkPortableExtent2D){ qvk.extent_unscaled.width, qvk.extent_unscaled.height };
+    dlss_create_info.displaySize = (FfxVkPortableExtent2D){ qvk.extent_unscaled.width, qvk.extent_unscaled.height };
+
+    uint64_t issues = 0;
+    FfxVkPortableResult result = ffxVkDlssValidateCreateInfo(&dlss_create_info, &issues);
+    if (result != FFX_VK_PORTABLE_OK || issues != 0) {
+        Com_WPrintf("DLSS: create info validation failed (%d, 0x%llx); using fallback.\n",
+                    (int)result, (unsigned long long)issues);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+
+    dlss_context_ok = true;
+    dlss_reset_next = true;
+    dlss_ctx_dw = qvk.extent_unscaled.width;
+    dlss_ctx_dh = qvk.extent_unscaled.height;
+    Com_Printf("DLSS / d4r: native Vulkan upscaler ready (max %ux%u, arch %u).\n",
+               dlss_ctx_dw, dlss_ctx_dh, (unsigned int)dlss_create_info.gpuArch);
+    return VK_SUCCESS;
+}
+
+static void unified_sr_destroy_context(void)
+{
+    if (unified_sr_context_ok) {
+        ffxVkUnifiedSrDestroy(&unified_sr_context);
+    }
+    memset(&unified_sr_context, 0, sizeof(unified_sr_context));
+    unified_sr_context_ok = false;
+    unified_sr_ctx_dw = unified_sr_ctx_dh = 0;
+    unified_sr_reset_next = true;
+}
+
+static VkResult unified_sr_create_context(void)
+{
+    unified_sr_destroy_context();
+    if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
+        return VK_ERROR_INITIALIZATION_FAILED;
+
+    FfxVkUnifiedSrCreateInfo create_info;
+    memset(&create_info, 0, sizeof(create_info));
+    create_info.structSize = sizeof(create_info);
+    create_info.version = FFX_VK_UNIFIED_SR_VERSION;
+    create_info.device = qvk.device;
+    create_info.physicalDevice = qvk.physical_device;
+    create_info.preferredUpscaler = FFX_VK_UPSCALER_AUTO;
+
+    switch (requested_fsr_quality()) {
+    case VKPT_FSR_QUALITY_NATIVE_AA:
+        create_info.quality = FFX_VK_QUALITY_PRESET_NATIVE;
+        break;
+    case VKPT_FSR_QUALITY_QUALITY:
+        create_info.quality = FFX_VK_QUALITY_PRESET_QUALITY;
+        break;
+    case VKPT_FSR_QUALITY_BALANCED:
+        create_info.quality = FFX_VK_QUALITY_PRESET_BALANCED;
+        break;
+    case VKPT_FSR_QUALITY_PERFORMANCE:
+        create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
+        break;
+    case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE:
+        create_info.quality = FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE;
+        break;
+    default:
+        create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
+        break;
+    }
+
+    create_info.maxInputExtent = qvk.extent_unscaled;
+    create_info.maxOutputExtent = qvk.extent_unscaled;
+
+    VkResult result = ffxVkUnifiedSrCreate(&unified_sr_context, &create_info);
+    if (result != VK_SUCCESS) {
+        Com_WPrintf("Unified SR: context creation failed (%d); using fallback.\n", (int)result);
+        return result;
+    }
+
+    unified_sr_context_ok = true;
+    unified_sr_reset_next = true;
+    unified_sr_ctx_dw = qvk.extent_unscaled.width;
+    unified_sr_ctx_dh = qvk.extent_unscaled.height;
+    Com_Printf("Unified SR: auto-selected %s for GPU %s (%s, max %ux%u).\n",
+               ffxVkUnifiedSrGetUpscalerName(unified_sr_context.activeUpscaler),
+               unified_sr_context.capabilities.deviceName,
+               ffxVkUnifiedSrGetGpuTierName(unified_sr_context.capabilities.tier),
+               unified_sr_ctx_dw, unified_sr_ctx_dh);
+    return VK_SUCCESS;
+}
+
+static bool xess_is_enabled(void)
+{
+    return requested_upscaler() == VKPT_UPSCALER_XESS &&
+           xess_context_ok &&
+           xess_ctx_dw == qvk.extent_unscaled.width &&
+           xess_ctx_dh == qvk.extent_unscaled.height &&
+           upscaler_frame_is_eligible(VKPT_UPSCALER_XESS);
+}
+
+static bool dlss_is_enabled(void)
+{
+    return requested_upscaler() == VKPT_UPSCALER_DLSS &&
+           dlss_context_ok &&
+           dlss_ctx_dw == qvk.extent_unscaled.width &&
+           dlss_ctx_dh == qvk.extent_unscaled.height &&
+           upscaler_frame_is_eligible(VKPT_UPSCALER_DLSS);
+}
+
+static bool unified_sr_is_enabled(void)
+{
+    return requested_upscaler() == VKPT_UPSCALER_UNIFIED &&
+           unified_sr_context_ok &&
+           unified_sr_ctx_dw == qvk.extent_unscaled.width &&
+           unified_sr_ctx_dh == qvk.extent_unscaled.height &&
+           upscaler_frame_is_eligible(VKPT_UPSCALER_UNIFIED);
+}
 #endif
 
 static bool fsr4_is_enabled(void)
@@ -1175,6 +1433,48 @@ static bool resolve_upscaler(int *active, const char **reason)
         *reason = "FSR3 3.1.5 public-SDK Vulkan experiment active";
         return true;
     }
+    if (requested == VKPT_UPSCALER_XESS) {
+        if (!xess_context_ok) {
+            *reason = "fallback: Intel XeSS Vulkan context unavailable";
+            return false;
+        }
+        if (xess_ctx_dw != qvk.extent_unscaled.width ||
+            xess_ctx_dh != qvk.extent_unscaled.height) {
+            *reason = "fallback: XeSS context resize pending";
+            return false;
+        }
+        *active = VKPT_UPSCALER_XESS;
+        *reason = "Intel XeSS Super Resolution active";
+        return true;
+    }
+    if (requested == VKPT_UPSCALER_DLSS) {
+        if (!dlss_context_ok) {
+            *reason = "fallback: NVIDIA DLSS / AMD d4r Vulkan context unavailable";
+            return false;
+        }
+        if (dlss_ctx_dw != qvk.extent_unscaled.width ||
+            dlss_ctx_dh != qvk.extent_unscaled.height) {
+            *reason = "fallback: DLSS context resize pending";
+            return false;
+        }
+        *active = VKPT_UPSCALER_DLSS;
+        *reason = "NVIDIA DLSS / AMD d4r Super Resolution active";
+        return true;
+    }
+    if (requested == VKPT_UPSCALER_UNIFIED) {
+        if (!unified_sr_context_ok) {
+            *reason = "fallback: Unified Super Resolution context unavailable";
+            return false;
+        }
+        if (unified_sr_ctx_dw != qvk.extent_unscaled.width ||
+            unified_sr_ctx_dh != qvk.extent_unscaled.height) {
+            *reason = "fallback: Unified SR context resize pending";
+            return false;
+        }
+        *active = VKPT_UPSCALER_UNIFIED;
+        *reason = "Unified Super Resolution (Auto) active";
+        return true;
+    }
 #endif
 
     /* A build may deliberately omit the public FSR3 closure.  Do not let a
@@ -1254,6 +1554,12 @@ static const char *fsr_diagnostic_provider_name(int provider)
         return "FSR4 source-v07 INT8/DOT4 Vulkan";
     case VKPT_UPSCALER_FSR3_315:
         return "FSR3 3.1.5 public-SDK Vulkan experiment";
+    case VKPT_UPSCALER_XESS:
+        return "Intel XeSS Super Resolution";
+    case VKPT_UPSCALER_DLSS:
+        return "NVIDIA DLSS / AMD d4r Super Resolution";
+    case VKPT_UPSCALER_UNIFIED:
+        return "Unified Super Resolution (Auto)";
     default:
         return "Q2RTX fallback";
     }
@@ -1461,6 +1767,14 @@ void vkpt_fsr_print_diagnostics(void)
         else
             Com_Printf("  FSR3 3.1.5 memory: unavailable (%d)\n", (int)result);
     }
+    Com_Printf("  XeSS: context=%s path=%s\n",
+        xess_context_ok ? "ready" : "not ready",
+        xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute");
+    Com_Printf("  DLSS / d4r: context=%s arch=%u\n",
+        dlss_context_ok ? "ready" : "not ready", (unsigned int)dlss_create_info.gpuArch);
+    Com_Printf("  Unified SR: context=%s active=%s\n",
+        unified_sr_context_ok ? "ready" : "not ready",
+        ffxVkUnifiedSrGetUpscalerName(unified_sr_context.activeUpscaler));
     Com_Printf("  FSR3 FI/OF: requested=%s backend=%s context=%s active=%s "
                "rendered=%.1f generated=%.1f\n",
         cvar_flt_frame_generation && cvar_flt_frame_generation->integer ? "on" : "off",
@@ -1639,6 +1953,9 @@ void vkpt_fsr_request_reset(void)
 #ifdef VKPT_FSR3
     fsr3_reset_next = true;
     fsr3_315_reset_next = true;
+    xess_reset_next = true;
+    dlss_reset_next = true;
+    unified_sr_reset_next = true;
     /* Frame interpolation has independent optical-flow/history state. A
      * camera cut, projection change, provider switch, or temporal input reset
      * must invalidate it even when the upscaler remains usable. */
@@ -1714,6 +2031,21 @@ VkResult vkpt_fsr_create_pipelines(void)
         fsr3_315_ctx_dh != qvk.extent_unscaled.height) {
         (void)fsr3_315_create_context();
     }
+    if (!xess_context_ok ||
+        xess_ctx_dw != qvk.extent_unscaled.width ||
+        xess_ctx_dh != qvk.extent_unscaled.height) {
+        (void)xess_create_context();
+    }
+    if (!dlss_context_ok ||
+        dlss_ctx_dw != qvk.extent_unscaled.width ||
+        dlss_ctx_dh != qvk.extent_unscaled.height) {
+        (void)dlss_create_context();
+    }
+    if (!unified_sr_context_ok ||
+        unified_sr_ctx_dw != qvk.extent_unscaled.width ||
+        unified_sr_ctx_dh != qvk.extent_unscaled.height) {
+        (void)unified_sr_create_context();
+    }
     if (cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0 &&
         (!fsr3_frame_generation_context_ok ||
          fsr3_frame_generation_dw != qvk.extent_unscaled.width ||
@@ -1741,6 +2073,9 @@ VkResult vkpt_fsr_destroy_pipelines(void)
      * Tear down the complete tier-specific backend so coherent pre/model/post
      * pipelines and persistent resource extents are rebuilt together. */
 #ifdef VKPT_FSR3
+    unified_sr_destroy_context();
+    dlss_destroy_context();
+    xess_destroy_context();
     fsr3_destroy_frame_generation_context();
     fsr3_destroy_context();
     fsr3_315_destroy_context();
@@ -2122,7 +2457,10 @@ bool vkpt_fsr_frame_generation_is_ready(void)
      * have the same analytical-FG input contract as the proven 1.1.4 path. */
     if (!((upscaler == VKPT_UPSCALER_FSR3 && fsr3_is_enabled()) ||
           (upscaler == VKPT_UPSCALER_FSR3_315 && fsr3_315_is_enabled()) ||
-          (upscaler == VKPT_UPSCALER_FSR4 && fsr4_is_enabled())))
+          (upscaler == VKPT_UPSCALER_FSR4 && fsr4_is_enabled()) ||
+          (upscaler == VKPT_UPSCALER_XESS && xess_is_enabled()) ||
+          (upscaler == VKPT_UPSCALER_DLSS && dlss_is_enabled()) ||
+          (upscaler == VKPT_UPSCALER_UNIFIED && unified_sr_is_enabled())))
         return false;
     const bool sdk_316 = cvar_flt_frame_generation_backend &&
         cvar_flt_frame_generation_backend->integer == 1;
@@ -2917,6 +3255,256 @@ static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
     END_PERF_MARKER(cmd_buf, PROFILER_FSR);
     return VK_SUCCESS;
 }
+
+static VkResult xess_dispatch(VkCommandBuffer cmd_buf)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    FfxVkXessDispatchInfo dispatch;
+    char temporal_reason[128];
+    VkImageSubresourceRange color_range = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+    };
+    const uint32_t required_inputs =
+        VKPT_TEMPORAL_INPUT_SCENE_COLOR |
+        VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+        VKPT_TEMPORAL_INPUT_DEVICE_DEPTH;
+
+    if (!xess_is_enabled())
+        return VK_SUCCESS;
+    if (!vkpt_temporal_validate_current_frame(required_inputs,
+            temporal_reason, sizeof(temporal_reason)) ||
+        !(frame->flags & VKPT_TEMPORAL_FRAME_RECTILINEAR_PROJECTION) ||
+        frame->inputs.device_depth_description.convention !=
+            VKPT_TEMPORAL_DEPTH_DEVICE_ZERO_TO_ONE) {
+        Com_WPrintf("XeSS: temporal inputs rejected: %s\n",
+            temporal_reason[0] ? temporal_reason : "unsupported projection/depth convention");
+        xess_reset_next = true;
+        return VK_NOT_READY;
+    }
+
+    BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
+
+    const VkptTemporalImage *provider_inputs[] = {
+        &frame->inputs.scene_color,
+        &frame->inputs.motion_vectors,
+        &frame->inputs.device_depth,
+    };
+    for (size_t i = 0; i < sizeof(provider_inputs) / sizeof(provider_inputs[0]); ++i) {
+        const VkptTemporalImage *input = provider_inputs[i];
+        IMAGE_BARRIER_STAGES(cmd_buf, input->producer_stage,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            .image = input->image,
+            .subresourceRange = color_range,
+            .srcAccessMask = input->producer_access,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = input->layout,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        );
+    }
+
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.structSize = sizeof(dispatch);
+    dispatch.contractVersion = FFX_VK_XESS_CONTRACT_VERSION;
+    dispatch.commandBuffer = cmd_buf;
+    dispatch.colorIn = fsr3_temporal_image(
+        &frame->inputs.scene_color, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.depth = fsr3_temporal_image(
+        &frame->inputs.device_depth, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.velocity = fsr3_temporal_image(
+        &frame->inputs.motion_vectors, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.colorOut = fsr3_output_image();
+    dispatch.inputExtent = (VkExtent2D){ frame->render_size.width, frame->render_size.height };
+    dispatch.outputExtent = (VkExtent2D){ frame->display_size.width, frame->display_size.height };
+    dispatch.jitterOffsetX = -frame->camera.jitter_render_pixels[0];
+    dispatch.jitterOffsetY = -frame->camera.jitter_render_pixels[1];
+    dispatch.sharpness = cvar_flt_fsr3_sharpening ? Q_clipf(cvar_flt_fsr3_sharpening->value, 0.0f, 1.0f) : 0.0f;
+    dispatch.resetHistory = (xess_reset_next || !frame->history_valid);
+
+    uint64_t issues = ffxVkXessValidateDispatchInfo(&xess_create_info, &dispatch);
+    if (issues != FFX_VK_XESS_VALIDATION_NONE) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        xess_reset_next = true;
+        Com_WPrintf("XeSS: dispatch validation failed (0x%llx)\n", (unsigned long long)issues);
+        return VK_ERROR_VALIDATION_FAILED_EXT;
+    }
+
+    xess_reset_next = false;
+    copy_upscaled_output_to_taa(cmd_buf, frame);
+    END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    return VK_SUCCESS;
+}
+
+static VkResult dlss_dispatch(VkCommandBuffer cmd_buf)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    FfxVkDlssDispatchInfo dispatch;
+    char temporal_reason[128];
+    VkImageSubresourceRange color_range = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+    };
+    const uint32_t required_inputs =
+        VKPT_TEMPORAL_INPUT_SCENE_COLOR |
+        VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+        VKPT_TEMPORAL_INPUT_DEVICE_DEPTH;
+
+    if (!dlss_is_enabled())
+        return VK_SUCCESS;
+    if (!vkpt_temporal_validate_current_frame(required_inputs,
+            temporal_reason, sizeof(temporal_reason)) ||
+        !(frame->flags & VKPT_TEMPORAL_FRAME_RECTILINEAR_PROJECTION) ||
+        frame->inputs.device_depth_description.convention !=
+            VKPT_TEMPORAL_DEPTH_DEVICE_ZERO_TO_ONE) {
+        Com_WPrintf("DLSS: temporal inputs rejected: %s\n",
+            temporal_reason[0] ? temporal_reason : "unsupported projection/depth convention");
+        dlss_reset_next = true;
+        return VK_NOT_READY;
+    }
+
+    BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
+
+    const VkptTemporalImage *provider_inputs[] = {
+        &frame->inputs.scene_color,
+        &frame->inputs.motion_vectors,
+        &frame->inputs.device_depth,
+    };
+    for (size_t i = 0; i < sizeof(provider_inputs) / sizeof(provider_inputs[0]); ++i) {
+        const VkptTemporalImage *input = provider_inputs[i];
+        IMAGE_BARRIER_STAGES(cmd_buf, input->producer_stage,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            .image = input->image,
+            .subresourceRange = color_range,
+            .srcAccessMask = input->producer_access,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = input->layout,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        );
+    }
+
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.structSize = sizeof(dispatch);
+    dispatch.contractVersion = FFX_VK_DLSS_CONTRACT_VERSION;
+    dispatch.flags = FFX_VK_DLSS_FLAG_AUTO_EXPOSURE | FFX_VK_DLSS_FLAG_HDR_INPUT;
+    dispatch.renderSize = (FfxVkPortableExtent2D){ frame->render_size.width, frame->render_size.height };
+    dispatch.color = fsr3_temporal_image(
+        &frame->inputs.scene_color, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.depth = fsr3_temporal_image(
+        &frame->inputs.device_depth, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.motionVectors = fsr3_temporal_image(
+        &frame->inputs.motion_vectors, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.output = fsr3_output_image();
+    dispatch.jitterOffset = (FfxVkPortableFloat2){
+        -frame->camera.jitter_render_pixels[0],
+        -frame->camera.jitter_render_pixels[1]
+    };
+    dispatch.motionVectorScale = (FfxVkPortableFloat2){
+        frame->inputs.motion_description.to_render_pixels[0] > 0.0f
+            ? frame->inputs.motion_description.to_render_pixels[0] : (float)frame->render_size.width,
+        frame->inputs.motion_description.to_render_pixels[1] > 0.0f
+            ? frame->inputs.motion_description.to_render_pixels[1] : (float)frame->render_size.height
+    };
+    dispatch.verticalFov = frame->camera.vertical_fov_radians > 0.0f
+        ? frame->camera.vertical_fov_radians : 1.0f;
+    dispatch.nearZ = frame->camera.near_plane > 0.0f
+        ? frame->camera.near_plane : 0.1f;
+    dispatch.farZ = frame->camera.far_plane > dispatch.nearZ
+        ? frame->camera.far_plane : 1000.0f;
+    dispatch.preExposure = 1.0f;
+    dispatch.frameReset = (dlss_reset_next || !frame->history_valid) ? VK_TRUE : VK_FALSE;
+
+    uint64_t issues = 0;
+    FfxVkPortableResult result = ffxVkDlssValidateDispatchInfo(&dlss_create_info, &dispatch, &issues);
+    if (result != FFX_VK_PORTABLE_OK || issues != 0) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        dlss_reset_next = true;
+        Com_WPrintf("DLSS: dispatch validation failed (%d, 0x%llx)\n",
+                    (int)result, (unsigned long long)issues);
+        return VK_ERROR_VALIDATION_FAILED_EXT;
+    }
+
+    dlss_reset_next = false;
+    copy_upscaled_output_to_taa(cmd_buf, frame);
+    END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    return VK_SUCCESS;
+}
+
+static VkResult unified_sr_dispatch(VkCommandBuffer cmd_buf)
+{
+    const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
+    FfxVkUnifiedSrDispatchInfo dispatch;
+    char temporal_reason[128];
+    VkImageSubresourceRange color_range = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+    };
+    const uint32_t required_inputs =
+        VKPT_TEMPORAL_INPUT_SCENE_COLOR |
+        VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
+        VKPT_TEMPORAL_INPUT_DEVICE_DEPTH;
+
+    if (!unified_sr_is_enabled())
+        return VK_SUCCESS;
+    if (!vkpt_temporal_validate_current_frame(required_inputs,
+            temporal_reason, sizeof(temporal_reason)) ||
+        !(frame->flags & VKPT_TEMPORAL_FRAME_RECTILINEAR_PROJECTION) ||
+        frame->inputs.device_depth_description.convention !=
+            VKPT_TEMPORAL_DEPTH_DEVICE_ZERO_TO_ONE) {
+        Com_WPrintf("Unified SR: temporal inputs rejected: %s\n",
+            temporal_reason[0] ? temporal_reason : "unsupported projection/depth convention");
+        unified_sr_reset_next = true;
+        return VK_NOT_READY;
+    }
+
+    BEGIN_PERF_MARKER(cmd_buf, PROFILER_FSR);
+
+    const VkptTemporalImage *provider_inputs[] = {
+        &frame->inputs.scene_color,
+        &frame->inputs.motion_vectors,
+        &frame->inputs.device_depth,
+    };
+    for (size_t i = 0; i < sizeof(provider_inputs) / sizeof(provider_inputs[0]); ++i) {
+        const VkptTemporalImage *input = provider_inputs[i];
+        IMAGE_BARRIER_STAGES(cmd_buf, input->producer_stage,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            .image = input->image,
+            .subresourceRange = color_range,
+            .srcAccessMask = input->producer_access,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = input->layout,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        );
+    }
+
+    memset(&dispatch, 0, sizeof(dispatch));
+    dispatch.structSize = sizeof(dispatch);
+    dispatch.version = FFX_VK_UNIFIED_SR_VERSION;
+    dispatch.commandBuffer = cmd_buf;
+    dispatch.colorIn = fsr3_temporal_image(
+        &frame->inputs.scene_color, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.depth = fsr3_temporal_image(
+        &frame->inputs.device_depth, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.motionVectors = fsr3_temporal_image(
+        &frame->inputs.motion_vectors, FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+    dispatch.colorOut = fsr3_output_image();
+    dispatch.inputExtent = (VkExtent2D){ frame->render_size.width, frame->render_size.height };
+    dispatch.outputExtent = (VkExtent2D){ frame->display_size.width, frame->display_size.height };
+    dispatch.jitterOffsetX = -frame->camera.jitter_render_pixels[0];
+    dispatch.jitterOffsetY = -frame->camera.jitter_render_pixels[1];
+    dispatch.sharpness = cvar_flt_fsr3_sharpening ? Q_clipf(cvar_flt_fsr3_sharpening->value, 0.0f, 1.0f) : 0.0f;
+    dispatch.frameTimeMs = frame->frame_time_ms > 0.0f ? frame->frame_time_ms : 16.667f;
+    dispatch.resetHistory = (unified_sr_reset_next || !frame->history_valid);
+
+    VkResult result = ffxVkUnifiedSrDispatch(&unified_sr_context, &dispatch);
+    if (result != VK_SUCCESS) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        unified_sr_reset_next = true;
+        Com_WPrintf("Unified SR: dispatch failed (%d)\n", (int)result);
+        return result;
+    }
+
+    unified_sr_reset_next = false;
+    copy_upscaled_output_to_taa(cmd_buf, frame);
+    END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+    return VK_SUCCESS;
+}
 #endif
 
 void vkpt_fsr_retire(uint32_t frame_slot)
@@ -3205,6 +3793,12 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
 VkResult vkpt_fsr_do(VkCommandBuffer cmd_buf)
 {
 #ifdef VKPT_FSR3
+    if (unified_sr_is_enabled())
+        return unified_sr_dispatch(cmd_buf);
+    if (dlss_is_enabled())
+        return dlss_dispatch(cmd_buf);
+    if (xess_is_enabled())
+        return xess_dispatch(cmd_buf);
     if (fsr3_315_is_enabled())
         return fsr3_315_dispatch(cmd_buf);
     if (fsr3_is_enabled())

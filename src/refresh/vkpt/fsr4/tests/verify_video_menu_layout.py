@@ -104,7 +104,13 @@ def verify(menu_path: Path) -> None:
     # Provider controls must carry a runtime condition, not merely explanatory
     # help text. The menu parser supports a single (non-nested) condition.
     expected_conditions = {
-        "flt_fsr3_sharpening": {"ifeq flt_upscaler 1", "ifeq flt_upscaler 3"},
+        "flt_fsr3_sharpening": {
+            "ifeq flt_upscaler 1",
+            "ifeq flt_upscaler 3",
+            "ifeq flt_upscaler 4",
+            "ifeq flt_upscaler 5",
+            "ifeq flt_upscaler 6",
+        },
         "flt_fsr4_sharpening": {"ifeq flt_upscaler 2"},
         "flt_fsr4_auto_exposure": {"ifeq flt_upscaler 2"},
         "flt_fsr4_dynamic_resolution": {"ifeq flt_upscaler 2"},

@@ -743,9 +743,11 @@ cannot run.
 
 #### `flt_upscaler`
 Selects the temporal reconstruction provider: 0 uses the Q2RTX `flt_taa`
-fallback, 1 selects the native Vulkan FSR 3.1.4 upscaler, and 2 selects the
-experimental FSR4 source-v07 INT8/DOT4 upscaler. Value 3 selects the
-experimental public-SDK FSR3 3.1.5 Vulkan bridge. The default is 0.
+fallback, 1 selects the native Vulkan FSR 3.1.4 upscaler, 2 selects the
+experimental FSR4 source-v07 INT8/DOT4 upscaler, 3 selects the experimental
+public-SDK FSR3 3.1.5 Vulkan bridge, 4 selects Intel XeSS Super Resolution,
+5 selects NVIDIA DLSS / AMD d4r Super Resolution, and 6 selects Unified Super
+Resolution (automatic hardware vendor and tier detection). The default is 0.
 
 FSR3 and FSR4 v07 both use the discrete `flt_fsr_quality` choice. FSR4 loads a
 separate coherent INT8 graph, initializer payload, and pass-0 weights for each
@@ -916,7 +918,8 @@ rates, GPU timestamps, or a substitute for the remaining explicit pacing work.
 
 Read-only diagnostics published by the provider resolver. `flt_upscaler_active`
 is 0 for the Q2RTX fallback, 1 for native FSR3 3.1.4, 2 for experimental FSR4
-v07, and 3 for experimental public-SDK FSR3 3.1.5. `flt_upscaler_reason`
+v07, 3 for experimental public-SDK FSR3 3.1.5, 4 for Intel XeSS, 5 for NVIDIA DLSS / AMD d4r,
+and 6 for Unified Super Resolution (Auto). `flt_upscaler_reason`
 states the selected active backend or the precise fallback reason, such as
 missing context, invalid extent, multiple GPUs, or a non-rectilinear
 projection. When the experimental FSR4 v07 graph is incomplete, it identifies
@@ -948,6 +951,9 @@ zero-dependency Vulkan targets:
   U-Net convolutional pipeline and DP4a cross-vendor execution.
 - `ffx-vulkan::dlss-contract`: NVIDIA DLSS and AMD `countervolts/d4r` contract
   supporting native Swin WMMA layers, FP8 math, and zero-copy external VRAM handles.
+- `ffx-vulkan::mlframegen-contract`: AMD ML Frame Generation 4.0.1 contract modeling
+  bidirectional neural motion vectors, multi-frame interpolation multipliers (2x, 3x, 4x),
+  hardware execution tiers (Generic Compute, DP4a, WMMA/FP8, Tensor Cores), and WSI presentation.
 - `ffx-vulkan::framegeneration-presenter-policy`: VRR presentation policy
   selecting `VK_PRESENT_MODE_FIFO_RELAXED_KHR` when VSync is off to avoid
   frametime quantization drops on Adaptive Sync / VRR monitors.

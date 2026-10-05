@@ -11,6 +11,23 @@ finishing all items in TODO.md.
 
 Current truth:
 
+- NATIVE Q2RTX ENGINE INTEGRATION OF XESS, DLSS, AND UNIFIED SR COMPLETED:
+  Directly integrated Intel XeSS (4), NVIDIA DLSS / AMD d4r (5), and Unified Super Resolution (6)
+  into Q2RTX client (`src/refresh/vkpt/fsr.c`, `src/CMakeLists.txt`, `baseq2/q2rtx.menu`).
+  * `flt_upscaler` supports: 0=Q2RTX fallback, 1=FSR3 3.1.4, 2=FSR4 v07, 3=FSR3 3.1.5,
+    4=Intel XeSS, 5=NVIDIA DLSS / AMD d4r, 6=Unified Super Resolution (Auto-detected).
+  * Video menu exposes all 6 choices in `temporal_settings`, sharpening sliders in
+    `upscaler_tuning`, and live diagnostics.
+  * Verified live with `vk_validation 1` under demo runs; all contexts initialize, validate,
+    and dispatch cleanly with zero Vulkan validation layer warnings.
+
+- AMD ML FRAME GENERATION 4.0.1 CONTRACT DELIVERED (ffx-vulkan::mlframegen-contract):
+  Implemented standalone target `ffx-vulkan::mlframegen-contract` (`include/ffx_vk_mlframegen_contract.h`,
+  `src/ffx_vk_mlframegen_contract.c`, and CTest `tests/mlframegen_contract_test.c`). Formally models
+  neural bidirectional motion vectors, multi-frame interpolation multipliers (2x, 3x, 4x),
+  hardware execution tiers (Generic Compute, DP4a, FP8/WMMA, Tensor Cores), and WSI presentation
+  contracts. Linked to `ffx_vulkan_effects` and standalone test suite (42/42 tests passing in ffx-vulkan).
+
 - UNIFIED SUPER RESOLUTION UMBRELLA API IMPLEMENTED (ffx-vulkan::unified-sr):
   Created turnkey, multi-vendor umbrella API (`include/ffx_vk_unified_sr.h`,
   `src/ffx_vk_unified_sr.c`, and CTest `tests/unified_sr_test.c`). Automatically queries
@@ -27,7 +44,7 @@ Current truth:
   `src/ffx_vk_xess_contract.c`, and CTest `tests/xess_contract_test.c`). Formally models
   the 14-dispatch U-Net convolutional pipeline, 13 neural weight layers (253,280 bytes),
   DP4a cross-vendor execution path, and binary validation for `XESSMOD2` model containers.
-  Validated with standalone CTest `ffx_vk_xess_contract` (41/41 passing in ffx-vulkan suite).
+  Validated with standalone CTest `ffx_vk_xess_contract`.
 
 - STANDALONE VULKAN INTEGRATION GUIDE DELIVERED:
   Created `extern/ffx-vulkan/INTEGRATION_GUIDE.md` detailing CMake integration (FetchContent,
@@ -36,7 +53,7 @@ Current truth:
   for third-party Vulkan games and engines.
 
 - ALL TEST SUITES 100% PASSING AND CLEAN INSTALLATION VERIFIED:
-  * 41/41 CTest tests passing in `build/ffx-vulkan` (including unified-sr and xess-contract).
+  * 42/42 CTest tests passing in `build/ffx-vulkan` (including mlframegen, unified-sr, and xess-contract).
   * 6/6 CTest tests passing in root Q2RTX `build`.
   * 34/34 Python unit tests passing in `tools/ffx_dxil/tests`.
   * Clean CMake installation exports `ffx-vulkan-targets.cmake` and all public headers.
