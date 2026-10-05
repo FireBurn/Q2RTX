@@ -2,17 +2,37 @@
 
 #include <limits.h>
 
-VkPresentModeKHR ffxVkFrameGenerationSelectPresentMode(
+VkPresentModeKHR ffxVkFrameGenerationSelectPresentModeEx(
     bool frameGenerationEnabled, bool vsyncEnabled,
+    FfxVkFrameGenerationSyncPolicy syncPolicy,
     const VkPresentModeKHR *availableModes, uint32_t availableModeCount)
 {
-    if (frameGenerationEnabled || vsyncEnabled)
+    if (vsyncEnabled)
         return VK_PRESENT_MODE_FIFO_KHR;
+
+    if (frameGenerationEnabled) {
+        if (syncPolicy == FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO) {
+            for (uint32_t i = 0; i < availableModeCount; ++i)
+                if (availableModes && availableModes[i] == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+                    return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+        }
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
 
     for (uint32_t i = 0; i < availableModeCount; ++i)
         if (availableModes && availableModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR)
             return VK_PRESENT_MODE_IMMEDIATE_KHR;
     return VK_PRESENT_MODE_MAILBOX_KHR;
+}
+
+VkPresentModeKHR ffxVkFrameGenerationSelectPresentMode(
+    bool frameGenerationEnabled, bool vsyncEnabled,
+    const VkPresentModeKHR *availableModes, uint32_t availableModeCount)
+{
+    return ffxVkFrameGenerationSelectPresentModeEx(
+        frameGenerationEnabled, vsyncEnabled,
+        FFX_VK_FRAME_GENERATION_SYNC_POLICY_STRICT_FIFO,
+        availableModes, availableModeCount);
 }
 
 uint32_t ffxVkFrameGenerationRequiredImageCount(uint32_t minImageCount,

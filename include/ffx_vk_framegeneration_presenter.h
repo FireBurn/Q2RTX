@@ -15,10 +15,23 @@
 extern "C" {
 #endif
 
+typedef enum FfxVkFrameGenerationSyncPolicy {
+    FFX_VK_FRAME_GENERATION_SYNC_POLICY_STRICT_FIFO = 0,
+    FFX_VK_FRAME_GENERATION_SYNC_POLICY_RELAXED_FIFO = 1,
+} FfxVkFrameGenerationSyncPolicy;
+
 /* FIFO is required for an enabled generated→real pair. Otherwise preserve the
  * normal low-latency preference: Immediate when offered, then Mailbox. */
 VkPresentModeKHR ffxVkFrameGenerationSelectPresentMode(
     bool frameGenerationEnabled, bool vsyncEnabled,
+    const VkPresentModeKHR *availableModes, uint32_t availableModeCount);
+
+/* Extended mode selector with optional VRR / relaxed FIFO policy. When relaxed
+ * FIFO is requested without explicit VSync, VK_PRESENT_MODE_FIFO_RELAXED_KHR is
+ * chosen if available to avoid hard stutter/quantization on VRR displays. */
+VkPresentModeKHR ffxVkFrameGenerationSelectPresentModeEx(
+    bool frameGenerationEnabled, bool vsyncEnabled,
+    FfxVkFrameGenerationSyncPolicy syncPolicy,
     const VkPresentModeKHR *availableModes, uint32_t availableModeCount);
 
 /* A generated and real image can both be acquired while the presentation
