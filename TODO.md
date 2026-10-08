@@ -1042,3 +1042,24 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 - [x] Update Gentoo ebuild packaging in overlay.
   Updated `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild` documenting the native Vulkan
   XeSS, DLSS/d4r, and Unified SR modes in `pkg_postinst`.
+
+- [x] Eliminate compiler warnings across upstream Q2RTX engine code.
+  Fixed const qualifiers in `src/refresh/vkpt/material.c` and `src/shared/shared.c`, removed unused
+  `total_prims` in `src/refresh/vkpt/vertex_buffer.c`, and scoped diagnostic pragma around vendored
+  `src/refresh/stb/stb.c`. Verified 100% warning-free build under GCC with `-Wall -Wextra`.
+
+- [x] Standalone release packaging automation for `ffx-vulkan`.
+  Added CPack configuration to `extern/ffx-vulkan/CMakeLists.txt` and delivered
+  `extern/ffx-vulkan/tools/package_release.sh` generating `.tar.gz` and `.zip` archives with
+  automated SHA256 checksums (`SHA256SUMS.txt`).
+
+- [x] In-game screenshot gallery and automated image quality comparison harness.
+  Implemented `tools/compare_upscaler_images.py` running deterministic uncompressed captures across
+  all upscaler modes with PSNR, RMSE, and MAE similarity evaluation against native baseline, saving
+  gallery crops and writing `doc/image_quality_comparison.md`.
+
+- [x] Visual tuning enhancements for XeSS and DLSS/d4r reconstruction compute shaders.
+  Added luminance-aware bilateral edge-weighting and color bounding box anti-ringing clamp to
+  `xess_unet_reconstruct.comp`. Added feature distance attention weighting and contrast-adaptive
+  high-frequency sharpening to `d4r_swin_reconstruct.comp`. Recompiled SPIR-V 1.6 and regenerated
+  embedded C headers with 100% CTest pass rate.

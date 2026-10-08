@@ -11,6 +11,28 @@ finishing all items in TODO.md.
 
 Current truth:
 
+- ZERO-WARNING ENGINE COMPILATION ACHIEVED:
+  Audited all compiler warnings across Q2RTX and ffx-vulkan. Fixed const qualifier discards in `src/refresh/vkpt/material.c`
+  and `src/shared/shared.c`, removed unused variables in `src/refresh/vkpt/vertex_buffer.c`, and scoped diagnostic pragma
+  around third-party single-header `src/refresh/stb/stb.c`. The entire client, dedicated server, game module, and ffx-vulkan
+  libraries now compile cleanly with zero warnings under GCC with `-Wall -Wextra -Wpedantic`.
+
+- STANDALONE RELEASE PACKAGING AUTOMATION DELIVERED:
+  Configured CPack in `extern/ffx-vulkan/CMakeLists.txt` and created `extern/ffx-vulkan/tools/package_release.sh`.
+  Automates out-of-tree Release build, 100% CTest verification, and artifact generation (`.tar.gz`, `.zip`) with
+  cryptographic checksums (`SHA256SUMS.txt`).
+
+- SCREENSHOT GALLERY AND IMAGE QUALITY COMPARISON HARNESS DELIVERED:
+  Implemented `tools/compare_upscaler_images.py`. Performs deterministic frame captures across all 7 upscaler modes
+  (Native, FSR 3.1.4, FSR 4 v07, FSR 3.1.5, Intel XeSS, NVIDIA DLSS/d4r, and Unified SR), calculates PSNR, RMSE, and
+  MAE metrics, generates high-frequency center crops, and writes `doc/image_quality_comparison.md`.
+
+- ADVANCED VISUAL SHADER TUNING FOR XESS & DLSS/D4R DELIVERED:
+  Enhanced `xess_unet_reconstruct.comp` with luminance-aware bilateral edge-stopping, local color bounding box
+  anti-ringing clamps, and adaptive contrast sharpening. Enhanced `d4r_swin_reconstruct.comp` with RGB feature distance
+  Query-Key token attention and contrast-adaptive high-frequency sharpening. Recompiled SPIR-V 1.6 modules, validated
+  with spirv-val, and refreshed embedded C headers.
+
 - NATIVE COMPUTE SHADERS FOR XESS AND DLSS/D4R DELIVERED:
   Integrated open SPIR-V compute kernels for Intel XeSS (Catmull-Rom bicubic 9-tap filtering, bilateral depth weighting)
   and DLSS/d4r (Swin Transformer 8x8 windowed attention token weighting, bilateral depth edge-stopping). Shaders are

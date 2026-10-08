@@ -26,8 +26,15 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define STBI_FREE(p)              Z_Free(p)
 
 #define STBI_FAILURE_USERMSG
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION

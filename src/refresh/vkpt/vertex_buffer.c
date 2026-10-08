@@ -198,16 +198,12 @@ static void build_model_blas(VkCommandBuffer cmd_buf, model_geometry_t* info, si
 
 	assert(buffer->address);
 
-	uint32_t total_prims = 0;
-
 	for (uint32_t index = 0; index < info->num_geometries; index++)
 	{
 		VkAccelerationStructureGeometryKHR* geometry = info->geometries + index;
 
 		geometry->geometry.triangles.vertexData.deviceAddress = buffer->address
 			+ info->prim_offsets[index] * sizeof(prim_positions_t) + first_vertex_offset;
-
-		total_prims += info->prim_counts[index];
 	}
 
 	VkAccelerationStructureBuildGeometryInfoKHR blasBuildinfo = {

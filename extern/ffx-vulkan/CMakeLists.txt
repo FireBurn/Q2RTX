@@ -807,6 +807,18 @@ if(FFX_VK_PORTABLE_INSTALL)
         ${CMAKE_CURRENT_BINARY_DIR}/ffx-vulkan-config.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/ffx-vulkan-config-version.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ffx-vulkan)
+
+    # Standalone release packaging (CPack)
+    set(CPACK_PACKAGE_NAME "ffx-vulkan")
+    set(CPACK_PACKAGE_VENDOR "FireBurn")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Portable Vulkan Super Resolution and Frame Generation Framework")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "ffx-vulkan")
+    set(CPACK_GENERATOR "TGZ;ZIP")
+    set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    include(CPack)
 endif()
 
 if(FFX_VK_PORTABLE_BUILD_TESTS)

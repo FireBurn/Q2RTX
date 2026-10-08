@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * Intel XeSS 2 / 3 U-Net Convolutional Reconstruction Compute Kernel
- * Multi-tap spatial filtering and convolutional feature synthesis.
+ * Multi-tap spatial filtering, luminance-aware bilateral weighting, and ringing suppression.
  */
 
 #extension GL_EXT_samplerless_texture_functions : enable
@@ -36,6 +36,10 @@ vec4 CatmullRom(float x) {
     );
 }
 
+float Luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
 void main() {
     uvec2 outCoord = gl_GlobalInvocationID.xy;
     if (outCoord.x >= pc.outputExtent.x || outCoord.y >= pc.outputExtent.y)
@@ -49,10 +53,17 @@ void main() {
     vec4 wx = CatmullRom(f.x);
     vec4 wy = CatmullRom(f.y);
 
-    /* 3x3 U-Net feature accumulation with bilateral depth edge-stopping */
+    ivec2 centerCoord = clamp(baseCoord, ivec2(0), ivec2(pc.inputExtent) - 1);
+    vec3 centerColor = texelFetch(s_ColorIn, centerCoord, 0).rgb;
+    float centerDepth = texelFetch(s_DepthIn, centerCoord, 0).r;
+    float centerLuma = Luminance(centerColor);
+
+    /* Local 3x3 color neighborhood bounding box for ringing suppression */
+    vec3 minColor = centerColor;
+    vec3 maxColor = centerColor;
+
     vec3 colorAcc = vec3(0.0);
     float weightAcc = 0.0;
-    float centerDepth = texelFetch(s_DepthIn, clamp(baseCoord, ivec2(0), ivec2(pc.inputExtent) - 1), 0).r;
 
     for (int dy = -1; dy <= 2; ++dy) {
         for (int dx = -1; dx <= 2; ++dx) {
@@ -60,25 +71,40 @@ void main() {
             vec3 tapColor = texelFetch(s_ColorIn, tapCoord, 0).rgb;
             float tapDepth = texelFetch(s_DepthIn, tapCoord, 0).r;
 
+            if (dx >= 0 && dx <= 1 && dy >= 0 && dy <= 1) {
+                minColor = min(minColor, tapColor);
+                maxColor = max(maxColor, tapColor);
+            }
+
             float spatialWeight = (dx >= -1 && dx <= 2 ? (dx == -1 ? wx.x : (dx == 0 ? wx.y : (dx == 1 ? wx.z : wx.w))) : 0.0) *
                                  (dy >= -1 && dy <= 2 ? (dy == -1 ? wy.x : (dy == 0 ? wy.y : (dy == 1 ? wy.z : wy.w))) : 0.0);
 
-            /* Bilateral depth weight to preserve geometric edges */
+            /* Bilateral depth edge-stopping to preserve crisp geometric boundaries */
             float depthDiff = abs(tapDepth - centerDepth);
-            float depthWeight = exp(-depthDiff * 40.0);
+            float depthWeight = exp(-depthDiff * 45.0);
 
-            float totalW = max(0.0, spatialWeight * depthWeight);
+            /* Contrast-aware luminance weighting to eliminate dark halo artifacts */
+            float lumaDiff = abs(Luminance(tapColor) - centerLuma);
+            float lumaWeight = exp(-lumaDiff * 3.5);
+
+            float totalW = max(0.0, spatialWeight * depthWeight * lumaWeight);
             colorAcc += tapColor * totalW;
             weightAcc += totalW;
         }
     }
 
-    vec3 reconstructed = (weightAcc > 1e-5) ? (colorAcc / weightAcc) : texelFetch(s_ColorIn, clamp(baseCoord, ivec2(0), ivec2(pc.inputExtent) - 1), 0).rgb;
+    vec3 reconstructed = (weightAcc > 1e-5) ? (colorAcc / weightAcc) : centerColor;
 
-    /* Optional sharpening */
+    /* Anti-ringing box clamp with conservative 10% headroom */
+    vec3 margin = (maxColor - minColor) * 0.10;
+    reconstructed = clamp(reconstructed, max(vec3(0.0), minColor - margin), maxColor + margin);
+
+    /* Contrast-adaptive high frequency sharpening */
     if (pc.sharpness > 0.0) {
-        vec3 center = texelFetch(s_ColorIn, clamp(baseCoord, ivec2(0), ivec2(pc.inputExtent) - 1), 0).rgb;
-        reconstructed = mix(reconstructed, 2.0 * reconstructed - center, clamp(pc.sharpness * 0.25, 0.0, 0.5));
+        vec3 contrastDiff = reconstructed - centerColor;
+        float lumaContrast = clamp(abs(Luminance(contrastDiff)) / (centerLuma + 0.01), 0.0, 1.0);
+        float sharpFactor = pc.sharpness * (1.0 - lumaContrast * 0.5) * 0.35;
+        reconstructed = mix(reconstructed, 2.0 * reconstructed - centerColor, clamp(sharpFactor, 0.0, 0.5));
     }
 
     imageStore(img_ColorOut, ivec2(outCoord), vec4(max(vec3(0.0), reconstructed), 1.0));
