@@ -168,6 +168,40 @@ FfxVkPortableResult ffxVkDlssGetOptimalRenderResolution(
 const char* ffxVkDlssGetModelName(FfxVkDlssModel model);
 const char* ffxVkDlssGetArchName(FfxVkDlssGpuArch arch);
 
+#define FFX_VK_DLSS_DESCRIPTOR_SET_COUNT 4
+
+/* DLSS / d4r Native Compute Pipeline and Descriptor State */
+typedef struct FfxVkDlssPipeline {
+    VkDevice device;
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSets[FFX_VK_DLSS_DESCRIPTOR_SET_COUNT];
+    VkSampler linearSampler;
+    VkShaderModule shaderModule;
+    uint32_t currentSetIndex;
+} FfxVkDlssPipeline;
+
+/* Access the embedded DLSS / d4r Swin Transformer reconstruction SPIR-V binary */
+const uint32_t* ffxVkDlssGetReconstructSpirv(size_t* outWordCount);
+
+/* Create compute pipeline for DLSS / d4r Swin Transformer reconstruction pass */
+FfxVkPortableResult ffxVkDlssCreatePipeline(
+    VkDevice device,
+    FfxVkDlssPipeline* outPipeline);
+
+/* Destroy compute pipeline resources */
+void ffxVkDlssDestroyPipeline(
+    VkDevice device,
+    FfxVkDlssPipeline* pipeline);
+
+/* Execute DLSS / d4r Swin Transformer reconstruction compute dispatch */
+FfxVkPortableResult ffxVkDlssExecuteDispatch(
+    VkCommandBuffer cmdBuf,
+    FfxVkDlssPipeline* pipeline,
+    const FfxVkDlssDispatchInfo* dispatchInfo);
+
 #if defined(__cplusplus)
 }
 #endif

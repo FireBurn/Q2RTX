@@ -157,12 +157,14 @@ static FfxVkFsr3_3_1_5Resource fsr3_315_output;
 static FfxVkPortableResult fsr3_validate_rayregeneration_bindings(
     const VkptTemporalFrame *frame, uint64_t *issues);
 static FfxVkXessCreateInfo xess_create_info;
+static FfxVkXessPipeline xess_pipeline;
 static bool xess_context_ok = false;
 static bool xess_reset_next = true;
 static uint32_t xess_ctx_dw = 0;
 static uint32_t xess_ctx_dh = 0;
 
 static FfxVkDlssCreateInfo dlss_create_info;
+static FfxVkDlssPipeline dlss_pipeline;
 static bool dlss_context_ok = false;
 static bool dlss_reset_next = true;
 static uint32_t dlss_ctx_dw = 0;
@@ -1118,6 +1120,9 @@ static bool fsr3_315_is_enabled(void)
 
 static void xess_destroy_context(void)
 {
+    if (xess_pipeline.pipeline != VK_NULL_HANDLE) {
+        ffxVkXessDestroyPipeline(qvk.device, &xess_pipeline);
+    }
     memset(&xess_create_info, 0, sizeof(xess_create_info));
     xess_context_ok = false;
     xess_ctx_dw = xess_ctx_dh = 0;
@@ -1169,6 +1174,12 @@ static VkResult xess_create_context(void)
         return VK_ERROR_FEATURE_NOT_PRESENT;
     }
 
+    FfxVkPortableResult pres = ffxVkXessCreatePipeline(qvk.device, &xess_pipeline);
+    if (pres != FFX_VK_PORTABLE_OK) {
+        Com_WPrintf("XeSS: compute pipeline creation failed (%d); using fallback.\n", (int)pres);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+
     xess_context_ok = true;
     xess_reset_next = true;
     xess_ctx_dw = qvk.extent_unscaled.width;
@@ -1181,6 +1192,9 @@ static VkResult xess_create_context(void)
 
 static void dlss_destroy_context(void)
 {
+    if (dlss_pipeline.pipeline != VK_NULL_HANDLE) {
+        ffxVkDlssDestroyPipeline(qvk.device, &dlss_pipeline);
+    }
     memset(&dlss_create_info, 0, sizeof(dlss_create_info));
     dlss_context_ok = false;
     dlss_ctx_dw = dlss_ctx_dh = 0;
@@ -1240,6 +1254,12 @@ static VkResult dlss_create_context(void)
     if (result != FFX_VK_PORTABLE_OK || issues != 0) {
         Com_WPrintf("DLSS: create info validation failed (%d, 0x%llx); using fallback.\n",
                     (int)result, (unsigned long long)issues);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+
+    FfxVkPortableResult pres = ffxVkDlssCreatePipeline(qvk.device, &dlss_pipeline);
+    if (pres != FFX_VK_PORTABLE_OK) {
+        Com_WPrintf("DLSS: compute pipeline creation failed (%d); using fallback.\n", (int)pres);
         return VK_ERROR_FEATURE_NOT_PRESENT;
     }
 
@@ -2231,6 +2251,7 @@ static FfxVkPortableImage fsr3_temporal_image(
     result.usage = image->usage;
     result.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     result.state = state;
+    result.view = image->view;
     return result;
 }
 
@@ -2257,6 +2278,7 @@ static FfxVkPortableImage fsr3_rayregeneration_output_image(
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     result.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     result.state = FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS;
+    result.view = qvk.images_views[image_index];
     return result;
 }
 
@@ -2412,6 +2434,7 @@ static FfxVkPortableImage fsr3_output_image(void)
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     result.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     result.state = FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS;
+    result.view = qvk.images_views[VKPT_IMG_FSR_EASU_OUTPUT];
     return result;
 }
 
@@ -3329,6 +3352,13 @@ static VkResult xess_dispatch(VkCommandBuffer cmd_buf)
     }
 
     xess_reset_next = false;
+    FfxVkPortableResult pres = ffxVkXessExecuteDispatch(cmd_buf, &xess_pipeline, &dispatch);
+    if (pres != FFX_VK_PORTABLE_OK) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        xess_reset_next = true;
+        Com_WPrintf("XeSS: compute dispatch failed (%d)\n", (int)pres);
+        return VK_ERROR_UNKNOWN;
+    }
     copy_upscaled_output_to_taa(cmd_buf, frame);
     END_PERF_MARKER(cmd_buf, PROFILER_FSR);
     return VK_SUCCESS;
@@ -3422,6 +3452,13 @@ static VkResult dlss_dispatch(VkCommandBuffer cmd_buf)
     }
 
     dlss_reset_next = false;
+    FfxVkPortableResult pres = ffxVkDlssExecuteDispatch(cmd_buf, &dlss_pipeline, &dispatch);
+    if (pres != FFX_VK_PORTABLE_OK) {
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        dlss_reset_next = true;
+        Com_WPrintf("DLSS: compute dispatch failed (%d)\n", (int)pres);
+        return VK_ERROR_UNKNOWN;
+    }
     copy_upscaled_output_to_taa(cmd_buf, frame);
     END_PERF_MARKER(cmd_buf, PROFILER_FSR);
     return VK_SUCCESS;

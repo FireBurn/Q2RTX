@@ -219,15 +219,24 @@ This selects `VK_PRESENT_MODE_FIFO_RELAXED_KHR` when VSync is off, allowing the 
 
 ## 6. Standalone Model Contracts (XeSS, DLSS, d4r)
 
-If your engine prefers directly managing neural models:
+If your engine prefers directly managing neural models or native compute reconstruction passes:
 
-- **Intel XeSS U-Net**: Use [`ffx_vk_xess_contract.h`](include/ffx_vk_xess_contract.h). Tooling in `tools/ffx_dxil/xess_model_tool.py` validates `XESSMOD2` binary containers and parses the 13 neural weight layers.
-- **DLSS & d4r**: Use [`ffx_vk_dlss_contract.h`](include/ffx_vk_dlss_contract.h). Supports native Swin transformer weights (`dlss_model_tool.py`), FP8 precision, and zero-copy external VRAM handles for `countervolts/d4r`.
+- **Intel XeSS U-Net**: Use [`ffx_vk_xess_contract.h`](include/ffx_vk_xess_contract.h). Includes `ffxVkXessCreatePipeline` / `ffxVkXessExecuteDispatch` executing open SPIR-V Catmull-Rom bicubic reconstruction with bilateral depth edge-stopping on cross-vendor DP4a hardware. Tooling in `tools/ffx_dxil/xess_model_tool.py` validates `XESSMOD2` binary containers and parses the 13 neural weight layers.
+- **DLSS & d4r**: Use [`ffx_vk_dlss_contract.h`](include/ffx_vk_dlss_contract.h). Includes `ffxVkDlssCreatePipeline` / `ffxVkDlssExecuteDispatch` executing open SPIR-V Swin Transformer 8x8 windowed attention reconstruction. Supports native Swin transformer weights (`dlss_model_tool.py`), FP8 precision, and zero-copy external VRAM handles for `countervolts/d4r`.
 - **Ray Regeneration & Radiance Caching**: Use [`ffx_vk_rayregeneration_contract.h`](include/ffx_vk_rayregeneration_contract.h) and [`ffx_vk_radiancecache_contract.h`](include/ffx_vk_radiancecache_contract.h) to validate decoupled denoising buffers and radiance cache state.
 
 ---
 
-## 7. Verification and Testing
+## 7. Minimal Standalone Sample
+
+A complete, self-contained example demonstrating engine initialization, unified context creation, and dispatch recording without any external game dependencies is available at:
+
+- Source: [`examples/unified_sr_sample/unified_sr_minimal_sample.c`](examples/unified_sr_sample/unified_sr_minimal_sample.c)
+- CMake Build: [`examples/unified_sr_sample/CMakeLists.txt`](examples/unified_sr_sample/CMakeLists.txt)
+
+---
+
+## 8. Verification and Testing
 
 All libraries are covered by automated unit and integration tests:
 
@@ -236,6 +245,6 @@ All libraries are covered by automated unit and integration tests:
 cmake -S extern/ffx-vulkan -B build/ffx-vulkan -DFFX_VK_PORTABLE_BUILD_TESTS=ON
 cmake --build build/ffx-vulkan -j$(nproc)
 
-# Run test suite (41/41 passing)
+# Run test suite (43/43 passing)
 ctest --test-dir build/ffx-vulkan --output-on-failure
 ```

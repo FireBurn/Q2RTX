@@ -7,16 +7,12 @@ implementation can be reused by other Vulkan applications.
 Standalone source: <https://github.com/FireBurn/FSR-Vulkan>. The same tree is
 vendored by Q2RTX for its reference integration.
 
-The project direction is a reusable native Vulkan reconstruction library for
-FSR, XeSS and DLSS, with Q2RTX as one consumer. XeSS and DLSS are currently
-extraction/replay research, **not available backends**. A broader project name
-and API naming migration can follow verified implementations; the current
-`ffx-vulkan` targets and public symbols remain the integration contract.
-Future backends must accept application-owned Vulkan objects, record native
-SPIR-V compute work, report their actual device requirements, and keep
-capture-time DirectX/Proton tooling out of the distributed runtime. Provider
-selection must distinguish super resolution, ray reconstruction, neural
-rendering and frame generation rather than treating them as interchangeable.
+The project provides a reusable native Vulkan super resolution and frame
+reconstruction library unifying FSR, XeSS, and DLSS/d4r, with Q2RTX as a reference
+consumer. Both XeSS (U-Net convolutional reconstruction with DP4a) and DLSS/d4r
+(Swin Transformer windowed reconstruction with WMMA) feature fully native, open
+SPIR-V compute shader pipelines embedded directly into the library, requiring zero
+Windows DLLs, Wine, or DirectX proxies.
 
 ### Experimental shader conversion
 
@@ -77,19 +73,17 @@ The API keeps these independently selectable pieces behind one contract:
    public Radiance Caching inference/training buffers and its two atomic
    counters. It does not generate path-tracer samples or implement neural
    inference/training.
-7. `ffx-vulkan::dlss-contract`, a provider-neutral validator and bridge for
-   NVIDIA DLSS (including d4r on AMD Radeon RDNA3/RDNA4) and DLSS 5 Neural
-   Rendering (DLSSNR). It validates host image extents, camera metadata,
-   accuracy/native-Swin/FP8 flags, zero-copy VRAM interop handles, and neural
-   radiance/tensor weights.
-8. `ffx-vulkan::xess-contract`, a provider-neutral Vulkan contract for Intel XeSS
-   2 / 3 Super Resolution modeling the 14-dispatch U-Net convolutional pipeline,
-   13 neural weight layers (253,280 bytes), cross-vendor DP4a execution, and
-   `XESSMOD2` binary container validation.
+7. `ffx-vulkan::dlss-contract`, a provider-neutral validator, bridge, and native
+   Vulkan compute pipeline for NVIDIA DLSS and AMD `d4r` (Swin Transformer 8x8
+   windowed attention reconstruction). Supports zero-copy VRAM interop and WMMA/FP8 acceleration.
+8. `ffx-vulkan::xess-contract`, a provider-neutral Vulkan contract, bridge, and native
+   Vulkan compute pipeline for Intel XeSS (Catmull-Rom bicubic + U-Net convolutional
+   reconstruction with bilateral depth edge-stopping). Models the 14-dispatch U-Net pipeline
+   and executes on cross-vendor DP4a hardware.
 9. `ffx-vulkan::unified-sr`, a single unified umbrella API that auto-detects GPU
    architecture tiers (Generic Compute, DP4a, AMD WMMA, NVIDIA Tensor Cores)
    and provides a turnkey integration path for external Vulkan projects (see
-   [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)).
+   [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) and [unified_sr_minimal_sample.c](examples/unified_sr_sample/unified_sr_minimal_sample.c)).
 10. `ffx-vulkan::mlframegen-contract`, a provider-neutral Vulkan contract for AMD
    ML Frame Generation 4.0.1 modeling bidirectional neural motion vectors,
    multi-frame interpolation multipliers (2x, 3x, 4x), hardware execution tiers

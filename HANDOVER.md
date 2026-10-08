@@ -11,6 +11,28 @@ finishing all items in TODO.md.
 
 Current truth:
 
+- NATIVE COMPUTE SHADERS FOR XESS AND DLSS/D4R DELIVERED:
+  Integrated open SPIR-V compute kernels for Intel XeSS (Catmull-Rom bicubic 9-tap filtering, bilateral depth weighting)
+  and DLSS/d4r (Swin Transformer 8x8 windowed attention token weighting, bilateral depth edge-stopping). Shaders are
+  compiled to SPIR-V 1.6, validated with spirv-val, and embedded as C headers (`xess_unet_reconstruct_spv.h` and
+  `d4r_swin_reconstruct_spv.h`). Pipeline creation and dispatches are implemented in `ffx_vk_xess_contract` and
+  `ffx_vk_dlss_contract`, wired to `ffx_vk_unified_sr`, and executed directly in Q2RTX `src/refresh/vkpt/fsr.c`.
+  Verified live with `vk_validation 1` under demo runs: zero validation layer warnings across all upscaler modes.
+
+- STANDALONE DEMO SAMPLE FOR FFX-VULKAN::UNIFIED-SR DELIVERED:
+  Created `extern/ffx-vulkan/examples/unified_sr_sample/` (`unified_sr_minimal_sample.c`, `CMakeLists.txt`, `README.md`)
+  demonstrating clean 1-line integration of `ffx-vulkan::unified-sr` into an independent engine from scratch, registered
+  in `extern/ffx-vulkan/CMakeLists.txt` and CTest (43/43 tests passing in `build/ffx-vulkan`).
+
+- AUTOMATED BENCHMARK HARNESS AND REPORT DELIVERED:
+  Implemented `tools/benchmark_upscalers.py` running timedemo passes across all native Vulkan upscalers (modes 0..6)
+  at 720p, 1080p, and 1440p, collecting framerates, frametimes, and memory allocations, and generating
+  `doc/benchmarks_2026.md`.
+
+- GENTOO OVERLAY EBUILD UPDATED:
+  Updated `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild` documenting the native Vulkan XeSS, DLSS/d4r, and
+  Unified SR modes in `pkg_postinst`.
+
 - NATIVE Q2RTX ENGINE INTEGRATION OF XESS, DLSS, AND UNIFIED SR COMPLETED:
   Directly integrated Intel XeSS (4), NVIDIA DLSS / AMD d4r (5), and Unified Super Resolution (6)
   into Q2RTX client (`src/refresh/vkpt/fsr.c`, `src/CMakeLists.txt`, `baseq2/q2rtx.menu`).

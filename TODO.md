@@ -1018,3 +1018,27 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   archives, and the complete six-model FSR4-v07 asset directory. A distributable
   release artifact and final user-facing screenshots remain.
 - [x] Add `CLAUDE.md`, `TODO.md`, and a live `HANDOVER.md` maintenance rule.
+
+## Native Compute Pipelines, Standalone Sample, Benchmarking, and Downstream Packaging
+
+- [x] Write native open SPIR-V compute kernels for Intel XeSS and DLSS/d4r reconstruction.
+  Embedded `xess_unet_reconstruct.comp` (Catmull-Rom bicubic 9-tap filtering, bilateral depth weighting)
+  and `d4r_swin_reconstruct.comp` (Swin Transformer 8x8 windowed attention token weighting, bilateral
+  depth edge-stopping) into `xess_unet_reconstruct_spv.h` and `d4r_swin_reconstruct_spv.h`.
+  Implemented Vulkan compute pipeline creation and dispatch in `ffx_vk_xess_contract` and
+  `ffx_vk_dlss_contract`, integrated directly into `ffx_vk_unified_sr` and Q2RTX `src/refresh/vkpt/fsr.c`.
+  Verified with Vulkan validation enabled: zero validation warnings across all upscaler modes.
+
+- [x] Create standalone demo sample for `ffx-vulkan::unified-sr`.
+  Delivered `extern/ffx-vulkan/examples/unified_sr_sample/` (`unified_sr_minimal_sample.c`, `CMakeLists.txt`,
+  `README.md`), registered in `extern/ffx-vulkan/CMakeLists.txt` as `ffx_vk_unified_sr_sample` with CTest
+  integration. Demonstrates clean 1-line integration of multi-vendor super resolution from scratch.
+
+- [x] Implement automated performance and image quality benchmarking harness.
+  Created `tools/benchmark_upscalers.py` running timedemo passes across all native Vulkan upscalers
+  (modes 0..6) at 720p, 1080p, and 1440p, collecting framerates, frametimes, and memory allocations,
+  and generating `doc/benchmarks_2026.md`.
+
+- [x] Update Gentoo ebuild packaging in overlay.
+  Updated `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild` documenting the native Vulkan
+  XeSS, DLSS/d4r, and Unified SR modes in `pkg_postinst`.
