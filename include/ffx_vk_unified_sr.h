@@ -113,6 +113,8 @@ typedef struct FfxVkUnifiedSrContext {
     FfxVkGpuCapabilities capabilities;
     FfxVkUnifiedSrCreateInfo createInfo;
     void *backendContext;
+    FfxVkXessPipeline xessPipeline;
+    FfxVkDlssPipeline dlssPipeline;
 } FfxVkUnifiedSrContext;
 
 /* Query GPU vendor, architecture tier, and recommend optimal upscaler */

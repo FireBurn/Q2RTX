@@ -159,5 +159,20 @@ int main(void) {
     assert(issues & FFX_VK_DLSS_VALIDATION_IMAGE_FORMAT);
     dispatch_info.indirectDiffuse.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
+    /* 5. Test embedded SPIR-V binary query and pipeline API safety */
+    size_t spirvWordCount = 0;
+    const uint32_t *spirvWords = ffxVkDlssGetReconstructSpirv(&spirvWordCount);
+    assert(spirvWords != NULL);
+    assert(spirvWordCount > 0);
+    assert(spirvWords[0] == 0x07230203u); /* SPIR-V magic number */
+
+    /* Null device or pipeline pointer fail safely */
+    assert(ffxVkDlssCreatePipeline(VK_NULL_HANDLE, NULL) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    FfxVkDlssPipeline dummyPipeline;
+    assert(ffxVkDlssCreatePipeline(VK_NULL_HANDLE, &dummyPipeline) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    ffxVkDlssDestroyPipeline(VK_NULL_HANDLE, &dummyPipeline);
+    assert(ffxVkDlssExecuteDispatch(VK_NULL_HANDLE, &dummyPipeline, &dispatch_info) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
     return 0;
 }
+

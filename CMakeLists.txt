@@ -867,6 +867,14 @@ if(FFX_VK_PORTABLE_BUILD_TESTS)
     add_test(NAME ffx_vk_unified_sr
         COMMAND ffx_vk_unified_sr_test)
 
+    add_executable(ffx_vk_unified_sr_sample
+        examples/unified_sr_sample/unified_sr_minimal_sample.c)
+    target_compile_features(ffx_vk_unified_sr_sample PRIVATE c_std_11)
+    target_link_libraries(ffx_vk_unified_sr_sample PRIVATE
+        ffx-vulkan::unified-sr)
+    add_test(NAME ffx_vk_unified_sr_sample
+        COMMAND ffx_vk_unified_sr_sample)
+
     add_executable(ffx_vk_mlframegen_contract_test
         tests/mlframegen_contract_test.c)
     target_link_libraries(ffx_vk_mlframegen_contract_test PRIVATE

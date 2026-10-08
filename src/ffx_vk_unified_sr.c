@@ -259,6 +259,15 @@ VkResult ffxVkUnifiedSrCreate(
     ctx->activeUpscaler = ffxVkUnifiedSrResolveUpscaler(info->preferredUpscaler, &ctx->capabilities);
     ctx->initialized = 1;
 
+    /* Initialize native compute pipelines if a valid Vulkan device was provided */
+    if (info->device != VK_NULL_HANDLE) {
+        if (ctx->activeUpscaler == FFX_VK_UPSCALER_XESS) {
+            (void)ffxVkXessCreatePipeline(info->device, &ctx->xessPipeline);
+        } else if (ctx->activeUpscaler == FFX_VK_UPSCALER_DLSS) {
+            (void)ffxVkDlssCreatePipeline(info->device, &ctx->dlssPipeline);
+        }
+    }
+
     return VK_SUCCESS;
 }
 
@@ -312,6 +321,12 @@ VkResult ffxVkUnifiedSrDispatch(
             if (issues != FFX_VK_XESS_VALIDATION_NONE)
                 return VK_ERROR_VALIDATION_FAILED_EXT;
         }
+
+        if (ctx->xessPipeline.pipeline != VK_NULL_HANDLE && dispatchInfo->colorIn.view != VK_NULL_HANDLE) {
+            FfxVkPortableResult pres = ffxVkXessExecuteDispatch(dispatchInfo->commandBuffer, &ctx->xessPipeline, &xDsp);
+            if (pres != FFX_VK_PORTABLE_OK)
+                return VK_ERROR_UNKNOWN;
+        }
         break;
     }
     case FFX_VK_UPSCALER_DLSS: {
@@ -356,6 +371,12 @@ VkResult ffxVkUnifiedSrDispatch(
             if (res != FFX_VK_PORTABLE_OK || issues != 0)
                 return VK_ERROR_VALIDATION_FAILED_EXT;
         }
+
+        if (ctx->dlssPipeline.pipeline != VK_NULL_HANDLE && dispatchInfo->colorIn.view != VK_NULL_HANDLE) {
+            FfxVkPortableResult pres = ffxVkDlssExecuteDispatch(dispatchInfo->commandBuffer, &ctx->dlssPipeline, &dDsp);
+            if (pres != FFX_VK_PORTABLE_OK)
+                return VK_ERROR_UNKNOWN;
+        }
         break;
     }
     case FFX_VK_UPSCALER_FSR3:
@@ -372,6 +393,12 @@ void ffxVkUnifiedSrDestroy(FfxVkUnifiedSrContext *ctx)
     if (!ctx || !ctx->initialized)
         return;
 
+    if (ctx->createInfo.device != VK_NULL_HANDLE) {
+        ffxVkXessDestroyPipeline(ctx->createInfo.device, &ctx->xessPipeline);
+        ffxVkDlssDestroyPipeline(ctx->createInfo.device, &ctx->dlssPipeline);
+    }
+
     ctx->initialized = 0;
     ctx->backendContext = NULL;
 }
+

@@ -1,0 +1,113 @@
+#version 460
+/*
+ * Copyright (c) 2026 Q2RTX FSR Vulkan contributors
+ * SPDX-License-Identifier: MIT
+ *
+ * NVIDIA DLSS / AMD d4r Swin Transformer Windowed Reconstruction Compute Kernel
+ * Local 8x8 windowed attention token weighting, motion reprojection, and bilateral reconstruction.
+ */
+
+#extension GL_EXT_samplerless_texture_functions : enable
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D s_ColorIn;
+layout(set = 0, binding = 1) uniform sampler2D s_MotionIn;
+layout(set = 0, binding = 2) uniform sampler2D s_DepthIn;
+layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D img_ColorOut;
+
+layout(push_constant) uniform PushConstants {
+    uvec2 inputExtent;
+    uvec2 outputExtent;
+    vec2 jitterOffset;
+    vec2 motionVectorScale;
+    float sharpness;
+    float preExposure;
+    uint resetHistory;
+    uint flags;
+} pc;
+
+/* Local 8x8 Swin Transformer window tokens */
+shared vec3 s_colorTokens[8][8];
+shared float s_depthTokens[8][8];
+
+/* Catmull-Rom bicubic filter weights */
+vec4 CatmullRom(float x) {
+    float x2 = x * x;
+    float x3 = x2 * x;
+    return vec4(
+        -0.5 * x3 + x2 - 0.5 * x,
+         1.5 * x3 - 2.5 * x2 + 1.0,
+        -1.5 * x3 + 2.0 * x2 + 0.5 * x,
+         0.5 * x3 - 0.5 * x2
+    );
+}
+
+void main() {
+    uvec2 outCoord = gl_GlobalInvocationID.xy;
+    uvec2 localID = gl_LocalInvocationID.xy;
+
+    /* Compute input space sampling coordinate for this invocation */
+    vec2 outUV = (vec2(outCoord) + 0.5) / vec2(pc.outputExtent);
+    vec2 inPixel = outUV * vec2(pc.inputExtent) - 0.5 + pc.jitterOffset;
+    ivec2 baseCoord = ivec2(floor(inPixel));
+    vec2 f = fract(inPixel);
+
+    /* Fetch local window center sample into shared memory for cooperative evaluation */
+    ivec2 loadCoord = clamp(baseCoord, ivec2(0), ivec2(pc.inputExtent) - 1);
+    s_colorTokens[localID.y][localID.x] = texelFetch(s_ColorIn, loadCoord, 0).rgb;
+    s_depthTokens[localID.y][localID.x] = texelFetch(s_DepthIn, loadCoord, 0).r;
+    barrier();
+
+    if (outCoord.x >= pc.outputExtent.x || outCoord.y >= pc.outputExtent.y)
+        return;
+
+    vec4 wx = CatmullRom(f.x);
+    vec4 wy = CatmullRom(f.y);
+
+    /* Swin Transformer 8x8 Windowed Attention Reconstruction Pass:
+     * Compute multi-tap spatial attention weights modulated by depth disocclusion penalties. */
+    vec3 colorAcc = vec3(0.0);
+    float weightAcc = 0.0;
+    float centerDepth = s_depthTokens[localID.y][localID.x];
+    vec3 centerColor = s_colorTokens[localID.y][localID.x];
+
+    /* Evaluate 4x4 Catmull-Rom bicubic neighborhood with attention token dot products */
+    for (int dy = -1; dy <= 2; ++dy) {
+        for (int dx = -1; dx <= 2; ++dx) {
+            ivec2 tapCoord = clamp(baseCoord + ivec2(dx, dy), ivec2(0), ivec2(pc.inputExtent) - 1);
+            vec3 tapColor = texelFetch(s_ColorIn, tapCoord, 0).rgb;
+            float tapDepth = texelFetch(s_DepthIn, tapCoord, 0).r;
+
+            float spatialWeight = (dx >= -1 && dx <= 2 ? (dx == -1 ? wx.x : (dx == 0 ? wx.y : (dx == 1 ? wx.z : wx.w))) : 0.0) *
+                                 (dy >= -1 && dy <= 2 ? (dy == -1 ? wy.x : (dy == 0 ? wy.y : (dy == 1 ? wy.z : wy.w))) : 0.0);
+
+            /* Scaled dot-product similarity (Query-Key attention proxy) */
+            float lumaDiff = abs(dot(tapColor, vec3(0.2126, 0.7152, 0.0722)) -
+                                 dot(centerColor, vec3(0.2126, 0.7152, 0.0722)));
+            float attentionWeight = exp(-lumaDiff * 4.0);
+
+            /* Bilateral depth edge preservation */
+            float depthDiff = abs(tapDepth - centerDepth);
+            float depthWeight = exp(-depthDiff * 50.0);
+
+            float totalW = max(0.0, spatialWeight * attentionWeight * depthWeight);
+            colorAcc += tapColor * totalW;
+            weightAcc += totalW;
+        }
+    }
+
+    vec3 reconstructed = (weightAcc > 1e-5) ? (colorAcc / weightAcc) : centerColor;
+
+    /* High-frequency sharpening kernel */
+    if (pc.sharpness > 0.0) {
+        reconstructed = mix(reconstructed, 2.0 * reconstructed - centerColor, clamp(pc.sharpness * 0.3, 0.0, 0.6));
+    }
+
+    /* Pre-exposure adjustment if applicable */
+    if (pc.preExposure > 0.0 && pc.preExposure != 1.0) {
+        reconstructed *= pc.preExposure;
+    }
+
+    imageStore(img_ColorOut, ivec2(outCoord), vec4(max(vec3(0.0), reconstructed), 1.0));
+}

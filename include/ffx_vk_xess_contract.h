@@ -148,6 +148,40 @@ bool ffxVkXessGetInputResolution(
     VkExtent2D outputExtent,
     VkExtent2D *outInputExtent);
 
+#define FFX_VK_XESS_DESCRIPTOR_SET_COUNT 4
+
+/* XeSS Native Compute Pipeline and Descriptor State */
+typedef struct FfxVkXessPipeline {
+    VkDevice device;
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSets[FFX_VK_XESS_DESCRIPTOR_SET_COUNT];
+    VkSampler linearSampler;
+    VkShaderModule shaderModule;
+    uint32_t currentSetIndex;
+} FfxVkXessPipeline;
+
+/* Access the embedded XeSS U-Net reconstruction SPIR-V binary */
+const uint32_t *ffxVkXessGetReconstructSpirv(size_t *outWordCount);
+
+/* Create compute pipeline for XeSS U-Net reconstruction pass */
+FfxVkPortableResult ffxVkXessCreatePipeline(
+    VkDevice device,
+    FfxVkXessPipeline *outPipeline);
+
+/* Destroy compute pipeline resources */
+void ffxVkXessDestroyPipeline(
+    VkDevice device,
+    FfxVkXessPipeline *pipeline);
+
+/* Execute XeSS U-Net reconstruction compute dispatch */
+FfxVkPortableResult ffxVkXessExecuteDispatch(
+    VkCommandBuffer cmdBuf,
+    FfxVkXessPipeline *pipeline,
+    const FfxVkXessDispatchInfo *dispatchInfo);
+
 #if defined(__cplusplus)
 }
 #endif

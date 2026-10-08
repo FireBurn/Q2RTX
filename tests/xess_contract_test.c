@@ -107,5 +107,20 @@ int main(void)
     issues = ffxVkXessValidateDispatchInfo(&createInfo, &dispatchInfo);
     assert(issues & FFX_VK_XESS_VALIDATION_EXTENT_EXCEEDS_MAX);
 
+    /* 5. Test embedded SPIR-V binary query and pipeline API safety */
+    size_t spirvWordCount = 0;
+    const uint32_t *spirvWords = ffxVkXessGetReconstructSpirv(&spirvWordCount);
+    assert(spirvWords != NULL);
+    assert(spirvWordCount > 0);
+    assert(spirvWords[0] == 0x07230203u); /* SPIR-V magic number */
+
+    /* Null device or pipeline pointer fail safely */
+    assert(ffxVkXessCreatePipeline(VK_NULL_HANDLE, NULL) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    FfxVkXessPipeline dummyPipeline;
+    assert(ffxVkXessCreatePipeline(VK_NULL_HANDLE, &dummyPipeline) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    ffxVkXessDestroyPipeline(VK_NULL_HANDLE, &dummyPipeline);
+    assert(ffxVkXessExecuteDispatch(VK_NULL_HANDLE, &dummyPipeline, &dispatchInfo) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
     return 0;
 }
+
