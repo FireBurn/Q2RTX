@@ -43,6 +43,10 @@ vec4 CatmullRom(float x) {
     );
 }
 
+float Luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
 void main() {
     uvec2 outCoord = gl_GlobalInvocationID.xy;
     uvec2 localID = gl_LocalInvocationID.xy;
@@ -66,11 +70,16 @@ void main() {
     vec4 wy = CatmullRom(f.y);
 
     /* Swin Transformer 8x8 Windowed Attention Reconstruction Pass:
-     * Compute multi-tap spatial attention weights modulated by depth disocclusion penalties. */
+     * Compute multi-tap spatial attention weights modulated by depth and feature similarity. */
     vec3 colorAcc = vec3(0.0);
     float weightAcc = 0.0;
     float centerDepth = s_depthTokens[localID.y][localID.x];
     vec3 centerColor = s_colorTokens[localID.y][localID.x];
+    float centerLuma = Luminance(centerColor);
+
+    /* Local 2x2 bounding box for anti-ringing clamp */
+    vec3 minColor = centerColor;
+    vec3 maxColor = centerColor;
 
     /* Evaluate 4x4 Catmull-Rom bicubic neighborhood with attention token dot products */
     for (int dy = -1; dy <= 2; ++dy) {
@@ -79,13 +88,18 @@ void main() {
             vec3 tapColor = texelFetch(s_ColorIn, tapCoord, 0).rgb;
             float tapDepth = texelFetch(s_DepthIn, tapCoord, 0).r;
 
+            if (dx >= 0 && dx <= 1 && dy >= 0 && dy <= 1) {
+                minColor = min(minColor, tapColor);
+                maxColor = max(maxColor, tapColor);
+            }
+
             float spatialWeight = (dx >= -1 && dx <= 2 ? (dx == -1 ? wx.x : (dx == 0 ? wx.y : (dx == 1 ? wx.z : wx.w))) : 0.0) *
                                  (dy >= -1 && dy <= 2 ? (dy == -1 ? wy.x : (dy == 0 ? wy.y : (dy == 1 ? wy.z : wy.w))) : 0.0);
 
-            /* Scaled dot-product similarity (Query-Key attention proxy) */
-            float lumaDiff = abs(dot(tapColor, vec3(0.2126, 0.7152, 0.0722)) -
-                                 dot(centerColor, vec3(0.2126, 0.7152, 0.0722)));
-            float attentionWeight = exp(-lumaDiff * 4.0);
+            /* Scaled dot-product similarity (Query-Key attention proxy in RGB feature space) */
+            float lumaDiff = abs(Luminance(tapColor) - centerLuma);
+            float colorDist = length(tapColor - centerColor);
+            float attentionWeight = exp(-colorDist * 2.5 - lumaDiff * 2.0);
 
             /* Bilateral depth edge preservation */
             float depthDiff = abs(tapDepth - centerDepth);
@@ -99,9 +113,16 @@ void main() {
 
     vec3 reconstructed = (weightAcc > 1e-5) ? (colorAcc / weightAcc) : centerColor;
 
-    /* High-frequency sharpening kernel */
+    /* Clamp reconstruction to prevent ringing */
+    vec3 margin = (maxColor - minColor) * 0.12;
+    reconstructed = clamp(reconstructed, max(vec3(0.0), minColor - margin), maxColor + margin);
+
+    /* High-frequency contrast-adaptive sharpening */
     if (pc.sharpness > 0.0) {
-        reconstructed = mix(reconstructed, 2.0 * reconstructed - centerColor, clamp(pc.sharpness * 0.3, 0.0, 0.6));
+        vec3 contrastDiff = reconstructed - centerColor;
+        float lumaContrast = clamp(abs(Luminance(contrastDiff)) / (centerLuma + 0.01), 0.0, 1.0);
+        float sharpFactor = pc.sharpness * (1.0 - lumaContrast * 0.4) * 0.4;
+        reconstructed = mix(reconstructed, 2.0 * reconstructed - centerColor, clamp(sharpFactor, 0.0, 0.6));
     }
 
     /* Pre-exposure adjustment if applicable */
