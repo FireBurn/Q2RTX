@@ -102,6 +102,37 @@ FfxVkPortableResult ffxVkDlssValidateCreateInfo(
         accumulated |= FFX_VK_DLSS_VALIDATION_ZERO_EXTENT;
     }
 
+    /* Validate model container if provided */
+    if (createInfo->modelContainerData) {
+        const uint8_t* bytes = (const uint8_t*)createInfo->modelContainerData;
+        if (createInfo->modelContainerSizeBytes < 24) {
+            accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+        } else if (memcmp(bytes, "DLSSMOD1", 8) == 0) {
+            uint32_t version = 0, modelFamily = 0;
+            memcpy(&version, bytes + 8, sizeof(version));
+            memcpy(&modelFamily, bytes + 12, sizeof(modelFamily));
+            if (version != 1 || modelFamily > FFX_VK_DLSS_MODEL_5_NEURAL_RENDERING) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+            } else if (createInfo->model == FFX_VK_DLSS_MODEL_5_NEURAL_RENDERING) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+            } else if (createInfo->modelContainerSizeBytes < 65536) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_WEIGHTS_TRUNCATED;
+            }
+        } else if (memcmp(bytes, "DLSSNR1\0", 8) == 0 || memcmp(bytes, "DLSSNR1", 7) == 0) {
+            uint32_t version = 0;
+            memcpy(&version, bytes + 8, sizeof(version));
+            if (version != 1) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+            } else if (createInfo->model != FFX_VK_DLSS_MODEL_5_NEURAL_RENDERING) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+            } else if (createInfo->modelContainerSizeBytes < 1048576) {
+                accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_WEIGHTS_TRUNCATED;
+            }
+        } else {
+            accumulated |= FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID;
+        }
+    }
+
     *issues = accumulated;
     return (accumulated == FFX_VK_DLSS_VALIDATION_NONE)
         ? FFX_VK_PORTABLE_OK
@@ -525,6 +556,38 @@ void ffxVkDlssDestroyPipeline(
             vkDestroySampler(device, pipeline->linearSampler, NULL);
     }
     memset(pipeline, 0, sizeof(*pipeline));
+}
+
+FfxVkPortableResult ffxVkDlssPipelineSetModel(
+    FfxVkDlssPipeline* pipeline,
+    const void* modelContainerData,
+    size_t modelContainerSizeBytes)
+{
+    if (!pipeline || !modelContainerData)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    if (modelContainerSizeBytes < 24)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    const uint8_t* bytes = (const uint8_t*)modelContainerData;
+    if (memcmp(bytes, "DLSSMOD1", 8) == 0) {
+        uint32_t version = 0, modelFamily = 0;
+        memcpy(&version, bytes + 8, sizeof(version));
+        memcpy(&modelFamily, bytes + 12, sizeof(modelFamily));
+        if (version != 1 || modelFamily > FFX_VK_DLSS_MODEL_5_NEURAL_RENDERING || modelContainerSizeBytes < 65536)
+            return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+    } else if (memcmp(bytes, "DLSSNR1\0", 8) == 0 || memcmp(bytes, "DLSSNR1", 7) == 0) {
+        uint32_t version = 0;
+        memcpy(&version, bytes + 8, sizeof(version));
+        if (version != 1 || modelContainerSizeBytes < 1048576)
+            return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+    } else {
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+    }
+
+    pipeline->hasPretrainedWeights = true;
+    pipeline->weightsSizeBytes = modelContainerSizeBytes;
+    return FFX_VK_PORTABLE_OK;
 }
 
 FfxVkPortableResult ffxVkDlssExecuteDispatch(

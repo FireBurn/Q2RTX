@@ -6,6 +6,7 @@
 #include "ffx_vk_dlss_contract.h"
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 static FfxVkPortableImage make_image(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage) {
@@ -172,6 +173,70 @@ int main(void) {
     assert(ffxVkDlssCreatePipeline(VK_NULL_HANDLE, &dummyPipeline) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
     ffxVkDlssDestroyPipeline(VK_NULL_HANDLE, &dummyPipeline);
     assert(ffxVkDlssExecuteDispatch(VK_NULL_HANDLE, &dummyPipeline, &dispatch_info) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* 6. Test offline pre-trained tensor weights container ingestion (DLSSMOD1 and DLSSNR1) */
+    size_t dlssModelSize = 65536;
+    uint8_t* dlssModelBuf = (uint8_t*)calloc(1, dlssModelSize);
+    assert(dlssModelBuf != NULL);
+    memcpy(dlssModelBuf, "DLSSMOD1", 8);
+    uint32_t dlssVer = 1, dlssFamily = FFX_VK_DLSS_MODEL_4_SWIN_K;
+    memcpy(dlssModelBuf + 8, &dlssVer, sizeof(dlssVer));
+    memcpy(dlssModelBuf + 12, &dlssFamily, sizeof(dlssFamily));
+
+    /* Reset create_info to DLSS 4 Swin model */
+    create_info.model = FFX_VK_DLSS_MODEL_4_SWIN_K;
+    create_info.modelContainerData = dlssModelBuf;
+    create_info.modelContainerSizeBytes = dlssModelSize;
+    assert(ffxVkDlssValidateCreateInfo(&create_info, &issues) == FFX_VK_PORTABLE_OK);
+    assert(issues == FFX_VK_DLSS_VALIDATION_NONE);
+
+    memset(&dummyPipeline, 0, sizeof(dummyPipeline));
+    assert(ffxVkDlssPipelineSetModel(&dummyPipeline, dlssModelBuf, dlssModelSize) == FFX_VK_PORTABLE_OK);
+    assert(dummyPipeline.hasPretrainedWeights == true);
+    assert(dummyPipeline.weightsSizeBytes == dlssModelSize);
+
+    /* Truncated DLSSMOD1 container is rejected */
+    create_info.modelContainerSizeBytes = 1024;
+    assert(ffxVkDlssValidateCreateInfo(&create_info, &issues) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    assert(issues & FFX_VK_DLSS_VALIDATION_MODEL_WEIGHTS_TRUNCATED);
+    assert(ffxVkDlssPipelineSetModel(&dummyPipeline, dlssModelBuf, 1024) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* Invalid magic is rejected */
+    dlssModelBuf[0] = 'X';
+    create_info.modelContainerSizeBytes = dlssModelSize;
+    assert(ffxVkDlssValidateCreateInfo(&create_info, &issues) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    assert(issues & FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID);
+    assert(ffxVkDlssPipelineSetModel(&dummyPipeline, dlssModelBuf, dlssModelSize) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    free(dlssModelBuf);
+
+    /* DLSSNR1 Neural Rendering weights container */
+    size_t dlssnrModelSize = 1048576;
+    uint8_t* dlssnrModelBuf = (uint8_t*)calloc(1, dlssnrModelSize);
+    assert(dlssnrModelBuf != NULL);
+    memcpy(dlssnrModelBuf, "DLSSNR1\0", 8);
+    uint32_t dlssnrVer = 1;
+    memcpy(dlssnrModelBuf + 8, &dlssnrVer, sizeof(dlssnrVer));
+
+    create_info.model = FFX_VK_DLSS_MODEL_5_NEURAL_RENDERING;
+    create_info.modelContainerData = dlssnrModelBuf;
+    create_info.modelContainerSizeBytes = dlssnrModelSize;
+    assert(ffxVkDlssValidateCreateInfo(&create_info, &issues) == FFX_VK_PORTABLE_OK);
+    assert(issues == FFX_VK_DLSS_VALIDATION_NONE);
+
+    memset(&dummyPipeline, 0, sizeof(dummyPipeline));
+    assert(ffxVkDlssPipelineSetModel(&dummyPipeline, dlssnrModelBuf, dlssnrModelSize) == FFX_VK_PORTABLE_OK);
+    assert(dummyPipeline.hasPretrainedWeights == true);
+    assert(dummyPipeline.weightsSizeBytes == dlssnrModelSize);
+
+    /* Truncated DLSSNR1 container is rejected */
+    create_info.modelContainerSizeBytes = 512;
+    assert(ffxVkDlssValidateCreateInfo(&create_info, &issues) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    assert(issues & FFX_VK_DLSS_VALIDATION_MODEL_WEIGHTS_TRUNCATED);
+    assert(ffxVkDlssPipelineSetModel(&dummyPipeline, dlssnrModelBuf, 512) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    free(dlssnrModelBuf);
+    create_info.modelContainerData = NULL;
+    create_info.modelContainerSizeBytes = 0;
 
     return 0;
 }

@@ -6,6 +6,7 @@
 #include "ffx_vk_xess_contract.h"
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 static FfxVkPortableImage make_test_image(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage)
@@ -120,6 +121,43 @@ int main(void)
     assert(ffxVkXessCreatePipeline(VK_NULL_HANDLE, &dummyPipeline) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
     ffxVkXessDestroyPipeline(VK_NULL_HANDLE, &dummyPipeline);
     assert(ffxVkXessExecuteDispatch(VK_NULL_HANDLE, &dummyPipeline, &dispatchInfo) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* 6. Test offline pre-trained tensor weights container ingestion (XESSMOD2) */
+    uint32_t totalWeightBytes = ffxVkXessGetTotalWeightBytes();
+    uint8_t *xessModelBuf = (uint8_t *)calloc(1, totalWeightBytes);
+    assert(xessModelBuf != NULL);
+    memcpy(xessModelBuf, "XESSMOD2", 8);
+    uint32_t xessVer = 2, xessLayers = FFX_VK_XESS_LAYER_COUNT;
+    memcpy(xessModelBuf + 8, &xessVer, sizeof(xessVer));
+    memcpy(xessModelBuf + 12, &xessLayers, sizeof(xessLayers));
+
+    /* Valid container passes validation and binds to pipeline */
+    createInfo.modelContainerData = xessModelBuf;
+    createInfo.modelContainerSizeBytes = totalWeightBytes;
+    issues = ffxVkXessValidateCreateInfo(&createInfo, true, true);
+    assert(issues == FFX_VK_XESS_VALIDATION_NONE);
+
+    memset(&dummyPipeline, 0, sizeof(dummyPipeline));
+    assert(ffxVkXessPipelineSetModel(&dummyPipeline, xessModelBuf, totalWeightBytes) == FFX_VK_PORTABLE_OK);
+    assert(dummyPipeline.hasPretrainedWeights == true);
+    assert(dummyPipeline.weightsSizeBytes == totalWeightBytes);
+
+    /* Truncated container is rejected */
+    createInfo.modelContainerSizeBytes = 1000;
+    issues = ffxVkXessValidateCreateInfo(&createInfo, true, true);
+    assert(issues & FFX_VK_XESS_VALIDATION_MODEL_WEIGHTS_TRUNCATED);
+    assert(ffxVkXessPipelineSetModel(&dummyPipeline, xessModelBuf, 1000) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* Corrupted magic is rejected */
+    xessModelBuf[0] = 'Z';
+    createInfo.modelContainerSizeBytes = totalWeightBytes;
+    issues = ffxVkXessValidateCreateInfo(&createInfo, true, true);
+    assert(issues & FFX_VK_XESS_VALIDATION_MODEL_CONTAINER_INVALID);
+    assert(ffxVkXessPipelineSetModel(&dummyPipeline, xessModelBuf, totalWeightBytes) == FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    free(xessModelBuf);
+    createInfo.modelContainerData = NULL;
+    createInfo.modelContainerSizeBytes = 0;
 
     return 0;
 }
