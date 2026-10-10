@@ -360,6 +360,35 @@ void ffxVkXessDestroyPipeline(
     memset(pipeline, 0, sizeof(*pipeline));
 }
 
+FfxVkPortableResult ffxVkXessPipelineSetModel(
+    FfxVkXessPipeline *pipeline,
+    const void *modelContainerData,
+    size_t modelContainerSizeBytes)
+{
+    if (!pipeline || !modelContainerData)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    if (modelContainerSizeBytes < 24)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    const uint8_t *bytes = (const uint8_t *)modelContainerData;
+    if (memcmp(bytes, "XESSMOD2", 8) != 0)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    uint32_t version = 0, numLayers = 0;
+    memcpy(&version, bytes + 8, sizeof(version));
+    memcpy(&numLayers, bytes + 12, sizeof(numLayers));
+    if (version != 2 || numLayers != FFX_VK_XESS_LAYER_COUNT)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    if (modelContainerSizeBytes < (size_t)ffxVkXessGetTotalWeightBytes())
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    pipeline->hasPretrainedWeights = true;
+    pipeline->weightsSizeBytes = modelContainerSizeBytes;
+    return FFX_VK_PORTABLE_OK;
+}
+
 FfxVkPortableResult ffxVkXessExecuteDispatch(
     VkCommandBuffer cmdBuf,
     FfxVkXessPipeline *pipeline,

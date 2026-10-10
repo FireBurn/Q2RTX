@@ -1063,3 +1063,28 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `xess_unet_reconstruct.comp`. Added feature distance attention weighting and contrast-adaptive
   high-frequency sharpening to `d4r_swin_reconstruct.comp`. Recompiled SPIR-V 1.6 and regenerated
   embedded C headers with 100% CTest pass rate.
+
+## Multi-Frame Generation (3x / 4x), Offline Tensor Weights, and Headless Video Benchmark Tool
+
+- [x] Multi-Frame Generation presenter policy extension (3x / 4x multi-frame interpolation).
+  Extended `ffx-vulkan::framegeneration-presenter-policy` with `FFX_VK_FRAME_GENERATION_MAX_SLOTS (4)`,
+  `FfxVkFrameGenerationMultiPresentPlan`, `ffxVkFrameGenerationRequiredImageCountMulti`, and
+  `ffxVkFrameGenerationBuildMultiPresentPlan`. Supports 2x, 3x, and 4x interpolation multipliers with
+  exact fractional phase timestamps (e.g. 0.333, 0.667 or 0.25, 0.50, 0.75, followed by the real scene
+  frame at 1.0f). Added unit test coverage in `tests/framegeneration_presenter_policy_test.c` (43/43 tests passing).
+
+- [x] Offline pre-trained tensor weights container ingestion for XeSS and DLSS/DLSSNR.
+  Extended `ffx-vulkan::xess-contract` and `ffx-vulkan::dlss-contract` with offline weight container ingestion.
+  Added `hasPretrainedWeights` and `weightsSizeBytes` to `FfxVkXessPipeline` and `FfxVkDlssPipeline`.
+  Implemented `ffxVkXessPipelineSetModel` (`XESSMOD2` binary container parsing) and `ffxVkDlssPipelineSetModel`
+  (`DLSSMOD1` and `DLSSNR1` container parsing). Extended `FfxVkDlssCreateInfo` with `modelContainerData` and
+  `modelContainerSizeBytes`, validating magic, version, and model architecture in `ffxVkDlssValidateCreateInfo`.
+  Verified with standalone CTests in `tests/xess_contract_test.c` and `tests/dlss_contract_test.c`.
+
+- [x] Automated headless video benchmark capture harness and FFmpeg encoding.
+  Created `tools/capture_benchmark_video.py` executing deterministic gameplay passes across upscaler modes
+  and streaming raw RGB frames directly to `/usr/bin/ffmpeg` for high-quality H.264 MP4 encoding.
+  Supports animated sweeping split-screen wipes (`--layout split`), 2x2 comparison grids (`--layout grid`),
+  and multi-chapter tours (`--layout showcase`) with glassmorphic HUD telemetry overlays (FPS, frametime ms,
+  resolution, scaling factor, provider badge). Added comprehensive unit tests in
+  `tools/ffx_dxil/tests/test_capture_benchmark_video.py` (39/39 tests passing).

@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-10-05, Europe/London.  Update this file at every meaningful
+Last updated: 2026-10-10, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
@@ -10,6 +10,29 @@ reusable native-Vulkan components and a demonstrable Vulkan implementation,
 finishing all items in TODO.md.
 
 Current truth:
+
+- MULTI-FRAME GENERATION (3X / 4X INTERPOLATION) DELIVERED:
+  Extended `ffx-vulkan::framegeneration-presenter-policy` with `FFX_VK_FRAME_GENERATION_MAX_SLOTS (4)`,
+  `FfxVkFrameGenerationMultiPresentPlan`, `ffxVkFrameGenerationRequiredImageCountMulti`, and
+  `ffxVkFrameGenerationBuildMultiPresentPlan`. Implemented multi-frame interpolation cadences inserting 1, 2, or 3
+  generated frames between real frames with exact fractional phase timestamps (e.g. 0.333, 0.667 or 0.25, 0.50, 0.75,
+  followed by the real scene frame at 1.0f). Rejects duplicate swapchain indices and gracefully falls back to a 1-slot
+  acquire plan on partial acquire. 100% unit test coverage in `tests/framegeneration_presenter_policy_test.c` (43/43 passing).
+
+- OFFLINE PRE-TRAINED TENSOR WEIGHTS CONTAINER INGESTION DELIVERED:
+  Extended `ffx-vulkan::xess-contract` and `ffx-vulkan::dlss-contract` with offline weight container ingestion.
+  Added `hasPretrainedWeights` and `weightsSizeBytes` to `FfxVkXessPipeline` and `FfxVkDlssPipeline`.
+  Implemented `ffxVkXessPipelineSetModel` (`XESSMOD2` binary container parsing) and `ffxVkDlssPipelineSetModel`
+  (`DLSSMOD1` and `DLSSNR1` container parsing). Extended `FfxVkDlssCreateInfo` with `modelContainerData` and
+  `modelContainerSizeBytes`, validating container magic, version, and architecture in `ffxVkDlssValidateCreateInfo`.
+  Verified with standalone unit tests in `tests/xess_contract_test.c` and `tests/dlss_contract_test.c`.
+
+- AUTOMATED HEADLESS VIDEO BENCHMARK CAPTURE HARNESS DELIVERED:
+  Implemented `tools/capture_benchmark_video.py` executing deterministic gameplay passes across upscaler modes and
+  streaming raw RGB frames directly to `/usr/bin/ffmpeg` for high-quality H.264 MP4 encoding. Supports animated sweeping
+  split-screen wipes (`--layout split`), 2x2 comparison grids (`--layout grid`), and multi-chapter tours (`--layout showcase`)
+  with glassmorphic HUD telemetry overlays (FPS, frametime ms, resolution, scaling factor, provider badge).
+  Created comprehensive unit tests in `tools/ffx_dxil/tests/test_capture_benchmark_video.py` (39/39 passing).
 
 - ZERO-WARNING ENGINE COMPILATION ACHIEVED:
   Audited all compiler warnings across Q2RTX and ffx-vulkan. Fixed const qualifier discards in `src/refresh/vkpt/material.c`

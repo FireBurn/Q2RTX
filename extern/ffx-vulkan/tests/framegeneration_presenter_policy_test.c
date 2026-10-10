@@ -154,5 +154,60 @@ int main(void)
     CHECK(ffxVkFrameGenerationRenderFinishedSemaphoreIndex(3, 1, 2) == 7u);
     CHECK(ffxVkFrameGenerationRenderFinishedSemaphoreIndex(0, 1, 0) == SIZE_MAX);
     CHECK(ffxVkFrameGenerationRenderFinishedSemaphoreIndex(0, 2, 2) == SIZE_MAX);
+
+    /* Multi-frame generation (3x, 4x) tests */
+    CHECK(ffxVkFrameGenerationRequiredImageCountMulti(3, 2, true) == 5);
+    CHECK(ffxVkFrameGenerationRequiredImageCountMulti(3, 3, true) == 6);
+    CHECK(ffxVkFrameGenerationRequiredImageCountMulti(3, 4, true) == 7);
+    CHECK(ffxVkFrameGenerationRequiredImageCountMulti(3, 3, false) == 3);
+
+    CHECK(ffxVkFrameGenerationRequestedImageCountMulti(3, 0, 3, true) == 6);
+    CHECK(ffxVkFrameGenerationRequestedImageCountMulti(3, 5, 3, true) == 5);
+
+    {
+        /* Test 3x plan: 2 generated slots (t=0.333, t=0.667) + 1 real slot (t=1.0) */
+        const uint32_t indices3x[] = { 1, 2, 3 };
+        const VkSemaphore sems3x[] = { (VkSemaphore)(uintptr_t)10, (VkSemaphore)(uintptr_t)20, (VkSemaphore)(uintptr_t)30 };
+        FfxVkFrameGenerationMultiPresentPlan plan3x;
+
+        CHECK(ffxVkFrameGenerationBuildMultiPresentPlan(3, indices3x, sems3x, 3, true, false, &plan3x));
+        CHECK(plan3x.slotCount == 3);
+        CHECK(plan3x.multiplier == 3);
+        CHECK(plan3x.slots[0].imageIndex == 1 && plan3x.slots[0].useInterpolatedScene);
+        CHECK(plan3x.slots[1].imageIndex == 2 && plan3x.slots[1].useInterpolatedScene);
+        CHECK(plan3x.slots[2].imageIndex == 3 && !plan3x.slots[2].useInterpolatedScene);
+        CHECK(plan3x.interpolationPhases[0] > 0.33f && plan3x.interpolationPhases[0] < 0.34f);
+        CHECK(plan3x.interpolationPhases[1] > 0.66f && plan3x.interpolationPhases[1] < 0.67f);
+        CHECK(plan3x.interpolationPhases[2] == 1.0f);
+
+        /* Test 4x plan: 3 generated slots (t=0.25, 0.5, 0.75) + 1 real slot */
+        const uint32_t indices4x[] = { 0, 1, 2, 3 };
+        const VkSemaphore sems4x[] = { (VkSemaphore)(uintptr_t)1, (VkSemaphore)(uintptr_t)2,
+                                       (VkSemaphore)(uintptr_t)3, (VkSemaphore)(uintptr_t)4 };
+        FfxVkFrameGenerationMultiPresentPlan plan4x;
+
+        CHECK(ffxVkFrameGenerationBuildMultiPresentPlan(4, indices4x, sems4x, 4, true, false, &plan4x));
+        CHECK(plan4x.slotCount == 4);
+        CHECK(plan4x.multiplier == 4);
+        CHECK(plan4x.slots[0].imageIndex == 0 && plan4x.slots[0].useInterpolatedScene);
+        CHECK(plan4x.slots[1].imageIndex == 1 && plan4x.slots[1].useInterpolatedScene);
+        CHECK(plan4x.slots[2].imageIndex == 2 && plan4x.slots[2].useInterpolatedScene);
+        CHECK(plan4x.slots[3].imageIndex == 3 && !plan4x.slots[3].useInterpolatedScene);
+        CHECK(plan4x.interpolationPhases[0] == 0.25f);
+        CHECK(plan4x.interpolationPhases[1] == 0.50f);
+        CHECK(plan4x.interpolationPhases[2] == 0.75f);
+        CHECK(plan4x.interpolationPhases[3] == 1.0f);
+
+        /* Test duplicate index rejection */
+        const uint32_t dupIndices[] = { 1, 2, 1 };
+        CHECK(!ffxVkFrameGenerationBuildMultiPresentPlan(3, dupIndices, sems3x, 3, true, false, &plan3x));
+
+        /* Test insufficient acquire fallback */
+        CHECK(ffxVkFrameGenerationBuildMultiPresentPlan(3, indices3x, sems3x, 2, true, false, &plan3x));
+        CHECK(plan3x.slotCount == 1);
+        CHECK(plan3x.multiplier == 1);
+        CHECK(!plan3x.slots[0].useInterpolatedScene);
+    }
+
     return failures ? 1 : 0;
 }

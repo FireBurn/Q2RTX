@@ -56,3 +56,4 @@ baseq2/**/*.txt
 __pycache__/
 *.py[cod]
 vkd3d-proton.cache*
+*.mp4

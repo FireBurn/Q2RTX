@@ -83,7 +83,9 @@ typedef enum FfxVkDlssValidationIssueBits {
     FFX_VK_DLSS_VALIDATION_UNSUPPORTED_MODEL = 1ull << 11,
     FFX_VK_DLSS_VALIDATION_NEURAL_RENDERING_MISSING_SIGNAL = 1ull << 12,
     FFX_VK_DLSS_VALIDATION_NEURAL_RENDERING_WEIGHTS = 1ull << 13,
-    FFX_VK_DLSS_VALIDATION_VRAM_INTEROP_HANDLE = 1ull << 14
+    FFX_VK_DLSS_VALIDATION_VRAM_INTEROP_HANDLE = 1ull << 14,
+    FFX_VK_DLSS_VALIDATION_MODEL_CONTAINER_INVALID = 1ull << 15,
+    FFX_VK_DLSS_VALIDATION_MODEL_WEIGHTS_TRUNCATED = 1ull << 16
 } FfxVkDlssValidationIssueBits;
 
 /* External memory handle for zero-copy VRAM interop between Vulkan and d4r / CUDA / HIP */
@@ -107,6 +109,9 @@ typedef struct FfxVkDlssCreateInfo {
     FfxVkPortableExtent2D displaySize;
     /* Optional motion vector dilation window (0 = default 2-pixel dilation) */
     uint32_t motionVectorDilation;
+    /* Optional pointer to packed DLSSMOD1 / DLSSNR1 model container in host memory */
+    const void* modelContainerData;
+    size_t modelContainerSizeBytes;
 } FfxVkDlssCreateInfo;
 
 typedef struct FfxVkDlssDispatchInfo {
@@ -181,6 +186,8 @@ typedef struct FfxVkDlssPipeline {
     VkSampler linearSampler;
     VkShaderModule shaderModule;
     uint32_t currentSetIndex;
+    bool hasPretrainedWeights;
+    size_t weightsSizeBytes;
 } FfxVkDlssPipeline;
 
 /* Access the embedded DLSS / d4r Swin Transformer reconstruction SPIR-V binary */
@@ -195,6 +202,12 @@ FfxVkPortableResult ffxVkDlssCreatePipeline(
 void ffxVkDlssDestroyPipeline(
     VkDevice device,
     FfxVkDlssPipeline* pipeline);
+
+/* Bind offline pre-trained tensor weights container (DLSSMOD1 / DLSSNR1) */
+FfxVkPortableResult ffxVkDlssPipelineSetModel(
+    FfxVkDlssPipeline* pipeline,
+    const void* modelContainerData,
+    size_t modelContainerSizeBytes);
 
 /* Execute DLSS / d4r Swin Transformer reconstruction compute dispatch */
 FfxVkPortableResult ffxVkDlssExecuteDispatch(

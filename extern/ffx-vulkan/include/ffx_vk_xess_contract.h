@@ -161,6 +161,8 @@ typedef struct FfxVkXessPipeline {
     VkSampler linearSampler;
     VkShaderModule shaderModule;
     uint32_t currentSetIndex;
+    bool hasPretrainedWeights;
+    size_t weightsSizeBytes;
 } FfxVkXessPipeline;
 
 /* Access the embedded XeSS U-Net reconstruction SPIR-V binary */
@@ -175,6 +177,12 @@ FfxVkPortableResult ffxVkXessCreatePipeline(
 void ffxVkXessDestroyPipeline(
     VkDevice device,
     FfxVkXessPipeline *pipeline);
+
+/* Bind offline pre-trained tensor weights container (XESSMOD2) */
+FfxVkPortableResult ffxVkXessPipelineSetModel(
+    FfxVkXessPipeline *pipeline,
+    const void *modelContainerData,
+    size_t modelContainerSizeBytes);
 
 /* Execute XeSS U-Net reconstruction compute dispatch */
 FfxVkPortableResult ffxVkXessExecuteDispatch(
