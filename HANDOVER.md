@@ -1,6 +1,6 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-10-10, Europe/London.  Update this file at every meaningful
+Last updated: 2026-10-13, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
 ## Objective and truth status
