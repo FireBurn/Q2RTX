@@ -5,6 +5,7 @@
 
 #include "ffx_vk_unified_sr.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 
 int main(void)
@@ -36,6 +37,32 @@ int main(void)
 
     assert(ffxVkUnifiedSrGetRenderResolution(FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE, display, &render));
     assert(render.width == 854 && render.height == 480);
+
+    /* DRS preset returns valid even baseline resolution */
+    assert(ffxVkUnifiedSrGetRenderResolution(FFX_VK_QUALITY_PRESET_DRS, display, &render));
+    assert(render.width > 0 && render.height > 0);
+    assert((render.width & 1u) == 0 && (render.height & 1u) == 0);
+
+    /* Test DRS governor scaling */
+    /* Underperforming: 25.0ms vs 16.6ms target -> scale decreases */
+    float s1 = ffxVkUnifiedSrCalculateDrsScale(25.0f, 16.6f, 100.0f, 50.0f, 100.0f);
+    assert(s1 < 100.0f);
+    assert(s1 >= 50.0f);
+
+    /* Overperforming: 10.0ms vs 16.6ms target -> scale increases */
+    float s2 = ffxVkUnifiedSrCalculateDrsScale(10.0f, 16.6f, 60.0f, 50.0f, 100.0f);
+    assert(s2 > 60.0f);
+    assert(s2 <= 100.0f);
+
+    /* Deadband margin: +-1% variation returns current scale */
+    float s3 = ffxVkUnifiedSrCalculateDrsScale(16.5f, 16.6f, 75.0f, 50.0f, 100.0f);
+    assert(fabsf(s3 - 75.0f) < 0.001f);
+
+    /* Boundary clamp checks */
+    float sMin = ffxVkUnifiedSrCalculateDrsScale(100.0f, 16.6f, 51.0f, 50.0f, 100.0f);
+    assert(sMin >= 50.0f);
+    float sMax = ffxVkUnifiedSrCalculateDrsScale(1.0f, 16.6f, 99.0f, 50.0f, 100.0f);
+    assert(sMax <= 100.0f);
 
     /* 3. Test resolution auto-selection and fallback logic */
     FfxVkGpuCapabilities rtxCaps;

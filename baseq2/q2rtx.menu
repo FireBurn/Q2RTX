@@ -257,6 +257,9 @@ begin frame_generation_settings
     pairs --status "SDK 3.1.6 is the newer reusable Vulkan FI/OF scheduler and the default. Legacy 1.1.4 remains available for compatibility comparison." \
         "FSR3 FG scheduler" flt_frame_generation_backend \
         "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
+    pairs --status "Multi-frame interpolation multiplier: 2x (1 generated frame), 3x (2 generated frames), or 4x (3 generated frames)." \
+        "multi-frame multiplier" flt_frame_generation_multiplier \
+        "2x (1 gen)" 2 "3x (2 gen)" 3 "4x (3 gen)" 4
     range --status "Minimum completed render FPS for analytical generation. 30 is the conservative default, 60 is AMD's target, and 0 disables this safety gate for testing." \
         "FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
     action --status "shows the active provider, fallback reason, and generated/rendered presentation cadence. These are read-only runtime diagnostics." \

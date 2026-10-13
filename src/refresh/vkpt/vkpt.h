@@ -825,6 +825,7 @@ typedef struct VkptDrsDiagnostics {
     int max_scale;
 } VkptDrsDiagnostics;
 void vkpt_drs_get_diagnostics(VkptDrsDiagnostics *diagnostics);
+extern cvar_t *cvar_drs_enable;
 
 extern cvar_t *cvar_flt_fsr_enable;
 extern cvar_t *cvar_flt_upscaler;
@@ -834,6 +835,7 @@ extern cvar_t *cvar_flt_fsr4_sharpening;
 extern cvar_t *cvar_flt_fsr4_auto_exposure;
 extern cvar_t *cvar_flt_fsr4_dynamic_resolution;
 extern cvar_t *cvar_flt_frame_generation;
+extern cvar_t *cvar_flt_frame_generation_multiplier;
 extern cvar_t *cvar_flt_frame_generation_backend;
 extern cvar_t *cvar_flt_frame_generation_min_rendered_fps;
 extern cvar_t *cvar_flt_frame_generation_active;

@@ -285,6 +285,7 @@ SET(SRC_VKPT
 	refresh/vkpt/device_memory_allocator.c
 	refresh/vkpt/god_rays.c
 	refresh/vkpt/conversion.c
+	refresh/vkpt/video_recorder.c
 )
 
 IF(BUILD_TESTING)
@@ -324,6 +325,7 @@ SET(HEADERS_VKPT
 	refresh/vkpt/precomputed_sky.h
 	refresh/vkpt/conversion.h
 	refresh/vkpt/temporal_contract.h
+	refresh/vkpt/video_recorder.h
 )
 
 set(SRC_SHADERS

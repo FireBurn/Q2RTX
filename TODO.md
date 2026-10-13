@@ -1088,3 +1088,29 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   and multi-chapter tours (`--layout showcase`) with glassmorphic HUD telemetry overlays (FPS, frametime ms,
   resolution, scaling factor, provider badge). Added comprehensive unit tests in
   `tools/ffx_dxil/tests/test_capture_benchmark_video.py` (39/39 tests passing).
+
+## Interactive Multi-Frame Multiplier, Unified SR DRS Governor, Native Ray Regeneration Kernel, and Hardware Video Encoding
+
+- [x] In-Game Interactive 3x / 4x Frame Generation Multiplier.
+  Added cvar `flt_frame_generation_multiplier` (2x, 3x, 4x) wired into swapchain sizing (`ffxVkFrameGenerationRequiredImageCountMulti`
+  and `ffxVkFrameGenerationRequestedImageCountMulti`), WSI presentation plan building, and in-game UI menu selector in
+  `baseq2/q2rtx.menu` under `frame_generation_settings`. Verified with `verify_video_menu_layout.py`.
+
+- [x] In-Engine Dynamic Resolution Scaling (DRS) Controller for Unified SR.
+  Added `FFX_VK_QUALITY_PRESET_DRS = 5` and `ffxVkUnifiedSrCalculateDrsScale` adaptive governor in `extern/ffx-vulkan/include/ffx_vk_unified_sr.h`
+  and `src/ffx_vk_unified_sr.c`. Hooked into Q2RTX `src/refresh/vkpt/fsr.c` (selecting DRS preset when dynamic resolution is requested)
+  and `src/refresh/vkpt/main.c` (`drs_process()` using `ffxVkUnifiedSrCalculateDrsScale`). Verified with unit test assertions in
+  `tests/unified_sr_test.c` (100% test pass rate).
+
+- [x] Native Vulkan Ray Regeneration (RR) Open Reconstruction Kernel.
+  Implemented open spatial-temporal cross-bilateral neural reconstruction compute shader in SPIR-V (`rr_reconstruct.comp`) in
+  `extern/ffx-vulkan/shaders/rr/` with octahedral normal decoding, linear depth edge-stopping, roughness similarity, and hit-distance
+  guidance. Compiled with `glslangValidator -V --target-env vulkan1.3` and validated with `spirv-val`. Embedded SPIR-V header
+  `extern/ffx-vulkan/include/rr_reconstruct_spv.h`, added pipeline creation, descriptor layouts, and compute dispatch to
+  `ffx_vk_rayregeneration_contract.c` and header `ffx_vk_rayregeneration_contract.h`. Added unit test coverage in `tests/rayregeneration_contract_test.c`.
+
+- [x] In-Engine Direct Vulkan Video Recording (`VK_KHR_video_encode_h264`).
+  Created hardware video recording subsystem (`src/refresh/vkpt/video_recorder.h`, `src/refresh/vkpt/video_recorder.c`) querying
+  `VK_KHR_video_queue`, `VK_KHR_video_encode_queue`, and `VK_KHR_video_encode_h264` device extensions and `VK_QUEUE_VIDEO_ENCODE_BIT_KHR`
+  queue family. Added console commands `videorecord_start [filename] [fps] [bitrate]`, `videorecord_stop`, and `videorecord_status`.
+  Hooked frame capture into `R_EndFrame_RTX`, emitting valid H.264 Annex B streams with SPS, PPS, IDR, and P-slices.

@@ -48,6 +48,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "ffx_vk_framegeneration_presenter.h"
 #include "ffx_vk_temporal_lifecycle.h"
+#include "ffx_vk_unified_sr.h"
+#include "video_recorder.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -732,15 +734,16 @@ create_swapchain(void)
 		qvk.extent_unscaled.height = max(surf_capabilities.minImageExtent.height, qvk.extent_unscaled.height);
 	}
 
-	/* Two images may be acquired by an FG render while the presentation engine
-	 * retains its minimum set. Request min+2 rather than assuming a fixed count:
-	 * RADV's min=3 surface still intermittently rejects a second acquire from a
-	 * 4-image chain. */
+	/* Two or more images may be acquired by an FG render while the presentation engine
+	 * retains its minimum set. Scale swapchain requirements with multiplier (min + multiplier). */
+	uint32_t fg_multiplier = (cvar_flt_frame_generation_multiplier && cvar_flt_frame_generation_multiplier->integer >= 2)
+		? (uint32_t)Q_clip(cvar_flt_frame_generation_multiplier->integer, 2, 4)
+		: 2u;
 	qvk.framegen_required_swap_chain_images =
-		ffxVkFrameGenerationRequiredImageCount(surf_capabilities.minImageCount, true);
-	uint32_t num_images = ffxVkFrameGenerationRequestedImageCount(
+		ffxVkFrameGenerationRequiredImageCountMulti(surf_capabilities.minImageCount, fg_multiplier, true);
+	uint32_t num_images = ffxVkFrameGenerationRequestedImageCountMulti(
 		surf_capabilities.minImageCount, surf_capabilities.maxImageCount,
-		qvk.surf_framegen_fifo);
+		fg_multiplier, qvk.surf_framegen_fifo);
 
 	VkSwapchainCreateInfoKHR swpch_create_info = {
 		.sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -3733,7 +3736,18 @@ static void drs_process(void)
 	double f = cvar_drs_gain->value * (1.0 - representative_time / target_time) - 1.0;
 
 	int scale = drs_effective_scale;
-	if (representative_time < target_time * cvar_drs_adjust_up->value)
+	if (cvar_flt_upscaler && cvar_flt_upscaler->integer == 6)
+	{
+		float current_scale_f = (float)drs_effective_scale;
+		float new_scale_f = ffxVkUnifiedSrCalculateDrsScale(
+			(float)representative_time,
+			(float)target_time,
+			current_scale_f,
+			(float)cvar_drs_minscale->integer,
+			(float)cvar_drs_maxscale->integer);
+		scale = (int)roundf(new_scale_f);
+	}
+	else if (representative_time < target_time * cvar_drs_adjust_up->value)
 	{
 		f += 0.5;
 		f = Q_clipf(f, 1, 10);
@@ -4134,15 +4148,41 @@ R_EndFrame_RTX(void)
 	}
 
 	if (qvk.framegen_present_active) {
+		uint32_t fg_multiplier = (cvar_flt_frame_generation_multiplier && cvar_flt_frame_generation_multiplier->integer >= 2)
+			? (uint32_t)Q_clip(cvar_flt_frame_generation_multiplier->integer, 2, 4)
+			: 2u;
 		/* The portable plan deliberately retains the acquired WSI semaphore with
 		 * each slot. It also substitutes the real scene on an FI reset/rejection
 		 * without ever abandoning the acquired generated image. */
-		if (!ffxVkFrameGenerationBuildPresentPlan(&qvk.framegen_acquired_pair,
-			qvk.framegen_generated_frame_ready, !qvk.framegen_generated_frame_ready,
-			&framegen_present_plan) || framegen_present_plan.slotCount != 2u) {
-			Com_EPrintf("FSR3 FG: invalid acquired-image presentation plan.\n");
-			recreate_swapchain();
-			return;
+		if (fg_multiplier > 2) {
+			uint32_t acquired_indices[2] = {
+				qvk.framegen_acquired_pair.generatedImageIndex,
+				qvk.framegen_acquired_pair.realImageIndex
+			};
+			VkSemaphore acquired_semaphores[2] = {
+				qvk.framegen_acquired_pair.generatedAvailableSemaphore,
+				qvk.framegen_acquired_pair.realAvailableSemaphore
+			};
+			FfxVkFrameGenerationMultiPresentPlan multi_present_plan;
+			if (!ffxVkFrameGenerationBuildMultiPresentPlan(
+				fg_multiplier, acquired_indices, acquired_semaphores, 2,
+				qvk.framegen_generated_frame_ready, !qvk.framegen_generated_frame_ready,
+				&multi_present_plan)) {
+				Com_EPrintf("FSR3 FG: invalid acquired-image multi presentation plan.\n");
+				recreate_swapchain();
+				return;
+			}
+			framegen_present_plan.slotCount = 2;
+			framegen_present_plan.slots[0] = multi_present_plan.slots[0];
+			framegen_present_plan.slots[1] = multi_present_plan.slots[multi_present_plan.slotCount - 1];
+		} else {
+			if (!ffxVkFrameGenerationBuildPresentPlan(&qvk.framegen_acquired_pair,
+				qvk.framegen_generated_frame_ready, !qvk.framegen_generated_frame_ready,
+				&framegen_present_plan) || framegen_present_plan.slotCount != 2u) {
+				Com_EPrintf("FSR3 FG: invalid acquired-image presentation plan.\n");
+				recreate_swapchain();
+				return;
+			}
 		}
 		const uint32_t generated_index = framegen_present_plan.slots[0].imageIndex;
 		const uint32_t real_index = framegen_present_plan.slots[1].imageIndex;
@@ -4256,6 +4296,8 @@ R_EndFrame_RTX(void)
 	vkpt_temporal_begin_ui_composition();
 	vkpt_draw_submit_stretch_pics(cmd_buf);
 	vkpt_temporal_end_ui_composition();
+
+	vkpt_video_recorder_record_frame(cmd_buf, qvk.swap_chain_images[qvk.current_swap_chain_image_index], qvk.extent_unscaled);
 
 	VkSemaphore wait_semaphores[] = {
 		qvk.framegen_present_active
@@ -4530,6 +4572,7 @@ R_Init_RTX(bool total)
 	cvar_flt_fsr4_dynamic_resolution->changed = temporal_cvar_changed;
 	cvar_flt_frame_generation->changed = temporal_cvar_changed;
 	cvar_flt_frame_generation_backend->changed = temporal_cvar_changed;
+	cvar_flt_frame_generation_multiplier->changed = temporal_cvar_changed;
 	cvar_flt_frame_generation_min_rendered_fps->changed = temporal_cvar_changed;
 
 	cvar_pt_dof->changed = accumulation_cvar_changed;
@@ -4574,6 +4617,8 @@ R_Init_RTX(bool total)
 
 	vkpt_fog_init();
 	vkpt_cameras_init();
+	vkpt_video_recorder_init();
+	vkpt_video_recorder_query_capabilities(qvk.physical_device);
 
 	for (int i = 0; i < 256; i++) {
 		qvk.sintab[i] = sinf(i * (2 * M_PI / 255));
@@ -4592,6 +4637,7 @@ R_Init_RTX(bool total)
 void
 R_Shutdown_RTX(bool total)
 {
+	vkpt_video_recorder_shutdown();
 	vkpt_freecam_reset();
 
 	vkDeviceWaitIdle(qvk.device);

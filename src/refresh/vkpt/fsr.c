@@ -244,6 +244,7 @@ cvar_t *cvar_flt_fsr4_sharpening = NULL;
 cvar_t *cvar_flt_fsr4_auto_exposure = NULL;
 cvar_t *cvar_flt_fsr4_dynamic_resolution = NULL;
 cvar_t *cvar_flt_frame_generation = NULL;
+cvar_t *cvar_flt_frame_generation_multiplier = NULL;
 cvar_t *cvar_flt_frame_generation_backend = NULL;
 cvar_t *cvar_flt_frame_generation_min_rendered_fps = NULL;
 cvar_t *cvar_flt_frame_generation_active = NULL;
@@ -708,7 +709,10 @@ int vkpt_fsr_requested_render_scale(void)
     case VKPT_UPSCALER_FSR4: return fsr4_requested_render_scale();
     case VKPT_UPSCALER_XESS: return fsr3_requested_render_scale();
     case VKPT_UPSCALER_DLSS: return fsr3_requested_render_scale();
-    case VKPT_UPSCALER_UNIFIED: return fsr3_requested_render_scale();
+    case VKPT_UPSCALER_UNIFIED:
+        if (fsr4_dynamic_resolution_requested() || (cvar_drs_enable && cvar_drs_enable->integer))
+            return 0;
+        return fsr3_requested_render_scale();
     default: return 0;
     }
 }
@@ -1297,25 +1301,29 @@ static VkResult unified_sr_create_context(void)
     create_info.physicalDevice = qvk.physical_device;
     create_info.preferredUpscaler = FFX_VK_UPSCALER_AUTO;
 
-    switch (requested_fsr_quality()) {
-    case VKPT_FSR_QUALITY_NATIVE_AA:
-        create_info.quality = FFX_VK_QUALITY_PRESET_NATIVE;
-        break;
-    case VKPT_FSR_QUALITY_QUALITY:
-        create_info.quality = FFX_VK_QUALITY_PRESET_QUALITY;
-        break;
-    case VKPT_FSR_QUALITY_BALANCED:
-        create_info.quality = FFX_VK_QUALITY_PRESET_BALANCED;
-        break;
-    case VKPT_FSR_QUALITY_PERFORMANCE:
-        create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
-        break;
-    case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE:
-        create_info.quality = FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE;
-        break;
-    default:
-        create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
-        break;
+    if (fsr4_dynamic_resolution_requested() || (cvar_drs_enable && cvar_drs_enable->integer)) {
+        create_info.quality = FFX_VK_QUALITY_PRESET_DRS;
+    } else {
+        switch (requested_fsr_quality()) {
+        case VKPT_FSR_QUALITY_NATIVE_AA:
+            create_info.quality = FFX_VK_QUALITY_PRESET_NATIVE;
+            break;
+        case VKPT_FSR_QUALITY_QUALITY:
+            create_info.quality = FFX_VK_QUALITY_PRESET_QUALITY;
+            break;
+        case VKPT_FSR_QUALITY_BALANCED:
+            create_info.quality = FFX_VK_QUALITY_PRESET_BALANCED;
+            break;
+        case VKPT_FSR_QUALITY_PERFORMANCE:
+            create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
+            break;
+        case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE:
+            create_info.quality = FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE;
+            break;
+        default:
+            create_info.quality = FFX_VK_QUALITY_PRESET_PERFORMANCE;
+            break;
+        }
     }
 
     create_info.maxInputExtent = qvk.extent_unscaled;
@@ -1896,6 +1904,8 @@ void vkpt_fsr_init_cvars(void)
      * normal present path until that presenter has acquired two images. */
     cvar_flt_frame_generation = Cvar_Get("flt_frame_generation", "0",
                                          CVAR_ARCHIVE);
+    cvar_flt_frame_generation_multiplier = Cvar_Get("flt_frame_generation_multiplier", "2",
+                                                    CVAR_ARCHIVE);
     /* The current public-SDK Vulkan FI/OF bridge is the preferred scheduler;
      * retain the older native implementation as an explicit compatibility
      * choice. Revision 2 promotes archived values written by the temporary

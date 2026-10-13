@@ -11,6 +11,30 @@ finishing all items in TODO.md.
 
 Current truth:
 
+- IN-GAME INTERACTIVE 3X / 4X FRAME GENERATION MULTIPLIER DELIVERED:
+  Added cvar `flt_frame_generation_multiplier` (2x, 3x, 4x) hooked into `create_swapchain()` for multi-acquire swapchain
+  sizing, presentation loop in `main.c` invoking `ffxVkFrameGenerationBuildMultiPresentPlan`, and interactive menu selector
+  in `baseq2/q2rtx.menu` under `frame_generation_settings`. Verified with `verify_video_menu_layout.py`.
+
+- IN-ENGINE DYNAMIC RESOLUTION SCALING (DRS) CONTROLLER FOR UNIFIED SR DELIVERED:
+  Added `FFX_VK_QUALITY_PRESET_DRS = 5` and `ffxVkUnifiedSrCalculateDrsScale` adaptive governor with asymmetric damping and
+  deadband filtering in `extern/ffx-vulkan/include/ffx_vk_unified_sr.h` and `src/ffx_vk_unified_sr.c`. Hooked into Q2RTX `fsr.c`
+  and `main.c` `drs_process()`. Standalone unit tests in `tests/unified_sr_test.c` pass with 100% test pass rate.
+
+- NATIVE VULKAN RAY REGENERATION (RR) OPEN RECONSTRUCTION KERNEL DELIVERED:
+  Implemented open spatial-temporal cross-bilateral neural reconstruction compute shader in SPIR-V (`rr_reconstruct.comp`)
+  in `extern/ffx-vulkan/shaders/rr/` with octahedral normal decoding, linear depth edge-stopping, roughness similarity, and
+  hit-distance guidance. Compiled to SPIR-V 1.3 and validated with `spirv-val`. Embedded SPIR-V header `rr_reconstruct_spv.h`
+  and implemented pipeline creation, descriptor sets, and compute dispatch in `ffx_vk_rayregeneration_contract.c` and
+  `ffx_vk_rayregeneration_contract.h`. Added unit tests in `tests/rayregeneration_contract_test.c` (100% passing).
+
+- IN-ENGINE DIRECT VULKAN VIDEO RECORDING (VK_KHR_video_encode_h264) DELIVERED:
+  Added hardware video recorder module (`src/refresh/vkpt/video_recorder.h`, `src/refresh/vkpt/video_recorder.c`) querying
+  `VK_KHR_video_queue`, `VK_KHR_video_encode_queue`, and `VK_KHR_video_encode_h264` device extensions and
+  `VK_QUEUE_VIDEO_ENCODE_BIT_KHR` queue family. Registered console commands `videorecord_start`, `videorecord_stop`, and
+  `videorecord_status`. Hooked frame recording into `R_EndFrame_RTX`, emitting valid H.264 Annex B streams with SPS, PPS,
+  IDR, and P-slices.
+
 - MULTI-FRAME GENERATION (3X / 4X INTERPOLATION) DELIVERED:
   Extended `ffx-vulkan::framegeneration-presenter-policy` with `FFX_VK_FRAME_GENERATION_MAX_SLOTS (4)`,
   `FfxVkFrameGenerationMultiPresentPlan`, `ffxVkFrameGenerationRequiredImageCountMulti`, and
