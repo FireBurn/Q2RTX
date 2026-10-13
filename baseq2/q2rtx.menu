@@ -141,6 +141,25 @@ begin photomode
     toggle "depth of field" pt_dof
     pairs "camera aperture shape" pt_aperture_type circle 0 triangle 3 square 4 pentagon 5 hexagon 6 heptagon 7 octagon 8
     range -p -f "%.0f%%" "aperture rotation" pt_aperture_angle 0 1 0.1
+    blank
+    action "hardware video recording..." pushmenu hw_video_record
+    action "back" popmenu
+end
+
+begin hw_video_record
+    title "Hardware Video Recording"
+    background #212F3CD0
+    style --compact
+    pairs --status "Direct Vulkan hardware H.264 video recording (VK_KHR_video_encode_h264)." \
+        "recording status" videorecord_active \
+        "Idle" 0 "Recording" 1
+    range -f "%.0f fps" --status "Target recording framerate (30, 60, or 120 fps)." \
+        "recording framerate" videorecord_fps 30 120 30
+    action --status "Start direct Vulkan hardware H.264 video recording to capture file." \
+        "start recording" videorecord_start
+    action --status "Stop active recording and finalize H.264 Annex B stream." \
+        "stop recording" videorecord_stop
+    action "back" popmenu
 end
 
 begin video
