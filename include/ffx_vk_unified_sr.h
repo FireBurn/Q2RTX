@@ -37,7 +37,8 @@ typedef enum FfxVkQualityPreset {
     FFX_VK_QUALITY_PRESET_QUALITY = 1,          /* ~1.5x scale (67% input render scale) */
     FFX_VK_QUALITY_PRESET_BALANCED = 2,         /* ~1.7x scale (59% input render scale) */
     FFX_VK_QUALITY_PRESET_PERFORMANCE = 3,      /* ~2.0x scale (50% input render scale) */
-    FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE = 4 /* ~3.0x scale (33% input render scale) */
+    FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE = 4, /* ~3.0x scale (33% input render scale) */
+    FFX_VK_QUALITY_PRESET_DRS = 5               /* Dynamic resolution scaling (adaptive) */
 } FfxVkQualityPreset;
 
 /* Hardware capability tiers */
@@ -138,6 +139,14 @@ bool ffxVkUnifiedSrGetRenderResolution(
     FfxVkQualityPreset quality,
     VkExtent2D outputExtent,
     VkExtent2D *outInputExtent);
+
+/* Calculate adaptive DRS scale given frametimes and constraints */
+float ffxVkUnifiedSrCalculateDrsScale(
+    float currentFrameTimeMs,
+    float targetFrameTimeMs,
+    float currentScale,
+    float minScale,
+    float maxScale);
 
 /* Initialize unified super resolution context */
 VkResult ffxVkUnifiedSrCreate(

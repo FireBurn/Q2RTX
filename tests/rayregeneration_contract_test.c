@@ -127,5 +127,27 @@ int main(void) {
         FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
     assert((issues & FFX_VK_RR_VALIDATION_REQUIRED_SIGNAL) != 0);
     assert((issues & FFX_VK_RR_VALIDATION_SIGNAL_FLAGS) != 0);
+
+    /* Test embedded SPIR-V reconstruction kernel */
+    size_t wordCount = 0;
+    const uint32_t* spv = ffxVkRayRegenerationGetReconstructSpirv(&wordCount);
+    assert(spv != NULL);
+    assert(wordCount > 0);
+    assert(spv[0] == 0x07230203u); /* SPIR-V magic */
+
+    /* Test pipeline creation fail-closed semantics without device */
+    FfxVkRayRegenerationPipeline pipeline;
+    assert(ffxVkRayRegenerationCreatePipeline(VK_NULL_HANDLE, &pipeline) ==
+        FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+    assert(ffxVkRayRegenerationCreatePipeline((VkDevice)(uintptr_t)1, NULL) ==
+        FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* Test pipeline dispatch validation fail-closed */
+    assert(ffxVkRayRegenerationExecuteDispatch(VK_NULL_HANDLE, &pipeline, &inputs, &outputs) ==
+        FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT);
+
+    /* Test graceful destruction */
+    ffxVkRayRegenerationDestroyPipeline(VK_NULL_HANDLE, &pipeline);
+
     return 0;
 }

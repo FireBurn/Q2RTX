@@ -142,6 +142,41 @@ FfxVkPortableResult ffxVkRayRegenerationValidateOutputs(
     const FfxVkRayRegenerationInputs* inputs,
     const FfxVkRayRegenerationOutputs* outputs, uint64_t* issues);
 
+#define FFX_VK_RR_DESCRIPTOR_SET_COUNT 4
+
+/* Ray Regeneration Native Compute Pipeline and Descriptor State */
+typedef struct FfxVkRayRegenerationPipeline {
+    VkDevice device;
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSets[FFX_VK_RR_DESCRIPTOR_SET_COUNT];
+    VkSampler linearSampler;
+    VkShaderModule shaderModule;
+    uint32_t currentSetIndex;
+} FfxVkRayRegenerationPipeline;
+
+/* Access the embedded Ray Regeneration cross-bilateral reconstruction SPIR-V binary */
+const uint32_t* ffxVkRayRegenerationGetReconstructSpirv(size_t* outWordCount);
+
+/* Create compute pipeline for Ray Regeneration reconstruction pass */
+FfxVkPortableResult ffxVkRayRegenerationCreatePipeline(
+    VkDevice device,
+    FfxVkRayRegenerationPipeline* outPipeline);
+
+/* Destroy compute pipeline resources */
+void ffxVkRayRegenerationDestroyPipeline(
+    VkDevice device,
+    FfxVkRayRegenerationPipeline* pipeline);
+
+/* Execute Ray Regeneration reconstruction compute dispatch */
+FfxVkPortableResult ffxVkRayRegenerationExecuteDispatch(
+    VkCommandBuffer cmdBuf,
+    FfxVkRayRegenerationPipeline* pipeline,
+    const FfxVkRayRegenerationInputs* inputs,
+    const FfxVkRayRegenerationOutputs* outputs);
+
 #if defined(__cplusplus)
 }
 #endif

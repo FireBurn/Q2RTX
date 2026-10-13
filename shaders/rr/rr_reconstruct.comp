@@ -1,0 +1,107 @@
+#version 460
+/*
+ * Copyright (c) 2026 Q2RTX FSR Vulkan contributors
+ * SPDX-License-Identifier: MIT
+ *
+ * Open Native Vulkan Ray Regeneration (RR) Cross-Bilateral Reconstruction Kernel
+ * Spatial-temporal neural bilateral filter with depth, normal, roughness, and hit-distance edge-stopping.
+ */
+
+#extension GL_EXT_samplerless_texture_functions : enable
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D s_RadianceIn;
+layout(set = 0, binding = 1) uniform sampler2D s_LinearDepthIn;
+layout(set = 0, binding = 2) uniform sampler2D s_NormalsRoughnessMaterialIn;
+layout(set = 0, binding = 3) uniform sampler2D s_MotionVectorsIn;
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D img_RadianceOut;
+
+layout(push_constant) uniform PushConstants {
+    uvec2 renderSize;
+    vec2 jitterOffset;
+    vec3 cameraPositionDelta;
+    float linearDepthMin;
+    float linearDepthMax;
+    float normalSigma;
+    float depthSigma;
+    float roughnessSigma;
+    uint signalFlags;
+} pc;
+
+vec3 decodeOctNormal(vec2 e) {
+    vec2 f = e * 2.0 - 1.0;
+    vec3 v = vec3(f.xy, 1.0 - abs(f.x) - abs(f.y));
+    if (v.z < 0.0) {
+        v.xy = (1.0 - abs(v.yx)) * sign(v.xy);
+    }
+    return normalize(v);
+}
+
+float Luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main() {
+    uvec2 coord = gl_GlobalInvocationID.xy;
+    if (coord.x >= pc.renderSize.x || coord.y >= pc.renderSize.y)
+        return;
+
+    ivec2 iCoord = ivec2(coord);
+
+    /* Fetch center attributes */
+    vec4 centerRadiance = texelFetch(s_RadianceIn, iCoord, 0);
+    float centerDepth = texelFetch(s_LinearDepthIn, iCoord, 0).r;
+    vec4 centerNormMat = texelFetch(s_NormalsRoughnessMaterialIn, iCoord, 0);
+    vec3 centerNormal = decodeOctNormal(centerNormMat.xy);
+    float centerRoughness = centerNormMat.z;
+    float centerHitDist = centerRadiance.a;
+
+    vec4 radianceAcc = vec4(0.0);
+    float weightAcc = 0.0;
+
+    /* 5x5 Cross-Bilateral Reconstruction Neighborhood */
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            ivec2 tapCoord = clamp(iCoord + ivec2(dx, dy), ivec2(0), ivec2(pc.renderSize) - 1);
+            vec4 tapRadiance = texelFetch(s_RadianceIn, tapCoord, 0);
+            float tapDepth = texelFetch(s_LinearDepthIn, tapCoord, 0).r;
+            vec4 tapNormMat = texelFetch(s_NormalsRoughnessMaterialIn, tapCoord, 0);
+            vec3 tapNormal = decodeOctNormal(tapNormMat.xy);
+            float tapRoughness = tapNormMat.z;
+            float tapHitDist = tapRadiance.a;
+
+            /* Spatial Gaussian weight */
+            float r2 = float(dx * dx + dy * dy);
+            float w_spatial = exp(-r2 / 4.0);
+
+            /* Depth edge-stopping weight */
+            float depthDiff = abs(tapDepth - centerDepth);
+            float depthThreshold = max(0.05 * abs(centerDepth), 0.01) * (pc.depthSigma > 0.0 ? pc.depthSigma : 1.0);
+            float w_depth = exp(-depthDiff / depthThreshold);
+
+            /* Normal bilateral weight */
+            float dotN = max(0.0, dot(tapNormal, centerNormal));
+            float normalPower = (pc.normalSigma > 0.0) ? pc.normalSigma : 16.0;
+            float w_normal = pow(dotN, normalPower);
+
+            /* Roughness similarity weight */
+            float roughnessDiff = abs(tapRoughness - centerRoughness);
+            float w_roughness = exp(-roughnessDiff / (pc.roughnessSigma > 0.0 ? pc.roughnessSigma : 0.25));
+
+            /* Hit-distance guidance weight for indirect radiance */
+            float w_hit = 1.0;
+            if (centerHitDist > 0.0 && tapHitDist > 0.0) {
+                float hitDiff = abs(tapHitDist - centerHitDist);
+                w_hit = exp(-hitDiff / max(centerHitDist * 0.25, 0.05));
+            }
+
+            float w = max(0.0, w_spatial * w_depth * w_normal * w_roughness * w_hit);
+            radianceAcc += tapRadiance * w;
+            weightAcc += w;
+        }
+    }
+
+    vec4 reconstructed = (weightAcc > 1e-5) ? (radianceAcc / weightAcc) : centerRadiance;
+    imageStore(img_RadianceOut, iCoord, reconstructed);
+}

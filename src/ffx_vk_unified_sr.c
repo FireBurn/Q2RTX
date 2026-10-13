@@ -69,6 +69,9 @@ bool ffxVkUnifiedSrGetRenderResolution(
     case FFX_VK_QUALITY_PRESET_ULTRA_PERFORMANCE:
         scale = 3.0f;
         break;
+    case FFX_VK_QUALITY_PRESET_DRS:
+        scale = 1.5f; /* Dynamic resolution scaling baseline (Quality scale) */
+        break;
     default:
         return false;
     }
@@ -83,6 +86,48 @@ bool ffxVkUnifiedSrGetRenderResolution(
         outInputExtent->height += 1u;
 
     return true;
+}
+
+float ffxVkUnifiedSrCalculateDrsScale(
+    float currentFrameTimeMs,
+    float targetFrameTimeMs,
+    float currentScale,
+    float minScale,
+    float maxScale)
+{
+    if (targetFrameTimeMs <= 0.0f || currentFrameTimeMs <= 0.0f)
+        return currentScale;
+
+    if (minScale > maxScale) {
+        float tmp = minScale;
+        minScale = maxScale;
+        maxScale = tmp;
+    }
+
+    /* Target error: positive when running faster than target, negative when overloaded */
+    float error = 1.0f - (currentFrameTimeMs / targetFrameTimeMs);
+
+    /* Deadband: +-2% jitter margin */
+    if (fabsf(error) < 0.02f) {
+        if (currentScale < minScale) return minScale;
+        if (currentScale > maxScale) return maxScale;
+        return currentScale;
+    }
+
+    /* Adaptive adjustment step with damping to prevent oscillation */
+    float step = error * 0.10f * currentScale;
+
+    /* Asymmetric damping: downscale faster (1.25x) to recover framerate quickly */
+    if (step < 0.0f)
+        step *= 1.25f;
+
+    float newScale = currentScale + step;
+    if (newScale < minScale)
+        newScale = minScale;
+    if (newScale > maxScale)
+        newScale = maxScale;
+
+    return newScale;
 }
 
 bool ffxVkUnifiedSrQueryGpuCapabilities(
