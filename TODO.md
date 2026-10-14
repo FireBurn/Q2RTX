@@ -1136,3 +1136,21 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   formatted commits with SHA256 manifest) and authored `doc/upstream_submission.md` proposing the vendor-neutral temporal
   upscaling, multi-frame generation, and video recorder features for upstream NVIDIA/Q2RTX integration.
 
+## Dynamic Upscaler Context Menus, Reusable Multi-Scaler Single Header, and All-Card CMake/Ebuild Options
+
+- [x] Adaptive Menu Context Isolation in `baseq2/q2rtx.menu`.
+  Guarded all FSR3-specific controls (`FSR3 FG scheduler`, `FSR3 FG minimum FPS`) under `ifeq flt_upscaler 1` and `ifeq flt_upscaler 3`
+  so that selecting AMD FSR 4, Intel XeSS, NVIDIA DLSS, or Unified SR completely removes all FSR 3 options from the UI.
+  Standardized frame generation toggle to "Off / Enabled" and cleaned up upscaler selector names. Verified with `verify_video_menu_layout.py`.
+
+- [x] Reusable Single-Header Master Scaler API (`ffx_vk_all_scalers.h`).
+  Created `extern/ffx-vulkan/include/ffx_vk_all_scalers.h` bundling all multi-vendor upscalers (FSR 1/2/3/4, XeSS, DLSS,
+  Unified SR, Frame Generation, and Ray Regeneration) with universal capability queries for easy integration into third-party
+  game engines and projects (e.g. OptiScaler).
+
+- [x] Explicit CMake and Gentoo Ebuild Upscaler Subsystem Configuration.
+  Added explicit CMake options (`CONFIG_VKPT_FSR1..4`, `CONFIG_VKPT_XESS`, `CONFIG_VKPT_DLSS`, `CONFIG_VKPT_UNIFIED_SR`) with
+  a clear configuration report banner. Added `IUSE="+fsr +xess +dlss"` to `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild`
+  and clarified that all upscalers run across all cards (AMD, Intel, NVIDIA).
+
+

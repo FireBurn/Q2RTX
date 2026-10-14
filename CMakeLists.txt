@@ -28,7 +28,13 @@ execute_process(
 
 OPTION(CONFIG_GL_RENDERER "Enable GL renderer" ON)
 OPTION(CONFIG_VKPT_RENDERER "Enable VKPT renderer" ON)
+OPTION(CONFIG_VKPT_FSR1 "Enable AMD FSR 1.0 spatial upscaler" ON)
+OPTION(CONFIG_VKPT_FSR2 "Enable AMD FSR 2.2 temporal upscaler" ON)
 OPTION(CONFIG_VKPT_FSR3 "Build the native Vulkan FSR 3 upscaler" ON)
+OPTION(CONFIG_VKPT_FSR4 "Enable AMD FSR 4 neural ML upscaler" ON)
+OPTION(CONFIG_VKPT_XESS "Enable Intel XeSS (DP4a / U-Net) cross-vendor upscaler" ON)
+OPTION(CONFIG_VKPT_DLSS "Enable NVIDIA DLSS / d4r (Swin Transformer) cross-vendor upscaler" ON)
+OPTION(CONFIG_VKPT_UNIFIED_SR "Enable Unified Super Resolution auto-selector with DRS" ON)
 OPTION(CONFIG_VKPT_INSTALL_FSR4_V07_ASSETS
     "Install optional experimental FSR4 v07 shader/model assets when present" ON)
 OPTION(CONFIG_VKPT_ENABLE_DEVICE_GROUPS "Enable device groups (multi-gpu) support" ON)
@@ -50,6 +56,19 @@ OPTION(USE_SYSTEM_OPENAL "Prefer system OpenAL Soft instead of the bundled one" 
 OPTION(USE_SYSTEM_CURL "Prefer system cURL instead of the bundled one" OFF)
 OPTION(USE_SYSTEM_SDL2 "Prefer system SDL2 instead of the bundled one" OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+IF(CONFIG_VKPT_RENDERER)
+    MESSAGE(STATUS "--------------------------------------------------------")
+    MESSAGE(STATUS "  Quake II RTX Upscaler Subsystems (All-Card Native Vulkan):")
+    MESSAGE(STATUS "    - AMD FSR 1.0 (Spatial EASU/RCAS):       ${CONFIG_VKPT_FSR1}")
+    MESSAGE(STATUS "    - AMD FSR 2.2 (Temporal 2.2):            ${CONFIG_VKPT_FSR2}")
+    MESSAGE(STATUS "    - AMD FSR 3.1 (FidelityFX 3.1.5):        ${CONFIG_VKPT_FSR3}")
+    MESSAGE(STATUS "    - AMD FSR 4   (Neural ML INT8):          ${CONFIG_VKPT_FSR4}")
+    MESSAGE(STATUS "    - Intel XeSS  (DP4a / U-Net):             ${CONFIG_VKPT_XESS}")
+    MESSAGE(STATUS "    - NVIDIA DLSS (Swin Transformer / d4r):  ${CONFIG_VKPT_DLSS}")
+    MESSAGE(STATUS "    - Unified Super Resolution (Auto DRS):   ${CONFIG_VKPT_UNIFIED_SR}")
+    MESSAGE(STATUS "--------------------------------------------------------")
+ENDIF()
 
 # use dynamic zlib for steam runtime
 IF(CONFIG_LINUX_STEAM_RUNTIME_SUPPORT)
