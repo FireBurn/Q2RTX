@@ -879,6 +879,16 @@ if(FFX_VK_PORTABLE_BUILD_TESTS)
     add_test(NAME ffx_vk_unified_sr
         COMMAND ffx_vk_unified_sr_test)
 
+    add_executable(ffx_vk_all_scalers_test
+        tests/all_scalers_test.c)
+    target_link_libraries(ffx_vk_all_scalers_test PRIVATE
+        ffx-vulkan::unified-sr
+        ffx-vulkan::fsr4-v07-assets
+        ffx-vulkan::framegeneration-presenter-policy
+        ffx-vulkan::rayregeneration-contract)
+    add_test(NAME ffx_vk_all_scalers
+        COMMAND ffx_vk_all_scalers_test)
+
     add_executable(ffx_vk_unified_sr_sample
         examples/unified_sr_sample/unified_sr_minimal_sample.c)
     target_compile_features(ffx_vk_unified_sr_sample PRIVATE c_std_11)
