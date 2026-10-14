@@ -1,6 +1,6 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-09-08 (Europe/London)
+Last updated: 2026-10-15 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
@@ -1114,3 +1114,25 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   `VK_KHR_video_queue`, `VK_KHR_video_encode_queue`, and `VK_KHR_video_encode_h264` device extensions and `VK_QUEUE_VIDEO_ENCODE_BIT_KHR`
   queue family. Added console commands `videorecord_start [filename] [fps] [bitrate]`, `videorecord_stop`, and `videorecord_status`.
   Hooked frame capture into `R_EndFrame_RTX`, emitting valid H.264 Annex B streams with SPS, PPS, IDR, and P-slices.
+
+## In-Game DRS Target Presets, Direct VkVideoSessionKHR Encoding, and Upstream Contribution Patchset
+
+- [x] Gentoo Overlay Multi-Frame Generation and Video Recorder Documentation.
+  Committed post-install documentation in `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild` detailing multi-frame
+  generation multipliers (2x/3x/4x via `flt_frame_generation_multiplier`) and in-engine Vulkan hardware video recording.
+
+- [x] In-Game Dynamic Resolution Scaling (DRS) Target Framerate Presets.
+  Added target framerate selector presets (30, 60, 90, 120, 144, 240 FPS) and fine-tuning slider to `baseq2/q2rtx.menu` under
+  the dynamic resolution submenu. Exposed direct submenu action under Unified SR (`flt_upscaler 6`). Verified with
+  `verify_video_menu_layout.py` and CTest.
+
+- [x] Direct `VkVideoSessionKHR` Hardware Encode Session Management.
+  Expanded `src/refresh/vkpt/video_recorder.c` with dynamic procedure address resolution (`vkCreateVideoSessionKHR`,
+  `vkCreateVideoSessionParametersKHR`, `vkBindVideoSessionMemoryKHR`, `vkCmdEncodeVideoKHR`), H.264 encode video profile
+  specification, memory requirements binding, output bitstream buffer allocation, and telemetry reporting in `videorecord_status`.
+
+- [x] Upstream Contribution Patchset Exporter and Submission Proposal.
+  Created `tools/export_upstream_patches.sh` automated patch series generator against `origin/master` (generating 339
+  formatted commits with SHA256 manifest) and authored `doc/upstream_submission.md` proposing the vendor-neutral temporal
+  upscaling, multi-frame generation, and video recorder features for upstream NVIDIA/Q2RTX integration.
+

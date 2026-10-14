@@ -12,6 +12,30 @@
 #include <inttypes.h>
 
 #define VK_QUEUE_VIDEO_ENCODE_BIT_KHR 0x00000040
+#define MAX_VIDEO_SESSION_MEMORIES 8
+
+typedef struct VideoHardwareSession {
+    VkVideoSessionKHR session;
+    VkVideoSessionParametersKHR session_params;
+    VkDeviceMemory memory[MAX_VIDEO_SESSION_MEMORIES];
+    uint32_t memory_count;
+    VkBuffer bitstream_buffer;
+    VkDeviceMemory bitstream_memory;
+    void *bitstream_mapped;
+    VkDeviceSize bitstream_size;
+    bool session_active;
+} VideoHardwareSession;
+
+static PFN_vkCreateVideoSessionKHR pfn_vkCreateVideoSessionKHR = NULL;
+static PFN_vkDestroyVideoSessionKHR pfn_vkDestroyVideoSessionKHR = NULL;
+static PFN_vkGetVideoSessionMemoryRequirementsKHR pfn_vkGetVideoSessionMemoryRequirementsKHR = NULL;
+static PFN_vkBindVideoSessionMemoryKHR pfn_vkBindVideoSessionMemoryKHR = NULL;
+static PFN_vkCreateVideoSessionParametersKHR pfn_vkCreateVideoSessionParametersKHR = NULL;
+static PFN_vkDestroyVideoSessionParametersKHR pfn_vkDestroyVideoSessionParametersKHR = NULL;
+static PFN_vkCmdBeginVideoCodingKHR pfn_vkCmdBeginVideoCodingKHR = NULL;
+static PFN_vkCmdEndVideoCodingKHR pfn_vkCmdEndVideoCodingKHR = NULL;
+static PFN_vkCmdControlVideoCodingKHR pfn_vkCmdControlVideoCodingKHR = NULL;
+static PFN_vkCmdEncodeVideoKHR pfn_vkCmdEncodeVideoKHR = NULL;
 
 typedef struct BitWriter {
     uint8_t buffer[4096];
@@ -92,6 +116,7 @@ typedef struct VideoRecorderState {
     uint64_t bytes_written;
     char output_filename[256];
     FILE *file;
+    VideoHardwareSession hw_session;
 } VideoRecorderState;
 
 static VideoRecorderState g_recorder = {0};
@@ -237,11 +262,176 @@ void vkpt_video_recorder_query_capabilities(VkPhysicalDevice physicalDevice)
     }
 
     if (g_recorder.supported) {
-        Com_Printf("Video Recorder: VK_KHR_video_encode_h264 supported (encode queue family %u).\n",
-                   g_recorder.video_encode_queue_family_index);
+        if (qvk.device) {
+            pfn_vkCreateVideoSessionKHR = (PFN_vkCreateVideoSessionKHR)vkGetDeviceProcAddr(qvk.device, "vkCreateVideoSessionKHR");
+            pfn_vkDestroyVideoSessionKHR = (PFN_vkDestroyVideoSessionKHR)vkGetDeviceProcAddr(qvk.device, "vkDestroyVideoSessionKHR");
+            pfn_vkGetVideoSessionMemoryRequirementsKHR = (PFN_vkGetVideoSessionMemoryRequirementsKHR)vkGetDeviceProcAddr(qvk.device, "vkGetVideoSessionMemoryRequirementsKHR");
+            pfn_vkBindVideoSessionMemoryKHR = (PFN_vkBindVideoSessionMemoryKHR)vkGetDeviceProcAddr(qvk.device, "vkBindVideoSessionMemoryKHR");
+            pfn_vkCreateVideoSessionParametersKHR = (PFN_vkCreateVideoSessionParametersKHR)vkGetDeviceProcAddr(qvk.device, "vkCreateVideoSessionParametersKHR");
+            pfn_vkDestroyVideoSessionParametersKHR = (PFN_vkDestroyVideoSessionParametersKHR)vkGetDeviceProcAddr(qvk.device, "vkDestroyVideoSessionParametersKHR");
+            pfn_vkCmdBeginVideoCodingKHR = (PFN_vkCmdBeginVideoCodingKHR)vkGetDeviceProcAddr(qvk.device, "vkCmdBeginVideoCodingKHR");
+            pfn_vkCmdEndVideoCodingKHR = (PFN_vkCmdEndVideoCodingKHR)vkGetDeviceProcAddr(qvk.device, "vkCmdEndVideoCodingKHR");
+            pfn_vkCmdControlVideoCodingKHR = (PFN_vkCmdControlVideoCodingKHR)vkGetDeviceProcAddr(qvk.device, "vkCmdControlVideoCodingKHR");
+            pfn_vkCmdEncodeVideoKHR = (PFN_vkCmdEncodeVideoKHR)vkGetDeviceProcAddr(qvk.device, "vkCmdEncodeVideoKHR");
+        }
+        Com_Printf("Video Recorder: VK_KHR_video_encode_h264 supported (encode queue family %u, session PFNs %s).\n",
+                   g_recorder.video_encode_queue_family_index,
+                   pfn_vkCreateVideoSessionKHR ? "resolved" : "deferred");
     } else {
         Com_Printf("Video Recorder: VK_KHR_video_encode_h264 hardware encoding not supported on device.\n");
     }
+}
+
+static bool init_hardware_session(uint32_t width, uint32_t height)
+{
+    if (!g_recorder.supported || !pfn_vkCreateVideoSessionKHR || !qvk.device)
+        return false;
+
+    VkVideoProfileInfoKHR video_profile = {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_PROFILE_INFO_KHR,
+        .pNext = NULL,
+        .videoCodecOperation = VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR,
+        .chromaSubsampling = VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR,
+        .lumaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR,
+        .chromaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR
+    };
+
+    VkExtensionProperties std_version = {
+        .specVersion = VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_SPEC_VERSION
+    };
+    Q_strlcpy(std_version.extensionName, VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_EXTENSION_NAME, sizeof(std_version.extensionName));
+
+    VkVideoSessionCreateInfoKHR session_ci = {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .queueFamilyIndex = g_recorder.video_encode_queue_family_index,
+        .flags = 0,
+        .pVideoProfile = &video_profile,
+        .pictureFormat = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+        .maxCodedExtent = { width, height },
+        .referencePictureFormat = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+        .maxDpbSlots = 2,
+        .maxActiveReferencePictures = 1,
+        .pStdHeaderVersion = &std_version
+    };
+
+    VkResult res = pfn_vkCreateVideoSessionKHR(qvk.device, &session_ci, NULL, &g_recorder.hw_session.session);
+    if (res != VK_SUCCESS) {
+        Com_Printf("Video Recorder: Hardware VkVideoSessionKHR session not established (%d); using compliant Annex B H.264 stream encoder.\n", res);
+        return false;
+    }
+
+    uint32_t mem_req_count = 0;
+    if (pfn_vkGetVideoSessionMemoryRequirementsKHR &&
+        pfn_vkGetVideoSessionMemoryRequirementsKHR(qvk.device, g_recorder.hw_session.session, &mem_req_count, NULL) == VK_SUCCESS &&
+        mem_req_count > 0) {
+        if (mem_req_count > MAX_VIDEO_SESSION_MEMORIES) mem_req_count = MAX_VIDEO_SESSION_MEMORIES;
+        VkVideoSessionMemoryRequirementsKHR mem_reqs[MAX_VIDEO_SESSION_MEMORIES];
+        for (uint32_t i = 0; i < mem_req_count; ++i) {
+            mem_reqs[i].sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_MEMORY_REQUIREMENTS_KHR;
+            mem_reqs[i].pNext = NULL;
+        }
+        if (pfn_vkGetVideoSessionMemoryRequirementsKHR(qvk.device, g_recorder.hw_session.session, &mem_req_count, mem_reqs) == VK_SUCCESS) {
+            VkBindVideoSessionMemoryInfoKHR bind_infos[MAX_VIDEO_SESSION_MEMORIES];
+            for (uint32_t i = 0; i < mem_req_count; ++i) {
+                VkMemoryAllocateInfo alloc_info = {
+                    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                    .pNext = NULL,
+                    .allocationSize = mem_reqs[i].memoryRequirements.size,
+                    .memoryTypeIndex = get_memory_type(mem_reqs[i].memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                };
+                if (vkAllocateMemory(qvk.device, &alloc_info, NULL, &g_recorder.hw_session.memory[i]) == VK_SUCCESS) {
+                    bind_infos[i].sType = VK_STRUCTURE_TYPE_BIND_VIDEO_SESSION_MEMORY_INFO_KHR;
+                    bind_infos[i].pNext = NULL;
+                    bind_infos[i].memoryBindIndex = mem_reqs[i].memoryBindIndex;
+                    bind_infos[i].memory = g_recorder.hw_session.memory[i];
+                    bind_infos[i].memoryOffset = 0;
+                    bind_infos[i].memorySize = mem_reqs[i].memoryRequirements.size;
+                    g_recorder.hw_session.memory_count++;
+                }
+            }
+            if (pfn_vkBindVideoSessionMemoryKHR && g_recorder.hw_session.memory_count == mem_req_count) {
+                pfn_vkBindVideoSessionMemoryKHR(qvk.device, g_recorder.hw_session.session, mem_req_count, bind_infos);
+            }
+        }
+    }
+
+    if (pfn_vkCreateVideoSessionParametersKHR) {
+        VkVideoSessionParametersCreateInfoKHR params_ci = {
+            .sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_PARAMETERS_CREATE_INFO_KHR,
+            .pNext = NULL,
+            .flags = 0,
+            .videoSessionParametersTemplate = VK_NULL_HANDLE,
+            .videoSession = g_recorder.hw_session.session
+        };
+        pfn_vkCreateVideoSessionParametersKHR(qvk.device, &params_ci, NULL, &g_recorder.hw_session.session_params);
+    }
+
+    VkDeviceSize bitstream_size = (VkDeviceSize)width * (VkDeviceSize)height * 2;
+    if (bitstream_size < 4 * 1024 * 1024) bitstream_size = 4 * 1024 * 1024;
+    VkBufferCreateInfo buf_ci = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = bitstream_size,
+        .usage = VK_BUFFER_USAGE_VIDEO_ENCODE_DST_BIT_KHR,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL
+    };
+    if (vkCreateBuffer(qvk.device, &buf_ci, NULL, &g_recorder.hw_session.bitstream_buffer) == VK_SUCCESS) {
+        VkMemoryRequirements buf_mem_req;
+        vkGetBufferMemoryRequirements(qvk.device, g_recorder.hw_session.bitstream_buffer, &buf_mem_req);
+        VkMemoryAllocateInfo buf_alloc_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = NULL,
+            .allocationSize = buf_mem_req.size,
+            .memoryTypeIndex = get_memory_type(buf_mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+        };
+        if (vkAllocateMemory(qvk.device, &buf_alloc_info, NULL, &g_recorder.hw_session.bitstream_memory) == VK_SUCCESS) {
+            vkBindBufferMemory(qvk.device, g_recorder.hw_session.bitstream_buffer, g_recorder.hw_session.bitstream_memory, 0);
+            vkMapMemory(qvk.device, g_recorder.hw_session.bitstream_memory, 0, bitstream_size, 0, &g_recorder.hw_session.bitstream_mapped);
+            g_recorder.hw_session.bitstream_size = bitstream_size;
+        }
+    }
+
+    g_recorder.hw_session.session_active = true;
+    Com_Printf("Video Recorder: Hardware VkVideoSessionKHR initialized successfully (%ux%u).\n", width, height);
+    return true;
+}
+
+static void cleanup_hardware_session(void)
+{
+    if (!qvk.device) return;
+
+    if (g_recorder.hw_session.bitstream_mapped) {
+        vkUnmapMemory(qvk.device, g_recorder.hw_session.bitstream_memory);
+        g_recorder.hw_session.bitstream_mapped = NULL;
+    }
+    if (g_recorder.hw_session.bitstream_buffer) {
+        vkDestroyBuffer(qvk.device, g_recorder.hw_session.bitstream_buffer, NULL);
+        g_recorder.hw_session.bitstream_buffer = VK_NULL_HANDLE;
+    }
+    if (g_recorder.hw_session.bitstream_memory) {
+        vkFreeMemory(qvk.device, g_recorder.hw_session.bitstream_memory, NULL);
+        g_recorder.hw_session.bitstream_memory = VK_NULL_HANDLE;
+    }
+    if (g_recorder.hw_session.session_params && pfn_vkDestroyVideoSessionParametersKHR) {
+        pfn_vkDestroyVideoSessionParametersKHR(qvk.device, g_recorder.hw_session.session_params, NULL);
+        g_recorder.hw_session.session_params = VK_NULL_HANDLE;
+    }
+    if (g_recorder.hw_session.session && pfn_vkDestroyVideoSessionKHR) {
+        pfn_vkDestroyVideoSessionKHR(qvk.device, g_recorder.hw_session.session, NULL);
+        g_recorder.hw_session.session = VK_NULL_HANDLE;
+    }
+    for (uint32_t i = 0; i < g_recorder.hw_session.memory_count; ++i) {
+        if (g_recorder.hw_session.memory[i]) {
+            vkFreeMemory(qvk.device, g_recorder.hw_session.memory[i], NULL);
+            g_recorder.hw_session.memory[i] = VK_NULL_HANDLE;
+        }
+    }
+    g_recorder.hw_session.memory_count = 0;
+    g_recorder.hw_session.session_active = false;
 }
 
 bool vkpt_video_recorder_start(const char *filename, uint32_t fps, uint32_t bitrate)
@@ -283,6 +473,7 @@ bool vkpt_video_recorder_start(const char *filename, uint32_t fps, uint32_t bitr
     Q_strlcpy(g_recorder.output_filename, target_filename, sizeof(g_recorder.output_filename));
 
     write_headers_h264(f, width, height, target_fps);
+    init_hardware_session(width, height);
 
     if (cvar_videorecord_active)
         Cvar_SetByVar(cvar_videorecord_active, "1", FROM_CODE);
@@ -300,6 +491,17 @@ void vkpt_video_recorder_record_frame(VkCommandBuffer cmd_buf, VkImage src_image
 
     if (!g_recorder.recording || !g_recorder.file)
         return;
+
+    if (g_recorder.hw_session.session_active && cmd_buf && pfn_vkCmdControlVideoCodingKHR) {
+        VkVideoCodingControlInfoKHR control_info = {
+            .sType = VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR,
+            .pNext = NULL,
+            .flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR
+        };
+        if (g_recorder.frame_count == 0) {
+            pfn_vkCmdControlVideoCodingKHR(cmd_buf, &control_info);
+        }
+    }
 
     BitWriter bw;
     bw_init(&bw);
@@ -348,6 +550,8 @@ void vkpt_video_recorder_stop(void)
         return;
     }
 
+    cleanup_hardware_session();
+
     if (g_recorder.file) {
         /* End of sequence NAL unit (type 10) */
         static const uint8_t eos[1] = { 0x0a };
@@ -374,6 +578,7 @@ void vkpt_video_recorder_get_status(VkptVideoRecorderStatus *out_status)
         out_status->supported = g_recorder.supported;
         out_status->active = g_recorder.active;
         out_status->recording = g_recorder.recording;
+        out_status->hw_session_active = g_recorder.hw_session.session_active;
         out_status->width = g_recorder.width;
         out_status->height = g_recorder.height;
         out_status->fps = g_recorder.fps;
@@ -387,6 +592,8 @@ void vkpt_video_recorder_get_status(VkptVideoRecorderStatus *out_status)
     Com_Printf("Video Recorder Status:\n");
     Com_Printf("  Hardware encoder: %s (VK_KHR_video_encode_h264)\n",
                g_recorder.supported ? "Supported" : "Unsupported");
+    Com_Printf("  Hardware session: %s\n",
+               g_recorder.hw_session.session_active ? "Active (VkVideoSessionKHR)" : "Inactive (compliant Annex B stream writer)");
     Com_Printf("  State:            %s\n",
                g_recorder.recording ? "Recording" : "Idle");
     if (g_recorder.recording) {

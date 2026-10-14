@@ -99,6 +99,9 @@ begin resolution
             "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
         action "dynamic resolution..." pushmenu dynamic_resolution
     endif
+    ifeq flt_upscaler 6
+        action "dynamic resolution..." pushmenu dynamic_resolution
+    endif
     action "back" popmenu
 end
 
@@ -108,7 +111,9 @@ begin dynamic_resolution
     style --compact
 	toggle "dynamic resolution scaling" drs_enable
 	blank
-	range -f "%.0f FPS" --status "only effective in dynamic mode" "target frames per second" drs_target 30 250 1
+	pairs --status "Quick target frame rate preset for dynamic resolution scaling." \
+		"target framerate preset" drs_target "30 FPS" 30 "60 FPS" 60 "90 FPS" 90 "120 FPS" 120 "144 FPS" 144 "240 FPS" 240
+	range -f "%.0f FPS" --status "Fine-tune target frames per second regulator." "target frames per second" drs_target 30 250 1
 	range -f "%.0f%%" --status "only effective in dynamic mode" "minimum scale" drs_minscale 25 100 5
 	range -f "%.0f%%" --status "only effective in dynamic mode" "maximum scale" drs_maxscale 50 150 5
 	blank

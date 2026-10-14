@@ -57,3 +57,4 @@ __pycache__/
 *.py[cod]
 vkd3d-proton.cache*
 *.mp4
+patches/
