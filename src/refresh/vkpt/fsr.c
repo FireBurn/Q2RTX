@@ -21,16 +21,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "vkpt.h"
 #include "system/system.h"
-#include "ffx_vk_fsr4_v07.h"
+#include "ffx_vk_all_scalers.h"
 #include "ffx_vk_fsr4_v07_schedule.h"
 #include "ffx_vk_fsr4_v07_assets.h"
 #ifdef VKPT_FSR3
-#include "ffx_vk_portable.h"
 #include "ffx_vk_fsr3_3_1_5_bridge.h"
-#include "ffx_vk_rayregeneration_contract.h"
-#include "ffx_vk_xess_contract.h"
-#include "ffx_vk_dlss_contract.h"
-#include "ffx_vk_unified_sr.h"
 #endif
 #include <math.h>
 
@@ -175,6 +170,9 @@ static bool unified_sr_context_ok = false;
 static bool unified_sr_reset_next = true;
 static uint32_t unified_sr_ctx_dw = 0;
 static uint32_t unified_sr_ctx_dh = 0;
+
+static FfxVkRayRegenerationPipeline rr_pipeline;
+static bool rr_context_ok = false;
 #endif
 
 static uint32_t align_up_8(uint32_t value)
@@ -1347,6 +1345,31 @@ static VkResult unified_sr_create_context(void)
     return VK_SUCCESS;
 }
 
+static void rayregeneration_destroy_context(void)
+{
+    if (rr_pipeline.pipeline != VK_NULL_HANDLE) {
+        ffxVkRayRegenerationDestroyPipeline(qvk.device, &rr_pipeline);
+    }
+    memset(&rr_pipeline, 0, sizeof(rr_pipeline));
+    rr_context_ok = false;
+}
+
+static VkResult rayregeneration_create_context(void)
+{
+    rayregeneration_destroy_context();
+    if (!qvk.device)
+        return VK_ERROR_INITIALIZATION_FAILED;
+
+    FfxVkPortableResult pres = ffxVkRayRegenerationCreatePipeline(qvk.device, &rr_pipeline);
+    if (pres != FFX_VK_PORTABLE_OK) {
+        Com_WPrintf("RayRegeneration: compute pipeline creation failed (%d).\n", (int)pres);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+    rr_context_ok = true;
+    Com_Printf("RayRegeneration: native Vulkan cross-bilateral reconstruction pipeline ready.\n");
+    return VK_SUCCESS;
+}
+
 static bool xess_is_enabled(void)
 {
     return requested_upscaler() == VKPT_UPSCALER_XESS &&
@@ -1575,22 +1598,11 @@ static bool resolve_upscaler(int *active, const char **reason)
 
 static const char *fsr_diagnostic_provider_name(int provider)
 {
-    switch (provider) {
-    case VKPT_UPSCALER_FSR3:
-        return "FSR3 3.1.4 native Vulkan";
-    case VKPT_UPSCALER_FSR4:
-        return "FSR4 source-v07 INT8/DOT4 Vulkan";
-    case VKPT_UPSCALER_FSR3_315:
-        return "FSR3 3.1.5 public-SDK Vulkan experiment";
-    case VKPT_UPSCALER_XESS:
-        return "Intel XeSS Super Resolution";
-    case VKPT_UPSCALER_DLSS:
-        return "NVIDIA DLSS / AMD d4r Super Resolution";
-    case VKPT_UPSCALER_UNIFIED:
-        return "Unified Super Resolution (Auto)";
-    default:
-        return "Q2RTX fallback";
+    if (provider >= 0 && provider < (int)FFX_VK_SCALER_COUNT) {
+        FfxVkMasterScalerInfo info = ffxVkGetScalerInfo((FfxVkMasterScalerId)provider);
+        return info.name;
     }
+    return "Q2RTX fallback";
 }
 
 static const char *fsr_diagnostic_motion_space(uint32_t space)
@@ -1803,6 +1815,18 @@ void vkpt_fsr_print_diagnostics(void)
     Com_Printf("  Unified SR: context=%s active=%s\n",
         unified_sr_context_ok ? "ready" : "not ready",
         ffxVkUnifiedSrGetUpscalerName(unified_sr_context.activeUpscaler));
+    Com_Printf("  Ray Regeneration: pipeline=%s (cross-bilateral denoiser reconstruction)\n",
+        rr_context_ok ? "ready" : "not ready");
+    {
+        int requested_id = requested_upscaler();
+        if (requested_id >= 0 && requested_id < (int)FFX_VK_SCALER_COUNT) {
+            FfxVkMasterScalerInfo info = ffxVkGetScalerInfo((FfxVkMasterScalerId)requested_id);
+            Com_Printf("  Selected Scaler Descriptor: %s [Vendor: %s, Algorithm: %s, DRS: %s, FG: %s]\n",
+                info.name, info.vendor, info.algorithm,
+                info.supports_drs ? "Supported" : "Fixed",
+                info.supports_framegen ? "Supported" : "No");
+        }
+    }
     Com_Printf("  FSR3 FI/OF: requested=%s backend=%s context=%s active=%s "
                "rendered=%.1f generated=%.1f\n",
         cvar_flt_frame_generation && cvar_flt_frame_generation->integer ? "on" : "off",
@@ -2076,6 +2100,9 @@ VkResult vkpt_fsr_create_pipelines(void)
         unified_sr_ctx_dh != qvk.extent_unscaled.height) {
         (void)unified_sr_create_context();
     }
+    if (!rr_context_ok) {
+        (void)rayregeneration_create_context();
+    }
     if (cvar_flt_frame_generation && cvar_flt_frame_generation->integer != 0 &&
         (!fsr3_frame_generation_context_ok ||
          fsr3_frame_generation_dw != qvk.extent_unscaled.width ||
@@ -2103,6 +2130,7 @@ VkResult vkpt_fsr_destroy_pipelines(void)
      * Tear down the complete tier-specific backend so coherent pre/model/post
      * pipelines and persistent resource extents are rebuilt together. */
 #ifdef VKPT_FSR3
+    rayregeneration_destroy_context();
     unified_sr_destroy_context();
     dlss_destroy_context();
     xess_destroy_context();

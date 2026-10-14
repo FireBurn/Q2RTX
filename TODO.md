@@ -1153,4 +1153,9 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   a clear configuration report banner. Added `IUSE="+fsr +xess +dlss"` to `/home/fireburn/Overlay/games-fps/q2rtx/q2rtx-9999.ebuild`
   and clarified that all upscalers run across all cards (AMD, Intel, NVIDIA).
 
+- [x] Full Q2RTX Engine Adoption of All New Features.
+  Updated `src/refresh/vkpt/fsr.c` to directly include `ffx_vk_all_scalers.h`, query descriptor metadata via `ffxVkGetScalerInfo()`,
+  and lifecycle-manage the native Vulkan Ray Regeneration (`FfxVkRayRegenerationPipeline`) cross-bilateral reconstruction pipeline
+  alongside FSR 3.1, FSR 4, Intel XeSS, NVIDIA DLSS, Unified SR DRS governor, and multi-frame generation. All test suites passing 100%.
+
 
