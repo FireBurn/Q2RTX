@@ -9,9 +9,9 @@ milestone and immediately before ending or transferring the session.
 
 Synchronized and published the reusable Vulkan subproject `extern/ffx-vulkan` to both its standalone dedicated GitHub repository [`FireBurn/FSR-Vulkan`](https://github.com/FireBurn/FSR-Vulkan) and the standalone distribution branch `ffx-vulkan-release` on [`FireBurn/Q2RTX`](https://github.com/FireBurn/Q2RTX):
 - **Repository and branch status**:
-  - `FireBurn/Q2RTX` `master`: commit `1b657498` (pushed, up to date with `github/master`).
-  - `FireBurn/Q2RTX` `ffx-vulkan-release`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, up to date with `github/ffx-vulkan-release`).
-  - `FireBurn/FSR-Vulkan` `main`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, fast-forwarded from `c64f0934` to `51da6c86`).
+  - `FireBurn/Q2RTX` `master`: commit `d3d673aa` (pushed, up to date with `github/master`).
+  - `FireBurn/Q2RTX` `ffx-vulkan-release`: commit `c235bf66` (pushed, up to date with `github/ffx-vulkan-release`).
+  - `FireBurn/FSR-Vulkan` `main`: commit `c235bf66` (pushed, fast-forwarded to `c235bf66`).
 - **Standalone documentation and multi-vendor branding**:
   - Fully revamped `extern/ffx-vulkan/README.md`, `INTEGRATION_GUIDE.md`, and `NOTICE.md` to reflect unified multi-vendor scope across AMD FSR 4.1.2 / FSR 3, Intel XeSS 2.0.2 Quality U-Net, and NVIDIA DLSS 4 / d4r Model K.
   - Promoted DLSS 4 / d4r Model K in `include/ffx_vk_scaler_catalog.h` and `tests/scaler_catalog_test.c` to native implementation.
