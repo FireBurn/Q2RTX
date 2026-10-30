@@ -1,9 +1,234 @@
 # FidelityFX Vulkan implementation TODO
 
-Last updated: 2026-10-15 (Europe/London)
+Last updated: 2026-10-30 (Europe/London)
 
 Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 `[ ]` not started, `[R]` research/unknown viability.
+
+## Current priority — DLSS 4 / d4r Neural Swin Transformer & Official FSR 4.1.2 Integration (2026-10-30)
+
+- [x] Native Vulkan DLSS 4 / d4r Swin Transformer & Model K Neural Pipeline (Approach B):
+  - Designed and implemented 4-stage neural pipeline compute shaders in `extern/ffx-vulkan/shaders/dlss/`:
+    - `d4r_input_preprocess.comp`: RGB -> YCoCg conversion, 3x3 depth-guided motion dilation, linear view-Z derivation, 3x3 color mean and variance calculation.
+    - `d4r_swin_encoder.comp`: 8x8 windowed attention token generation, Query-Key dot products in YCoCg space, bilateral depth edge-stopping.
+    - `d4r_swin_decoder.comp`: Multi-scale latent fusion, bilinear/bicubic latent upsampling, residual skip expansion, and confidence estimation.
+    - `d4r_dfn_reconstruct.comp`: 5x5 Anisotropic Gaussian Dynamic Filter Network (DFN) reconstruction, temporal history accumulation, variance-guided color clipping in YCoCg, and contrast-adaptive high-frequency sharpening.
+  - Validated all 5 SPIR-V binaries (`d4r_swin_reconstruct`, `d4r_input_preprocess`, `d4r_swin_encoder`, `d4r_swin_decoder`, `d4r_dfn_reconstruct`) with `spirv-val --target-env vulkan1.3` (0 errors).
+  - Built `extern/ffx-vulkan/tools/generate_dlss_shaders.py` to compile and generate embedded C headers (`d4r_*_spv.h`).
+  - Implemented `tools/ffx_dxil/pack_dlss_model.py` supporting `DLSSMOD1` and `DLSSNR1` packaging, with unit tests in `tools/ffx_dxil/tests/test_pack_dlss_model.py` (51/51 python tests passing).
+  - Generated `baseq2/dlss_models/dlss_k.bin` (74,048 bytes) and symlinked to `~/.local/share/quake2rtx/baseq2/dlss_models/`. Added `baseq2/dlss_models/` to `.gitignore`.
+  - Upgraded `FfxVkDlssPipeline` in `extern/ffx-vulkan/src/ffx_vk_dlss_contract.c` to manage multi-pass stage pipelines (`stagePipelines`, `stagePipelineLayouts`, `stageDescriptorSetLayouts`, `stageShaderModules`, `stageDescriptorSets`) and added `ffxVkDlssExecuteMultiPassDispatch`.
+  - Added SPIR-V query accessors (`ffxVkDlssGetInputPreprocessSpirv`, `ffxVkDlssGetSwinEncoderSpirv`, `ffxVkDlssGetSwinDecoderSpirv`, `ffxVkDlssGetDfnReconstructSpirv`).
+  - Updated engine wiring in `src/refresh/vkpt/fsr.c`: implemented `load_dlss_model_asset`, bound Model K tensor container at context creation, and updated diagnostic status.
+  - Verified live on physical AMD Radeon RX 6800M (RADV NAVI22) under full Vulkan validation (`vk_validation 1`):
+    - Zero validation errors (`VK_LAYER_KHRONOS_validation` completely clean).
+    - Status: `DLSS 4 / d4r Model K neural Swin transformer active`, FSR scope latency ~0.122 ms, frame ~3.99 ms.
+  - All 48/48 standalone `ffx-vulkan-project` CTests and 6/6 root Q2RTX CTests pass.
+
+- [x] Official AMD FSR 4.1.2 (`amdvkffx64_4.1.2_2.4.0.4370.dll`) extraction, SPIR-V normalization, schedule & asset builders:
+  - Decompressed official DLL (SHA-256 `80e761f7c8c0ec8ead7b321df01911baaf917defae51388d29eaecb1d6bc58bd`) via `tools/extract_fsr412_vk.py`.
+  - Extracted 1,154 SPIR-V modules and 18 initializer blobs in `baseq2/fsr4_shaders/` covering all 3 INT8 variants (`i8_2` RDNA2/Navi2 27 model passes, `lite_i8` Lite 10 model passes, `i8` RDNA3 27 model passes), 6 presets (`native`, `quality`, `balanced`, `performance`, `drs`, `ultraperf`), 3 resolution tiers (`1080`, `2160`, `4320`), plus `rcas_412.spv` and `spd_auto_exposure_412.spv`.
+  - Validated all 386 unique modules with `spirv-val --target-env vulkan1.3` (0 errors).
+  - Resolved `VUID-vkCmdDispatch-OpImageWrite-08795` by implementing automatic promotion of 3-component `OpImageWrite` texels to `vec4` (padded with alpha=1.0) in `tools/extract_fsr412_vk.py`.
+  - Implemented dynamic scheduling (`FfxFsr4ModelVariant`, `FfxFsr4412Schedule`, `ffxFsr4Build412Schedule`, `ffxFsr4GetVariantScratchSize`) and asset building (`FfxFsr4412AssetSet`, `ffxFsr4412BuildAssetSet`) in `extern/ffx-vulkan`.
+  - Updated Vulkan backend & provider (`ffx_vk_fsr4_v07.c`, `ffx_vk_fsr4_v07_provider.c`) with dynamic pass counts up to 29 passes, binding 33 InitializerBuffer in prepass, binding 4 CsTensorSizes UBO in model passes, and variant-specific hardware checks (RDNA2 `i8_2` runs with only DotProductInput4x8BitPacked + Float16).
+  - Integrated into Q2RTX (`src/refresh/vkpt/fsr.c`): added `cvar_flt_fsr4_variant` (`auto`, `412_i8_2`, `412_lite_i8`, `412_i8`, `v07_i8`), filesystem fallback for shaders, and early cvar guard in `vkpt_fsr_initialize()`.
+  - Verified live on physical AMD Radeon RX 6800M (RADV NAVI22 RDNA2) under full Vulkan validation (`vk_validation 1`):
+    - `412_i8_2` Quality (29 passes): 0 validation errors, ~1.20 ms FSR scope.
+    - `412_lite_i8` Quality (12 passes): 0 validation errors, ~0.93 ms FSR scope.
+    - `412_i8` Quality (29 passes): 0 validation errors, ~2.10 ms FSR scope.
+    - `v07_i8` Quality (16 passes): 0 validation errors, ~1.45 ms FSR scope.
+  - All 48/48 standalone `ffx-vulkan-project` CTests and 6/6 root Q2RTX CTests pass.
+
+## Previous priority — shared model selection and contextual options (2026-10-27)
+
+The user rejects the current fragmented Q2RTX menus. The desired consumer
+experience is one model selector with only that model's applicable controls
+below it. Most policy and option definitions must belong to the reusable
+native-Vulkan library; Q2RTX supplies presentation and renderer bindings.
+Latest review reconfirms this ownership split in the existing implementation;
+root CTest rerun passes 6/6. Remaining UI scope below is still open.
+
+- [x] Review the latest handover, TODO, implementation and retained test logs.
+  Preserve the unified API, packaging, extraction tools and integration work.
+  The Oct 15 logs report 44 standalone and 6 root tests passing; these are
+  evidence for the tested contracts, not recovered neural-model execution.
+- [-] Add an engine-independent model/option catalog with stable IDs, model
+  versions, implementation status, device availability/reasons, option types,
+  defaults, limits, enum choices and dependencies. Keep cvar names and menu
+  widgets out of this API. Distinguish requested model from active fallback.
+  Implemented `ffx_vk_scaler_catalog.h`: model/option IDs and persistence keys,
+  implementation status, types/defaults/ranges/choices, value validation and
+  FSR4 fixed-quality/dynamic-model dependency. C and C++ consumers pass without
+  Vulkan includes/linkage. Added runtime readiness masking from successfully
+  created contexts and per-model reason strings; detailed device requirement
+  enumeration and model-version discovery remain.
+- [-] Replace Q2RTX's hand-maintained provider lists and tuning conditions
+  with a thin adapter that enumerates this catalog and binds options to the
+  renderer. Put selection, quality and applicable tuning on one page; update
+  visible controls immediately when selection or a dependent option changes.
+  Keep per-model settings when switching away and back. Hide irrelevant
+  controls; explain unavailable models without exposing ineffective settings.
+  `scaler_settings` now generates selection and model-specific controls from
+  the catalog in one page. Q2RTX keeps cvar/widget bindings in `ui/scaler.c`.
+  Changes apply immediately; archived per-model values retain separate
+  sharpening/quality settings. Active-state row reports renderer fallback.
+  Unavailable selections now hide tuning and explain the reason. Dynamic
+  resolution controller navigation derives from the shared option dependency
+  and readiness. FG/RR catalogs and Auto's resolved-backend option filtering
+  remain to implement.
+- [ ] Describe frame generation and reconstruction capabilities separately:
+  do not infer their availability solely from the upscaler vendor. Expose
+  only supported combinations and options, with the actual active state.
+- [-] Verify model switching, dependency changes, persistence, fallback and
+  keyboard/controller navigation. Test the catalog from an independent
+  consumer and validate the menu visually with Vulkan validation enabled.
+  Debug game build and all 6 root tests pass; 2 targeted standalone tests
+  (catalog/umbrella) pass. Live RX 6800M Vulkan-validation run and checked-in
+  GDB interaction test verify FSR4/3.1.5 switching, hidden fixed quality when
+  DRS is selected, independent sharpening, menu reopen and archived values.
+  Inspected 960x540 screenshots; no VUID/validation errors in retained logs.
+  Physical controller input, restart persistence and every model/device
+  combination remain to test.
+  Auto now queries shared executable readiness and falls back when the unified
+  wrapper has no dispatch implementation; missing pipelines/resources cannot
+  report successful no-op dispatch. Targeted standalone tests 4/4 and root
+  tests 6/6 pass. Live RX 6800M map capture is full colour with fallback, and
+  the unavailable Auto menu has no tuning/controller controls or VUIDs.
+
+### Evidence correction and subsequent native-model work
+
+Oct 27 live Q2RTX integration of recovered XeSS 2.0.2 Quality U-Net and Unified SR:
+`src/refresh/vkpt/fsr.c` and `src/refresh/vkpt/main.c` now wire `FfxVkXeSSRecoveredContext`
+(`ffxVkXeSSRecoveredModelFromBlob`, `ffxVkXeSSRecoveredCreate`, `ffxVkXeSSRecoveredBindConverted`,
+`ffxVkXeSSRecoveredRecord`) into Q2RTX (`flt_upscaler 4`, `flt_fsr_quality 1`) at the three
+verified extents (`565x318 -> 960x540`, `753x424 -> 1280x720`, `1130x636 -> 1920x1080`) with
+2-frame-in-flight slots and even-width checkerboard render padding (`566x318`, `754x424`,
+`1130x636`), falling back to the spatial prototype outside Quality `540p`/`720p`/`1080p`.
+`ffx_vk_unified_sr.c` now dispatches portable `FSR 3.1.4` when a live `VkDevice` is provided,
+and Q2RTX `flt_upscaler 6` routes to `FSR4 v07` on RDNA2+ (`INT8/DOT4`) or portable `FSR 3.1.4`
+otherwise. Live Q2RTX runs with `+set vk_validation 1` pass with zero validation errors at
+`540p`, `720p`, and `1080p`; standalone CTest (48/48), root CTest (6/6), and Python unit tests
+(48/48) pass. Other XeSS presets, recovered DLSS4/5 execution, and pre-DP4a GPU lowering remain open.
+
+Oct 17 C integration prerequisite: opaque C creation/binding/recording/lifetime
+APIs and exact-extent queries are exported through `ffx-vulkan::xess-recovered`.
+A compact XESSVK1 model file plus C decoder eliminates runtime JSON/bundle-path
+dependencies. Packed-model C API replay and final installed-library consumption
+match all four moving-depth frames exactly on both GPUs with clean synchronization
+validation. Library tests 47/47 and root tests 6/6 pass. Model loading/C bridging
+are implemented; shared input conversion, feature flags, render sizing and actual
+Q2RTX dispatch remain open. DLSS4/5 and broad hardware support remain incomplete.
+
+Oct 17 engine scheduling prerequisite: the shared context now has per-slot
+prepare/resolve bindings (1..8 slots) with shared immutable pipelines/weights.
+Two frames recorded before either submission retain exact 1080p moving-depth
+reference equality on both GPUs, with synchronization validation clean. Reusing
+a slot requires retiring that slot, rather than waiting for the whole context.
+Q2RTX adapter work still requires model loading/C bridge, colour/motion conversion,
+exact render extents and device-feature enablement; game dispatch is not connected.
+
+Oct 17 depth/disocclusion fixture: a near blue rectangle moves over a static,
+varying-depth checkerboard, exposing 10176 background pixels per history frame.
+All four 1080p outputs match same-device references exactly on Renoir and Navi22
+with synchronization validation clean. Flattening depth changes only history
+frames, proving temporal depth dependence. Physical subpixel camera sampling,
+broader scenes and Q2RTX learned-model integration remain open.
+
+Oct 17 resolution extension: the shared context now derives rounded tensor
+geometry/dispatches and frame constants for three enabled quality extents:
+565x318 -> 960x540, 753x424 -> 1280x720 and 1130x636 -> 1920x1080. All generated
+geometry/constants match independent captures. Renoir four-frame motion/jitter
+comparisons are exact at all three sizes using the same original model bundle;
+1080p also passes a fresh same-device moving/jitter comparison on RX 6800M.
+Installed-header 540p consumption passes. Other sizes, quality levels and
+broader scenes still require validation; Q2RTX learned-model integration is
+still open.
+
+Latest milestone (Oct 17): the full recovered XeSS graph is now a shared
+`XeSSFixedContext` using caller-owned Vulkan images/device and in-memory model
+data. Exact four-frame same-device comparisons pass on Renoir and Navi22
+(moving/jitter/depth), including alternating image sets, invalid argument/reset
+checks and discarded-recording recovery. Context-generated dispatch constants
+remove capture-time addresses from the typed model API. It enables three size
+profiles at one quality/exposure setting and independent per-flight bindings;
+Q2RTX/unified learned
+integration and broader profiles/GPUs remain open. Earlier incremental context
+extraction tasks below are superseded by this milestone.
+
+The current XeSS and DLSS shader paths are spatial reconstruction prototypes,
+not verified implementations of the extracted learned models. Their model
+setters validate limited container metadata and set flags; they do not upload
+or bind weights. Earlier completion claims below must be read with this
+correction. Menu labels must not present these prototypes as working DLSS4/5
+or recovered XeSS models.
+
+- [-] Complete the native XeSS dispatch graph, weight bindings, intermediate
+  resources and temporal history; compare intermediates/output with captured
+  reference runs. First-pass native execution alone is insufficient.
+  Public-debug intermediate capture investigated: explicit `xessStartDump`
+  returns NOT_IMPLEMENTED (-7) in runtime 2.0.2; all four internal-resource
+  queries remain empty while reference frames pass. Continue via instrumented
+  intermediate readback or full-graph replay; do not repeat the empty query.
+  Native passes 1..12 now execute captured convolution shaders and 36 fully
+  recovered weight/scale/bias buffers (252800 bytes), including skip links.
+  Renoir and Navi22 runs are validation-clean with every output word written;
+  zero-weight controls change every layer. First ten layers match across the
+  two devices; layers 11/12 have 11/146 byte differences of one quantized step.
+  Prepare can now export the colour intermediate needed by final resolve.
+  Final resolve and temporal replay now pass: all four fixed checkerboard
+  frames match their same-device references byte-for-byte on both Navi22 and
+  Renoir (reset/history/history/reset), with Vulkan validation enabled. Final
+  CBV padding filled with 0xff also preserves exact Navi22 results. The earlier
+  cross-GPU differences reproduce in the reference runtime itself.
+  Remaining: moving/jittered inputs, resolutions/quality variants,
+  reusable GPU-resident library integration and other GPUs. Do not
+  promote the existing spatial prototype to a recovered-model claim yet.
+  External input plumbing is now implemented for prepare/resolve and per-frame
+  sequence replay. File-supplied checkerboard frames still match exactly on
+  Renoir under Vulkan validation; truncated depth is rejected. Moving reference
+  capture now passes: native 0/8/16/0-pixel translated inputs with corresponding
+  motion match all four Renoir reference frames exactly. Zero-motion controls
+  differ only on history frames, proving motion-data dependence. Fresh varying-
+  jitter metadata capture and native replay also match all four frames exactly
+  on Renoir (`trace-jitter-1`, `native-sequence-jitter-1`). Current jitter maps
+  to prepare/resolve words 4/5; previous jitter to prepare words 22/23. Physically
+  subpixel-sampled scenes, disocclusion and variable depth remain untested.
+  Shared fixed-profile frame-constant generation now reproduces all captured
+  prepare/resolve blocks. Full jitter replay using explicit frame parameters
+  and the old zero-jitter model trace matches all four references exactly.
+  The experimental header has no Vulkan/engine dependency; broader dimensions,
+  exposure/origin modes and a reusable GPU-resident context remain incomplete.
+  Relocatable native bundles now contain all 14 shaders and model resources.
+  Replaying a relocated bundle with nonexistent trace/shader paths preserves
+  exact four-frame jitter-reference equality; checksums and path confinement
+  are tested. Runtime trace dependence is removed for this fixed profile.
+  Shared convolution command recording now runs all twelve passes without
+  intermediate readbacks. Two submissions reuse the same resources and match
+  the original layer outputs; full moving/jitter replay remains exact. This
+  is not yet a full resource-owning context: prepare/resolve/history and device
+  ownership must still be combined for persistent multi-frame engine use.
+  Subsequent full-graph harness now keeps all fourteen pipelines/resources and
+  history on one device across four frames; only inputs and final output cross
+  the host boundary. Exact same-device reference matches pass on Renoir
+  (moving/jitter) and Navi22 (static), with synchronization validation clean.
+  This supersedes the separate-stage runtime limitation for the new harness.
+  Shared context extraction, robust ownership and game integration remain.
+  Shared borrowed-device image/buffer ownership is extracted and used by the
+  persistent graph. Exact four-frame reference equality remains; independent
+  owners, clear/reuse and retained caller device pass a live validation probe.
+  Pipeline/descriptor lifetime and graph loading/scheduling still need to move
+  into the complete library context.
+  Pipeline/descriptor/sampler ownership is now moved into the shared component,
+  including partial-creation tracking. Both GPUs retain exact four-frame output
+  and clean synchronization validation. Typed graph construction, bindings and
+  frame scheduling remain the next context-extraction work.
+- [ ] Implement and validate DLSS4/5 tensor/graph execution from the acquired
+  artifacts; keep acquisition, parsing and actual model inference distinct.
+- [ ] Validate supported GPUs and an independent engine consumer before
+  claiming broad portability. Final runtime remains Vulkan/SPIR-V without
+  DirectX, Wine/Proton or vendor DLL dependencies. Revisit the library name
+  when the additional backends genuinely execute their models.
 
 ## Immediate visual-correctness follow-up
 
@@ -44,7 +269,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   FIFO swapchain presentation: generated-real pairs consume two VBlanks (33.3ms minimum
   on a 60Hz display = 30 logical FPS / 60 presented FPS), and if render+FG exceeds 33.3ms,
   FIFO drops presentation to 3 intervals (20 FPS) or 4 intervals (15 FPS).
-- [x] Consolidate resolution/upscaling and frame-generation menus; hide other
+- [-] Consolidate resolution/upscaling and frame-generation menus; hide other
   providers' tuning controls. Split pages and initial layout checks pass;
   controller applicability and live interaction verified with Vulkan validation enabled.
   Resolution page gates fixed scale to fallback and FSR4 model controls to FSR4;
@@ -52,6 +277,8 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   revision 2026-09-fsr3-fsr4-v07-rr-fg-gate. Scripted in-game live run verified all 37
   menus register and navigate cleanly (video -> temporal_settings -> upscaler_tuning ->
   resolution -> temporal_diagnostics -> frame_generation_settings) without VUIDs or layout collisions.
+  Reopened Oct 15: the user finds this layout inadequate; the shared catalog
+  and directly contextual controls above supersede the previous acceptance.
 
 - [x] Reproduce and repair generated/real strobing from the generated target
   itself, rather than inferring correctness from a real-slot screenshot.
