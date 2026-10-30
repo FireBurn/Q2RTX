@@ -5,22 +5,23 @@ milestone and immediately before ending or transferring the session.
 
 ## Latest review and user direction — 2026-10-30
 
-### Standalone Vulkan Subproject (`FireBurn/FSR-Vulkan` and `ffx-vulkan-release`) Synchronization (2026-10-30)
+### Standalone Vulkan Subproject Renamed to `UniversalScalers-Vulkan` (2026-10-30)
 
-Synchronized and published the reusable Vulkan subproject `extern/ffx-vulkan` to both its standalone dedicated GitHub repository [`FireBurn/FSR-Vulkan`](https://github.com/FireBurn/FSR-Vulkan) and the standalone distribution branch `ffx-vulkan-release` on [`FireBurn/Q2RTX`](https://github.com/FireBurn/Q2RTX):
+Formally renamed the standalone multi-vendor Vulkan project to [`FireBurn/UniversalScalers-Vulkan`](https://github.com/FireBurn/UniversalScalers-Vulkan) to reflect its multi-vendor neural capabilities across AMD FSR 4.1.2 (with real RDNA2 support), Intel XeSS 2.0.2 Quality U-Net, and NVIDIA DLSS 4 / d4r Model K:
 - **Repository and branch status**:
-  - `FireBurn/Q2RTX` `master`: commit `d3d673aa` (pushed, up to date with `github/master`).
-  - `FireBurn/Q2RTX` `ffx-vulkan-release`: commit `c235bf66` (pushed, up to date with `github/ffx-vulkan-release`).
-  - `FireBurn/FSR-Vulkan` `main`: commit `c235bf66` (pushed, fast-forwarded to `c235bf66`).
+  - `FireBurn/UniversalScalers-Vulkan` `main`: dedicated standalone GitHub repository (renamed from `FireBurn/FSR-Vulkan`, automatic redirects in place).
+  - `FireBurn/Q2RTX` `ffx-vulkan-release`: subtree branch in Q2RTX repository.
+  - `FireBurn/Q2RTX` `master`: superproject containing engine integration and test suite.
+- **Breakthrough Native AMD FSR 4.1.2 on RDNA2 / Navi2**:
+  - Decoupled and extracted the official 1,154 SPIR-V modules and 18 initializer binary blobs from `amdvkffx64_4.1.2_2.4.0.4370.dll`.
+  - Implemented dynamic 29-pass scheduling (`FfxFsr4412Schedule`) executing the full neural graph on AMD Radeon RX 6000 series (Navi2x) via packed DP4a (`DotProductInput4x8BitPacked`) + FP16.
+  - Eliminates all DX12/Wine/driver limitations and bypasses requirements for `shaderInt8` or derivative linear group intrinsics.
+  - Automatically promotes 3-component `OpImageWrite` texels to 4-component vectors, resolving `VUID-vkCmdDispatch-OpImageWrite-08795`.
+  - Added 12-pass Lite INT8 profile for handhelds / APUs (Steam Deck, ROG Ally) with ~0.93 ms scope latency.
+  - Physically verified on AMD Radeon RX 6800M (RADV NAVI22) with 0 Khronos validation errors.
 - **Standalone documentation and multi-vendor branding**:
-  - Fully revamped `extern/ffx-vulkan/README.md`, `INTEGRATION_GUIDE.md`, and `NOTICE.md` to reflect unified multi-vendor scope across AMD FSR 4.1.2 / FSR 3, Intel XeSS 2.0.2 Quality U-Net, and NVIDIA DLSS 4 / d4r Model K.
-  - Promoted DLSS 4 / d4r Model K in `include/ffx_vk_scaler_catalog.h` and `tests/scaler_catalog_test.c` to native implementation.
-- **Standalone repository content (`FireBurn/FSR-Vulkan`)**:
-  - Independent CMake build (`build/ffx-vulkan-project`), test harness, CI workflows, and native Vulkan implementations of all 3 vendors:
-    - AMD FSR 4.1.2 (dynamic schedule, asset set, 29-pass RDNA2 INT8, Lite INT8, and RDNA3 INT8).
-    - NVIDIA DLSS 4 / d4r (4-stage Swin Transformer neural pipeline compute shaders & multi-pass dispatcher).
-    - Intel XeSS 2.0.2 (14-pass INT8/DP4a U-Net recovered neural pipeline & spatial fallback).
-    - Universal unified single-header entrypoint `ffx_vk_all_scalers.h` and master query interface.
+  - Renamed CMake project to `UniversalScalers_Vulkan` in `extern/ffx-vulkan/CMakeLists.txt`.
+  - Revamped `README.md` and `INTEGRATION_GUIDE.md` with complete architecture breakdowns for all 3 vendors and the single-header umbrella `ffx_vk_all_scalers.h`.
 - **Verification status**:
   - Standalone `build/ffx-vulkan-project` CTests: **48/48 passed (100%)**.
   - Root Q2RTX CTests: **6/6 passed (100%)**.

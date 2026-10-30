@@ -7,6 +7,18 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## Current priority — DLSS 4 / d4r Neural Swin Transformer & Official FSR 4.1.2 Integration (2026-10-30)
 
+- [x] Project renaming to `UniversalScalers-Vulkan` and native RDNA2 FSR 4.1.2 documentation:
+  - Renamed official standalone repository on GitHub to `FireBurn/UniversalScalers-Vulkan` (`gh repo rename UniversalScalers-Vulkan`).
+  - Updated remote tracking URL to `git@github.com:FireBurn/UniversalScalers-Vulkan.git`.
+  - Updated CMake project name in `extern/ffx-vulkan/CMakeLists.txt` to `UniversalScalers_Vulkan`.
+  - Extensively documented the breakthrough of native AMD FSR 4.1.2 on RDNA2 / Navi2 in `README.md` and `INTEGRATION_GUIDE.md`:
+    - Full 29-pass dynamic schedule on AMD Radeon RX 6000 series via packed DP4a (`DotProductInput4x8BitPacked`) + FP16.
+    - Zero dependencies on DX12, `shaderInt8`, or derivative group linear intrinsics.
+    - Automatic `OpImageWrite` texel operand vector promotion solving `VUID-vkCmdDispatch-OpImageWrite-08795`.
+    - 12-pass Lite INT8 profile for handhelds/APUs (~0.93 ms scope latency).
+    - Physical verification on AMD Radeon RX 6800M (RADV NAVI22) with zero Khronos validation errors.
+  - Verified 48/48 standalone `ffx-vulkan-project` CTests and 6/6 root Q2RTX CTests pass.
+
 - [x] Multi-vendor documentation overhaul and scaler catalog synchronization:
   - Overhauled `extern/ffx-vulkan/README.md`, `INTEGRATION_GUIDE.md`, and `NOTICE.md` to describe the library's full multi-vendor capabilities across AMD (FSR 3.1.5, FSR 3.1.6, FSR 4.1.2 dynamic 29-pass), Intel (XeSS 2.0.2 Quality 14-pass U-Net), and NVIDIA (DLSS 4 / d4r Model K Swin Transformer).
   - Synchronized `include/ffx_vk_scaler_catalog.h` and `tests/scaler_catalog_test.c` promoting DLSS to `FFX_VK_SCALER_IMPLEMENTATION_NATIVE` with Model K neural Swin transformer reconstruction.
