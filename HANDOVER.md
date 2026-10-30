@@ -9,9 +9,9 @@ milestone and immediately before ending or transferring the session.
 
 Formally renamed the standalone multi-vendor Vulkan project to [`FireBurn/UniversalScalers-Vulkan`](https://github.com/FireBurn/UniversalScalers-Vulkan) to reflect its multi-vendor neural capabilities across AMD FSR 4.1.2 (with real RDNA2 support), Intel XeSS 2.0.2 Quality U-Net, and NVIDIA DLSS 4 / d4r Model K:
 - **Repository and branch status**:
-  - `FireBurn/UniversalScalers-Vulkan` `main`: dedicated standalone GitHub repository (renamed from `FireBurn/FSR-Vulkan`, automatic redirects in place).
-  - `FireBurn/Q2RTX` `ffx-vulkan-release`: subtree branch in Q2RTX repository.
-  - `FireBurn/Q2RTX` `master`: superproject containing engine integration and test suite.
+  - `FireBurn/UniversalScalers-Vulkan` `main`: commit `69fecd7c` (dedicated standalone GitHub repository, renamed from `FireBurn/FSR-Vulkan`, automatic redirects in place).
+  - `FireBurn/Q2RTX` `ffx-vulkan-release`: commit `69fecd7c` (subtree branch in Q2RTX repository).
+  - `FireBurn/Q2RTX` `master`: commit `ca1a234b` (superproject containing engine integration and test suite).
 - **Breakthrough Native AMD FSR 4.1.2 on RDNA2 / Navi2**:
   - Decoupled and extracted the official 1,154 SPIR-V modules and 18 initializer binary blobs from `amdvkffx64_4.1.2_2.4.0.4370.dll`.
   - Implemented dynamic 29-pass scheduling (`FfxFsr4412Schedule`) executing the full neural graph on AMD Radeon RX 6000 series (Navi2x) via packed DP4a (`DotProductInput4x8BitPacked`) + FP16.
