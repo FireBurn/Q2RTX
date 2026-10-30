@@ -7,6 +7,11 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## Current priority — DLSS 4 / d4r Neural Swin Transformer & Official FSR 4.1.2 Integration (2026-10-30)
 
+- [x] Multi-vendor documentation overhaul and scaler catalog synchronization:
+  - Overhauled `extern/ffx-vulkan/README.md`, `INTEGRATION_GUIDE.md`, and `NOTICE.md` to describe the library's full multi-vendor capabilities across AMD (FSR 3.1.5, FSR 3.1.6, FSR 4.1.2 dynamic 29-pass), Intel (XeSS 2.0.2 Quality 14-pass U-Net), and NVIDIA (DLSS 4 / d4r Model K Swin Transformer).
+  - Synchronized `include/ffx_vk_scaler_catalog.h` and `tests/scaler_catalog_test.c` promoting DLSS to `FFX_VK_SCALER_IMPLEMENTATION_NATIVE` with Model K neural Swin transformer reconstruction.
+  - Verified 48/48 standalone `ffx-vulkan-project` CTests, 6/6 root Q2RTX CTests, and 51/51 python tests.
+
 - [x] Standalone Vulkan subproject (`extern/ffx-vulkan`) synchronization & push:
   - Exported subtree commits for XeSS 2.0.2 (`66af0501`), FSR 4.1.2 (`415ac273`), DLSS 4 d4r (`564263e1`), and multi-vendor scaler integration (`51da6c86`).
   - Rebased and fast-forwarded `ffx-vulkan-release` cleanly from `1a163f58` to `51da6c86`.
