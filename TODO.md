@@ -7,6 +7,13 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
 
 ## Current priority — DLSS 4 / d4r Neural Swin Transformer & Official FSR 4.1.2 Integration (2026-10-30)
 
+- [x] Standalone Vulkan subproject (`extern/ffx-vulkan`) synchronization & push:
+  - Exported subtree commits for XeSS 2.0.2 (`66af0501`), FSR 4.1.2 (`415ac273`), DLSS 4 d4r (`564263e1`), and multi-vendor scaler integration (`51da6c86`).
+  - Rebased and fast-forwarded `ffx-vulkan-release` cleanly from `1a163f58` to `51da6c86`.
+  - Pushed `refs/heads/ffx-vulkan-release` to `github.com:FireBurn/Q2RTX.git` (`51da6c86`).
+  - Standalone CTests in `build/ffx-vulkan-project`: 48/48 passed (100%).
+  - Live back-to-back testing of all 3 scalers on AMD Radeon RX 6800M (RADV NAVI22) with 0 validation errors.
+
 - [x] Native Vulkan DLSS 4 / d4r Swin Transformer & Model K Neural Pipeline (Approach B):
   - Designed and implemented 4-stage neural pipeline compute shaders in `extern/ffx-vulkan/shaders/dlss/`:
     - `d4r_input_preprocess.comp`: RGB -> YCoCg conversion, 3x3 depth-guided motion dilation, linear view-Z derivation, 3x3 color mean and variance calculation.

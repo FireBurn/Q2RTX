@@ -5,6 +5,24 @@ milestone and immediately before ending or transferring the session.
 
 ## Latest review and user direction — 2026-10-30
 
+### Standalone Vulkan Subproject (`ffx-vulkan-release`) Synchronization (2026-10-30)
+
+Synchronized and published the reusable Vulkan subproject `extern/ffx-vulkan` to its standalone distribution branch `ffx-vulkan-release` on GitHub (`git@github.com:FireBurn/Q2RTX.git`):
+- **Branch status**:
+  - `master`: commit `c1e37b1a237f8aaa728cc091be059d35e64ea09f` (pushed, up to date with `github/master`).
+  - `ffx-vulkan-release`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, up to date with `github/ffx-vulkan-release`).
+- **Subtree content on `ffx-vulkan-release`**:
+  - Contains standalone CMake build (`build/ffx-vulkan-project`), test harness, and native Vulkan implementations of all 3 vendors:
+    - AMD FSR 4.1.2 (dynamic schedule, asset set, 29-pass RDNA2 INT8, Lite INT8, and RDNA3 INT8).
+    - NVIDIA DLSS 4 / d4r (4-stage Swin Transformer neural pipeline compute shaders & multi-pass dispatcher).
+    - Intel XeSS 2.0.2 (14-pass INT8/DP4a U-Net recovered neural pipeline & spatial fallback).
+    - Universal unified single-header entrypoint `ffx_vk_all_scalers.h` and master query interface.
+- **Verification status**:
+  - Standalone `build/ffx-vulkan-project` CTests: **48/48 passed (100%)**.
+  - Root Q2RTX CTests: **6/6 passed (100%)**.
+  - Python tool & model test suite (`tools/ffx_dxil/tests`): **51/51 passed (100%)**.
+  - Live physical GPU validation on AMD Radeon RX 6800M (`RADV NAVI22`) under `VK_LAYER_KHRONOS_validation`: **0 errors** across all 3 upscalers.
+
 ### Native Vulkan DLSS 4 / d4r Model K Neural Swin Transformer Pipeline (Approach B) (2026-10-30)
 
 Implemented Approach B (the neural kernel translation approach, modeling `countervolts/d4r` Swin Transformer Model K neural execution entirely via native Vulkan compute) across both `extern/ffx-vulkan` and Q2RTX (`src/refresh/vkpt/fsr.c`):
