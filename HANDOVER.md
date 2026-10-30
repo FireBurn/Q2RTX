@@ -5,14 +5,15 @@ milestone and immediately before ending or transferring the session.
 
 ## Latest review and user direction — 2026-10-30
 
-### Standalone Vulkan Subproject (`ffx-vulkan-release`) Synchronization (2026-10-30)
+### Standalone Vulkan Subproject (`FireBurn/FSR-Vulkan` and `ffx-vulkan-release`) Synchronization (2026-10-30)
 
-Synchronized and published the reusable Vulkan subproject `extern/ffx-vulkan` to its standalone distribution branch `ffx-vulkan-release` on GitHub (`git@github.com:FireBurn/Q2RTX.git`):
-- **Branch status**:
-  - `master`: commit `c1e37b1a237f8aaa728cc091be059d35e64ea09f` (pushed, up to date with `github/master`).
-  - `ffx-vulkan-release`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, up to date with `github/ffx-vulkan-release`).
-- **Subtree content on `ffx-vulkan-release`**:
-  - Contains standalone CMake build (`build/ffx-vulkan-project`), test harness, and native Vulkan implementations of all 3 vendors:
+Synchronized and published the reusable Vulkan subproject `extern/ffx-vulkan` to both its standalone dedicated GitHub repository [`FireBurn/FSR-Vulkan`](https://github.com/FireBurn/FSR-Vulkan) and the standalone distribution branch `ffx-vulkan-release` on [`FireBurn/Q2RTX`](https://github.com/FireBurn/Q2RTX):
+- **Repository and branch status**:
+  - `FireBurn/Q2RTX` `master`: commit `3bccf303` (pushed, up to date with `github/master`).
+  - `FireBurn/Q2RTX` `ffx-vulkan-release`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, up to date with `github/ffx-vulkan-release`).
+  - `FireBurn/FSR-Vulkan` `main`: commit `51da6c869260a726ba484bbb65c293682fc47e76` (pushed, fast-forwarded from `c64f0934` to `51da6c86`).
+- **Standalone repository content (`FireBurn/FSR-Vulkan`)**:
+  - Independent CMake build (`build/ffx-vulkan-project`), test harness, CI workflows, and native Vulkan implementations of all 3 vendors:
     - AMD FSR 4.1.2 (dynamic schedule, asset set, 29-pass RDNA2 INT8, Lite INT8, and RDNA3 INT8).
     - NVIDIA DLSS 4 / d4r (4-stage Swin Transformer neural pipeline compute shaders & multi-pass dispatcher).
     - Intel XeSS 2.0.2 (14-pass INT8/DP4a U-Net recovered neural pipeline & spatial fallback).

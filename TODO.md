@@ -11,6 +11,7 @@ Status labels: `[x]` verified complete, `[-]` in progress/partially complete,
   - Exported subtree commits for XeSS 2.0.2 (`66af0501`), FSR 4.1.2 (`415ac273`), DLSS 4 d4r (`564263e1`), and multi-vendor scaler integration (`51da6c86`).
   - Rebased and fast-forwarded `ffx-vulkan-release` cleanly from `1a163f58` to `51da6c86`.
   - Pushed `refs/heads/ffx-vulkan-release` to `github.com:FireBurn/Q2RTX.git` (`51da6c86`).
+  - Fast-forwarded and pushed `main` on dedicated standalone repository `https://github.com/FireBurn/FSR-Vulkan` from `c64f0934` to `51da6c86`.
   - Standalone CTests in `build/ffx-vulkan-project`: 48/48 passed (100%).
   - Live back-to-back testing of all 3 scalers on AMD Radeon RX 6800M (RADV NAVI22) with 0 validation errors.
 
