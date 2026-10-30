@@ -159,7 +159,10 @@ typedef struct menuCommon_s {
     menuSound_t (*change)(struct menuCommon_s *);
     menuSound_t (*keydown)(struct menuCommon_s *, int key);
     menuSound_t (*focus)(struct menuCommon_s *, bool gain);
+    bool (*visible)(struct menuCommon_s *);
 } menuCommon_t;
+
+void UI_AddScalerSettings(menuFrameWork_t *menu);
 
 typedef struct menuField_s {
     menuCommon_t generic;

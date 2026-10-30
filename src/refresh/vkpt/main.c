@@ -239,6 +239,16 @@ static inline bool extents_equal(VkExtent2D a, VkExtent2D b)
 
 static VkExtent2D get_render_extent(void)
 {
+	VkExtent2D result;
+	if (vkpt_fsr_get_exact_render_extent(qvk.extent_unscaled, &result))
+	{
+		/* Q2RTX traces primary/lighting rays in two half-width checkerboard
+		 * fields, so the engine render width must remain even; recovered
+		 * providers with odd input widths crop the top-left valid rectangle. */
+		result.width = (result.width + 1) & ~1;
+		return result;
+	}
+
 	int scale = vkpt_fsr_requested_render_scale();
 	const bool fsr_dynamic_resolution = vkpt_fsr_is_requested() && scale == 0;
 	/* Fixed-ratio FSR models own their exact scale. The explicit FSR4 DRS model
@@ -264,7 +274,6 @@ static VkExtent2D get_render_extent(void)
 	if (fsr_dynamic_resolution)
 		scale = min(scale, 100);
 
-	VkExtent2D result;
 	result.width = (uint32_t)(qvk.extent_unscaled.width * (float)scale / 100.f);
 	result.height = (uint32_t)(qvk.extent_unscaled.height * (float)scale / 100.f);
 
@@ -1379,8 +1388,16 @@ init_vulkan(void)
 			device_features_derivatives.computeDerivativeGroupLinear;
 		qvk.supports_storage_image_extended_formats =
 			device_features.features.shaderStorageImageExtendedFormats;
+		qvk.supports_storage_image_read_without_format =
+			device_features.features.shaderStorageImageReadWithoutFormat;
 		qvk.supports_storage_image_write_without_format =
 			device_features.features.shaderStorageImageWriteWithoutFormat;
+		qvk.supports_uniform_buffer_standard_layout =
+			device_features_1_2.uniformBufferStandardLayout;
+		qvk.supports_ubo_nonuniform_indexing =
+			device_features_1_2.shaderUniformBufferArrayNonUniformIndexing;
+		qvk.supports_storage_image_nonuniform_indexing =
+			device_features_1_2.shaderStorageImageArrayNonUniformIndexing;
 		qvk.supports_debug_lines = device_features.features.fillModeNonSolid && device_features.features.wideLines;
 		qvk.supports_smooth_lines = qvk.supports_debug_lines && device_features_lines.smoothLines;
 	}
@@ -1482,8 +1499,11 @@ init_vulkan(void)
 		.descriptorIndexing = VK_TRUE,
 		.shaderFloat16 = qvk.supports_fp16,
 		.shaderInt8 = qvk.supports_int8,
+		.uniformBufferStandardLayout = qvk.supports_uniform_buffer_standard_layout,
+		.shaderUniformBufferArrayNonUniformIndexing = qvk.supports_ubo_nonuniform_indexing,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
+		.shaderStorageImageArrayNonUniformIndexing = qvk.supports_storage_image_nonuniform_indexing,
 		.runtimeDescriptorArray = VK_TRUE,
 		.samplerFilterMinmax = VK_TRUE,
 		.bufferDeviceAddress = VK_TRUE,
@@ -1529,7 +1549,7 @@ init_vulkan(void)
 			.shaderImageGatherExtended = VK_FALSE,
 			.shaderStorageImageExtendedFormats = qvk.supports_storage_image_extended_formats,
 			.shaderStorageImageMultisample = VK_FALSE,
-			.shaderStorageImageReadWithoutFormat = VK_FALSE,
+			.shaderStorageImageReadWithoutFormat = qvk.supports_storage_image_read_without_format,
 			.shaderStorageImageWriteWithoutFormat = qvk.supports_storage_image_write_without_format,
 			.shaderUniformBufferArrayDynamicIndexing = VK_TRUE,
 			.shaderSampledImageArrayDynamicIndexing = VK_TRUE,

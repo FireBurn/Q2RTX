@@ -772,6 +772,8 @@ static bool Parse_File(const char *path, int depth)
                     Parse_Spin(menu, MTYPE_STRINGS);
                 } else if (!strcmp(cmd, "pairs")) {
                     Parse_Pairs(menu);
+                } else if (!strcmp(cmd, "scaler_settings")) {
+                    UI_AddScalerSettings(menu);
                 } else if (!strcmp(cmd, "range")) {
                     Parse_Range(menu);
                 } else if (!strcmp(cmd, "action")) {

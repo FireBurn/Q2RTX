@@ -26,6 +26,11 @@ music/
 !baseq2/fsr4_shaders/fsr4_model_v07_i8_*_pre_weights.bin
 baseq2/fsr4_shaders/fsr4_initializers.bin
 baseq2/fsr4_shaders/fsr4_pre_weights.bin
+baseq2/fsr4_shaders/fsr4_model_412_*
+baseq2/fsr4_shaders/rcas_412.spv
+baseq2/fsr4_shaders/spd_auto_exposure_412.spv
+*.xessvk
+baseq2/xess/
 *.bsp
 *.cin
 *.dds
@@ -58,3 +63,5 @@ __pycache__/
 vkd3d-proton.cache*
 *.mp4
 patches/
+baseq2/dlss_models/
+baseq2/test_all_scalers.cfg

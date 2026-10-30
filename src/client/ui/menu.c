@@ -1554,6 +1554,16 @@ SLIDER CONTROL
 
 static menuSound_t Slider_DoSlide(menuSlider_t *s, int dir);
 
+static menuSound_t Slider_Changed(menuSlider_t *s)
+{
+    if (s->generic.change) {
+        menuSound_t sound = s->generic.change(&s->generic);
+        if (sound != QMS_NOTHANDLED)
+            return sound;
+    }
+    return QMS_SILENT;
+}
+
 static void Slider_Push(menuSlider_t *s)
 {
     s->modified = false;
@@ -1642,7 +1652,7 @@ static menuSound_t Slider_MouseMove(menuSlider_t *s)
 
     s->modified = true;
     s->curvalue = s->minvalue + steps * s->step;
-    return QMS_SILENT;
+    return Slider_Changed(s);
 }
 
 static menuSound_t Slider_Key(menuSlider_t *s, int key)
@@ -1651,10 +1661,12 @@ static menuSound_t Slider_Key(menuSlider_t *s, int key)
     case K_END:
         s->modified = true;
         s->curvalue = s->maxvalue;
+        Slider_Changed(s);
         return QMS_MOVE;
     case K_HOME:
         s->modified = true;
         s->curvalue = s->minvalue;
+        Slider_Changed(s);
         return QMS_MOVE;
     case K_MOUSE1:
         return Slider_Click(s);
@@ -1674,14 +1686,7 @@ static menuSound_t Slider_DoSlide(menuSlider_t *s, int dir)
     s->modified = true;
     s->curvalue = Q_circ_clipf(s->curvalue + dir * s->step, s->minvalue, s->maxvalue);
 
-    if (s->generic.change) {
-        menuSound_t sound = s->generic.change(&s->generic);
-        if (sound != QMS_NOTHANDLED) {
-            return sound;
-        }
-    }
-
-    return QMS_SILENT;
+    return Slider_Changed(s);
 }
 
 /*
@@ -1872,19 +1877,22 @@ void Menu_Init(menuFrameWork_t *menu)
     menu->y1 = 0;
     menu->y2 = uis.height;
 
-	for (i = 0; i < menu->nitems; i++) {
-		item = menu->items[i];
-
-		menuCondition_t *condition = &((menuCommon_t*)item)->condition;
-		if (condition->cvar)
-		{
-			bool equals = condition->cvar->integer == condition->value;
-			if (equals == condition->equals)
-				((menuCommon_t *)item)->flags &= ~QMF_HIDDEN;
-			else
-				((menuCommon_t *)item)->flags |= QMF_HIDDEN;
-		}
-	}
+    for (i = 0; i < menu->nitems; i++) {
+        menuCommon_t *common = menu->items[i];
+        menuCondition_t *condition = &common->condition;
+        if (condition->cvar || common->visible) {
+            bool visible = !condition->cvar ||
+                ((condition->cvar->integer == condition->value) == condition->equals);
+            if (common->visible)
+                visible = visible && common->visible(common);
+            if (visible)
+                common->flags &= ~QMF_HIDDEN;
+            else
+                common->flags |= QMF_HIDDEN;
+        }
+        if (common->flags & QMF_HIDDEN)
+            common->flags &= ~QMF_HASFOCUS;
+    }
 
     if (!menu->size) {
         menu->size = Menu_Size;
@@ -1956,6 +1964,9 @@ void Menu_Init(menuFrameWork_t *menu)
     for (i = 0; i < menu->nitems; i++) {
         item = menu->items[i];
         rc = &((menuCommon_t *)item)->rect;
+
+        if (((menuCommon_t *)item)->flags & QMF_HIDDEN)
+            continue;
 
         UI_AddRectToBounds(rc, menu->mins, menu->maxs);
     }

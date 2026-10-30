@@ -83,12 +83,12 @@ def verify(menu_path: Path) -> None:
     pages = {
         "image_tuning": ("fallback anti-aliasing",),
         "temporal_settings": (
-            "temporal upscaler",
+            "scaler_settings",
             "temporal diagnostics...",
         ),
-        "upscaler_tuning": ("FSR3 sharpening", "FSR4 sharpening"),
+        "upscaler_tuning": ("model and settings...",),
         "frame_generation_settings": ("frame generation", "FSR3 FG scheduler"),
-        "resolution": ("FSR quality", "fixed resolution scale"),
+        "resolution": ("fixed resolution scale",),
         "dynamic_resolution": ("dynamic resolution scaling", "target frames per second"),
         "ray_tracing_settings": ("global illumination", "GPU profiler"),
     }
@@ -101,7 +101,13 @@ def verify(menu_path: Path) -> None:
             require(lines, control)
         verify_status_space(lines, name)
 
-    # Provider controls must carry a runtime condition, not merely explanatory
+    temporal = menu_block(menu, "temporal_settings")
+    if temporal.count("scaler_settings") != 1:
+        raise ValueError("model selector and options must come from the shared catalog")
+    if any("flt_fsr" in line or '"temporal upscaler"' in line for line in temporal):
+        raise ValueError("model options must not be duplicated in the menu script")
+
+    # Engine controls must carry a runtime condition, not merely explanatory
     # help text. The menu parser supports a single (non-nested) condition.
     expected_conditions = {
         "flt_fsr3_sharpening": {

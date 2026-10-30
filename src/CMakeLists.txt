@@ -113,6 +113,7 @@ SET(SRC_CLIENT
 	client/ui/playerconfig.c
 	client/ui/playermodels.c
 	client/ui/script.c
+	client/ui/scaler.c
 	client/ui/servers.c
 	client/ui/ui.c
 	client/sound/dma.c
@@ -635,6 +636,7 @@ IF (TARGET client)
                 ffx-vulkan::radiancecache-contract
                 ffx-vulkan::dlss-contract
                 ffx-vulkan::xess-contract
+                ffx-vulkan::xess-recovered
                 ffx-vulkan::mlframegen-contract
                 ffx-vulkan::unified-sr
                 ffx-vulkan::temporal-lifecycle

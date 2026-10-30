@@ -228,7 +228,11 @@ typedef struct QVK_s {
 	bool                        supports_dot4;
 	bool                        supports_compute_derivatives;
 	bool                        supports_storage_image_extended_formats;
+	bool                        supports_storage_image_read_without_format;
 	bool                        supports_storage_image_write_without_format;
+	bool                        supports_uniform_buffer_standard_layout;
+	bool                        supports_ubo_nonuniform_indexing;
+	bool                        supports_storage_image_nonuniform_indexing;
 	bool                        supports_colorspace;
 	bool                        supports_debug_lines;
 	bool                        supports_smooth_lines;
@@ -866,6 +870,8 @@ bool vkpt_fsr_is_enabled(void);
 bool vkpt_fsr_debug_select(VkImageView *image_view, VkExtent2D *extent,
 	VkptTemporalDebugView *view, char *reason, size_t reason_size);
 int vkpt_fsr_requested_render_scale(void);
+bool vkpt_fsr_get_exact_render_extent(VkExtent2D display_extent,
+	VkExtent2D *out_extent);
 bool vkpt_fsr_needs_upscale(void);
 uint32_t vkpt_fsr_jitter_phase_count(void);
 void vkpt_fsr_update_ubo(QVKUniformBuffer_t *ubo);

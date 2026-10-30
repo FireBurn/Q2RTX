@@ -90,18 +90,6 @@ begin resolution
         range -f "%.0f%%" --status "Used by Q2RTX fallback when dynamic resolution is off." "fixed resolution scale" viewsize 25 200 5
         action "dynamic resolution..." pushmenu dynamic_resolution
     endif
-    ifneq flt_upscaler 0
-        pairs --status "Fixed FSR input ratio: Native AA 100%, Quality 67%, Balanced 59%, Performance 50%, Ultra Performance 33%. FSR4's dynamic model overrides this preset." \
-            "FSR quality" flt_fsr_quality "Native AA" 0 "Quality" 1 "Balanced" 2 "Performance" 3 "Ultra Performance" 4
-    endif
-    ifeq flt_upscaler 2
-        toggle --status "Uses the FSR4 v07 dynamic-resolution model instead of the fixed quality preset. Configure its controller below." \
-            "FSR4 dynamic-resolution model" flt_fsr4_dynamic_resolution
-        action "dynamic resolution..." pushmenu dynamic_resolution
-    endif
-    ifeq flt_upscaler 6
-        action "dynamic resolution..." pushmenu dynamic_resolution
-    endif
     action "back" popmenu
 end
 
@@ -231,17 +219,13 @@ begin temporal_settings
     title "Upscaling and Resolution"
     background #212F3CD0
     style --compact
-    pairs --status "Select upscaler: AMD FSR 3.1, AMD FSR 4 (Neural), Intel XeSS (DP4a/U-Net), NVIDIA DLSS (Swin Attention), or Unified Super Resolution." \
-        "temporal upscaler" flt_upscaler \
-        "Off (Native)" 0 \
-        "AMD FSR 3.1.4" 1 \
-        "AMD FSR 4 (Neural ML)" 2 \
-        "AMD FSR 3.1.5" 3 \
-        "Intel XeSS" 4 \
-        "NVIDIA DLSS" 5 \
-        "Unified SR (Auto)" 6
-    action "upscaler tuning..." pushmenu upscaler_tuning
-    action "resolution scaling..." pushmenu resolution
+    scaler_settings
+    static --width 52 --status "Actual active provider or fallback reason, reported by the renderer." \
+        "active state" flt_upscaler_reason
+    ifeq flt_upscaler 0
+        pairs "fallback anti-aliasing" flt_taa "none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
+        action "resolution scaling..." pushmenu resolution
+    endif
     action "temporal diagnostics..." pushmenu temporal_diagnostics
     action "back" popmenu
 end
@@ -250,30 +234,7 @@ begin upscaler_tuning
     title "Upscaler Tuning"
     background #212F3CD0
     style --compact
-    ifeq flt_upscaler 2
-        range -f "%.2f" --status "FSR4 neural RCAS sharpening amount (0 disables it)." \
-            "FSR4 sharpening" flt_fsr4_sharpening 0 1 0.05
-        toggle --status "FSR4 neural auto exposure. Off uses validated explicit identity exposure; changing it resets temporal history." \
-            "FSR4 auto exposure" flt_fsr4_auto_exposure
-    endif
-    ifeq flt_upscaler 1
-        range -f "%.2f" --status "FSR3 RCAS sharpening amount." "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
-    endif
-    ifeq flt_upscaler 3
-        range -f "%.2f" --status "FSR3 RCAS sharpening amount." "FSR3 sharpening" flt_fsr3_sharpening 0 1 0.05
-    endif
-    ifeq flt_upscaler 4
-        range -f "%.2f" --status "Intel XeSS post-reconstruction sharpening amount." "XeSS sharpening" flt_fsr3_sharpening 0 1 0.05
-    endif
-    ifeq flt_upscaler 5
-        range -f "%.2f" --status "NVIDIA DLSS attention sharpening amount." "DLSS sharpening" flt_fsr3_sharpening 0 1 0.05
-    endif
-    ifeq flt_upscaler 6
-        range -f "%.2f" --status "Unified Super Resolution sharpening amount." "Unified SR sharpening" flt_fsr3_sharpening 0 1 0.05
-    endif
-    ifeq flt_upscaler 0
-        pairs "fallback anti-aliasing" flt_taa "none" 0 "Q2RTX temporal AA" 1 "Q2RTX temporal upscaling" 2
-    endif
+    action "model and settings..." pushmenu temporal_settings
     action "back" popmenu
 end
 

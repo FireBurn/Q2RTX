@@ -81,6 +81,9 @@ static uint32_t         fsr4_ctx_dw      = 0;  /* display res context was create
 static uint32_t         fsr4_ctx_dh      = 0;
 static char             fsr4_shader_tier[5] = {0};
 static char             fsr4_shader_model[16] = {0};
+static FfxFsr4ModelVariant fsr4_active_variant = FFX_FSR4_VARIANT_V07_INT8;
+static FfxFsr4ModelVariant fsr4_backend_variant = FFX_FSR4_VARIANT_V07_INT8;
+static uint32_t         fsr4_active_pass_count = FFX_FSR4_VK_PASS_COUNT;
 /* Preserve a precise initialization failure for the requested-versus-active
  * menu status. Distribution packages intentionally omit incomplete v07 model
  * blobs, so a generic "context unavailable" is not actionable. */
@@ -153,6 +156,15 @@ static FfxVkPortableResult fsr3_validate_rayregeneration_bindings(
     const VkptTemporalFrame *frame, uint64_t *issues);
 static FfxVkXessCreateInfo xess_create_info;
 static FfxVkXessPipeline xess_pipeline;
+static FfxVkXeSSRecoveredContext *xess_recovered_context = NULL;
+static bool xess_recovered_ok = false;
+static FfxVkXeSSReplayExtent xess_recovered_extent = {0};
+static void *xess_model_blob = NULL;
+static size_t xess_model_blob_size = 0;
+static bool xess_model_blob_attempted = false;
+static float xess_prev_jitter_x = 0.0f;
+static float xess_prev_jitter_y = 0.0f;
+static int xess_ctx_quality = -1;
 static bool xess_context_ok = false;
 static bool xess_reset_next = true;
 static uint32_t xess_ctx_dw = 0;
@@ -206,11 +218,11 @@ static bool fsr4_device_is_capable(void)
         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
         VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
 
-    if (!qvk.supports_fp16 || !qvk.supports_int16 || !qvk.supports_int8 ||
-        !qvk.supports_dot4 || !qvk.supports_compute_derivatives ||
+    if (!qvk.supports_fp16 || !qvk.supports_int16 ||
+        !qvk.supports_dot4 ||
         !qvk.supports_storage_image_extended_formats ||
         !qvk.supports_storage_image_write_without_format) {
-        Com_WPrintf("FSR4: required FP16/INT16/INT8/DOT4/derivative/storage "
+        Com_WPrintf("FSR4: required FP16/INT16/DOT4/storage "
                     "features are unavailable; using fallback.\n");
         return false;
     }
@@ -241,6 +253,7 @@ cvar_t *cvar_flt_fsr3_sharpening = NULL;
 cvar_t *cvar_flt_fsr4_sharpening = NULL;
 cvar_t *cvar_flt_fsr4_auto_exposure = NULL;
 cvar_t *cvar_flt_fsr4_dynamic_resolution = NULL;
+cvar_t *cvar_flt_fsr4_variant = NULL;
 cvar_t *cvar_flt_frame_generation = NULL;
 cvar_t *cvar_flt_frame_generation_multiplier = NULL;
 cvar_t *cvar_flt_frame_generation_backend = NULL;
@@ -292,23 +305,53 @@ static bool load_spv(const char *rel_path, const char *entry_point, FfxFsr4VkSha
 
     byte *buf = NULL;
     int   len = FS_LoadFile(full, (void **)&buf);
+    bool  from_disk = false;
+
+    if (len <= 0 || !buf) {
+        char disk_path[MAX_OSPATH];
+        Q_snprintf(disk_path, sizeof(disk_path), "baseq2/fsr4_shaders/%s", rel_path);
+        FILE *fp = fopen(disk_path, "rb");
+        if (fp) {
+            if (fseek(fp, 0, SEEK_END) == 0) {
+                long sz = ftell(fp);
+                if (sz > 0 && fseek(fp, 0, SEEK_SET) == 0) {
+                    buf = Z_Malloc((size_t)sz);
+                    if (fread(buf, 1, (size_t)sz, fp) == (size_t)sz) {
+                        len = (int)sz;
+                        from_disk = true;
+                    } else {
+                        Z_Free(buf);
+                        buf = NULL;
+                    }
+                }
+            }
+            fclose(fp);
+        }
+    }
+
     if (len <= 0 || !buf) {
         Com_WPrintf("FSR4: shader not found: %s\n", full);
         Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                   "fallback: FSR4 v07 shader asset missing (%s)", rel_path);
+                   "fallback: FSR4 shader asset missing (%s)", rel_path);
         return false;
     }
     if (len & 3) {
         Com_WPrintf("FSR4: shader %s size %d not DWORD-aligned\n", full, len);
         Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                   "fallback: FSR4 v07 shader asset is invalid (%s)", rel_path);
-        FS_FreeFile(buf);
+                   "fallback: FSR4 shader asset is invalid (%s)", rel_path);
+        if (from_disk)
+            Z_Free(buf);
+        else
+            FS_FreeFile(buf);
         return false;
     }
 
     uint32_t *words = Z_Malloc((size_t)len);
     memcpy(words, buf, (size_t)len);
-    FS_FreeFile(buf);
+    if (from_disk)
+        Z_Free(buf);
+    else
+        FS_FreeFile(buf);
 
     out->spirv      = words;
     out->sizeBytes  = (size_t)len;
@@ -321,6 +364,7 @@ static bool load_model_asset(const char *rel_path, void **out_data, size_t *out_
     char full[MAX_OSPATH];
     byte *file_data = NULL;
     int file_size;
+    bool from_disk = false;
 
     if (!out_data || !out_size)
         return false;
@@ -329,22 +373,189 @@ static bool load_model_asset(const char *rel_path, void **out_data, size_t *out_
     Q_snprintf(full, sizeof(full), "fsr4_shaders/%s", rel_path);
     file_size = FS_LoadFile(full, (void **)&file_data);
     if (file_size <= 0 || !file_data) {
+        char disk_path[MAX_OSPATH];
+        Q_snprintf(disk_path, sizeof(disk_path), "baseq2/fsr4_shaders/%s", rel_path);
+        FILE *fp = fopen(disk_path, "rb");
+        if (fp) {
+            if (fseek(fp, 0, SEEK_END) == 0) {
+                long sz = ftell(fp);
+                if (sz > 0 && fseek(fp, 0, SEEK_SET) == 0) {
+                    file_data = Z_Malloc((size_t)sz);
+                    if (fread(file_data, 1, (size_t)sz, fp) == (size_t)sz) {
+                        file_size = (int)sz;
+                        from_disk = true;
+                    } else {
+                        Z_Free(file_data);
+                        file_data = NULL;
+                    }
+                }
+            }
+            fclose(fp);
+        }
+    }
+    if (file_size <= 0 || !file_data) {
         Com_WPrintf("FSR4: model asset not found: %s\n", full);
         Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                   "fallback: FSR4 v07 model asset missing (%s)", rel_path);
+                   "fallback: FSR4 model asset missing (%s)", rel_path);
         return false;
     }
 
     *out_data = Z_Malloc((size_t)file_size);
     memcpy(*out_data, file_data, (size_t)file_size);
     *out_size = (size_t)file_size;
-    FS_FreeFile(file_data);
+    if (from_disk)
+        Z_Free(file_data);
+    else
+        FS_FreeFile(file_data);
     return true;
 }
 
-static void free_blobs(FfxFsr4VkShaderBlob blobs[FFX_FSR4_VK_PASS_COUNT])
+static bool load_dlss_model_asset(const char *rel_path, void **out_data, size_t *out_size)
 {
-    for (int i = 0; i < FFX_FSR4_VK_PASS_COUNT; i++) {
+    char full[MAX_OSPATH];
+    byte *file_data = NULL;
+    int file_size;
+    bool from_disk = false;
+
+    if (!out_data || !out_size)
+        return false;
+    *out_data = NULL;
+    *out_size = 0;
+    Q_snprintf(full, sizeof(full), "dlss_models/%s", rel_path);
+    file_size = FS_LoadFile(full, (void **)&file_data);
+    if (file_size <= 0 || !file_data) {
+        char disk_path[MAX_OSPATH];
+        Q_snprintf(disk_path, sizeof(disk_path), "baseq2/dlss_models/%s", rel_path);
+        FILE *fp = fopen(disk_path, "rb");
+        if (fp) {
+            if (fseek(fp, 0, SEEK_END) == 0) {
+                long sz = ftell(fp);
+                if (sz > 0 && fseek(fp, 0, SEEK_SET) == 0) {
+                    file_data = Z_Malloc((size_t)sz);
+                    if (fread(file_data, 1, (size_t)sz, fp) == (size_t)sz) {
+                        file_size = (int)sz;
+                        from_disk = true;
+                    } else {
+                        Z_Free(file_data);
+                        file_data = NULL;
+                    }
+                }
+            }
+            fclose(fp);
+        }
+    }
+    if (file_size <= 0 || !file_data)
+        return false;
+
+    *out_data = Z_Malloc((size_t)file_size);
+    memcpy(*out_data, file_data, (size_t)file_size);
+    *out_size = (size_t)file_size;
+    if (from_disk)
+        Z_Free(file_data);
+    else
+        FS_FreeFile(file_data);
+    return true;
+}
+
+static bool fsr4_asset_exists(const char *rel_path)
+{
+    char full[MAX_OSPATH];
+    byte *buf = NULL;
+    int len;
+
+    if (!rel_path || !rel_path[0])
+        return false;
+    Q_snprintf(full, sizeof(full), "fsr4_shaders/%s", rel_path);
+    len = FS_LoadFile(full, (void **)&buf);
+    if (buf) {
+        FS_FreeFile(buf);
+        return len > 0;
+    }
+    if (len > 0)
+        return true;
+    char disk_path[MAX_OSPATH];
+    Q_snprintf(disk_path, sizeof(disk_path), "baseq2/fsr4_shaders/%s", rel_path);
+    FILE *fp = fopen(disk_path, "rb");
+    if (fp) {
+        fclose(fp);
+        return true;
+    }
+    return false;
+}
+
+static bool fsr4_parse_preset(const char *model, FfxFsr4ModelPreset *out_preset)
+{
+    if (!model || !out_preset)
+        return false;
+    if (!strcmp(model, "native"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_NATIVE_AA;
+    else if (!strcmp(model, "quality"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_QUALITY;
+    else if (!strcmp(model, "balanced"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_BALANCED;
+    else if (!strcmp(model, "performance"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_PERFORMANCE;
+    else if (!strcmp(model, "ultraperf"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_ULTRA_PERFORMANCE;
+    else if (!strcmp(model, "drs"))
+        *out_preset = FFX_FSR4_MODEL_PRESET_DRS;
+    else
+        return false;
+    return true;
+}
+
+static bool fsr4_412_variant_assets_exist(FfxFsr4ModelVariant variant,
+                                          FfxFsr4ModelPreset preset)
+{
+    FfxFsr4412AssetSet assets;
+    if (!ffxFsr4412BuildAssetSet(variant, preset,
+                                 qvk.extent_unscaled.width ? qvk.extent_unscaled.width : 1920u,
+                                 qvk.extent_unscaled.height ? qvk.extent_unscaled.height : 1080u,
+                                 &assets))
+        return false;
+    return fsr4_asset_exists(assets.pre) &&
+           fsr4_asset_exists(assets.post) &&
+           fsr4_asset_exists(assets.rcas) &&
+           fsr4_asset_exists(assets.spdAutoExposure) &&
+           fsr4_asset_exists(assets.initializer);
+}
+
+static FfxFsr4ModelVariant fsr4_requested_variant(const char *model)
+{
+    const char *req = (cvar_flt_fsr4_variant && cvar_flt_fsr4_variant->string[0])
+        ? cvar_flt_fsr4_variant->string
+        : "auto";
+    FfxFsr4ModelPreset preset = FFX_FSR4_MODEL_PRESET_PERFORMANCE;
+    (void)fsr4_parse_preset(model, &preset);
+
+    if (!Q_stricmp(req, "412_i8_2") || !Q_stricmp(req, "i8_2") ||
+        !Q_stricmp(req, "navi2") || !Q_stricmp(req, "rdna2") || !strcmp(req, "1"))
+        return FFX_FSR4_VARIANT_412_NAVI2_INT8;
+    if (!Q_stricmp(req, "412_lite_i8") || !Q_stricmp(req, "lite_i8") ||
+        !Q_stricmp(req, "lite") || !strcmp(req, "2"))
+        return FFX_FSR4_VARIANT_412_LITE_INT8;
+    if (!Q_stricmp(req, "412_i8") || !Q_stricmp(req, "rdna3") || !strcmp(req, "3"))
+        return FFX_FSR4_VARIANT_412_RDNA3_INT8;
+    if (!Q_stricmp(req, "v07_i8") || !Q_stricmp(req, "v07"))
+        return FFX_FSR4_VARIANT_V07_INT8;
+
+    /* "auto": prefer official FSR 4.1.2 RDNA2 INT8/DP4a (runs on RDNA2, RDNA3,
+     * and any Vulkan 1.3 DP4a+FP16 GPU without needing shaderInt8 or
+     * computeDerivativeGroupLinear), then Lite, then RDNA3, then v07. */
+    if (fsr4_412_variant_assets_exist(FFX_FSR4_VARIANT_412_NAVI2_INT8, preset))
+        return FFX_FSR4_VARIANT_412_NAVI2_INT8;
+    if (qvk.supports_compute_derivatives &&
+        fsr4_412_variant_assets_exist(FFX_FSR4_VARIANT_412_LITE_INT8, preset))
+        return FFX_FSR4_VARIANT_412_LITE_INT8;
+    if (qvk.supports_int8 && qvk.supports_compute_derivatives &&
+        fsr4_412_variant_assets_exist(FFX_FSR4_VARIANT_412_RDNA3_INT8, preset))
+        return FFX_FSR4_VARIANT_412_RDNA3_INT8;
+    return FFX_FSR4_VARIANT_V07_INT8;
+}
+
+static void free_blobs(FfxFsr4VkShaderBlob *blobs, uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
         if (blobs[i].spirv) {
             Z_Free((void *)blobs[i].spirv);
             blobs[i].spirv = NULL;
@@ -388,8 +599,9 @@ static void fsr4_destroy_backend(void)
 static VkResult fsr4_create_backend_for_tier(const char *tier,
                                               const char *model)
 {
-    FfxFsr4VkShaderBlob blobs[FFX_FSR4_VK_PASS_COUNT];
+    FfxFsr4VkShaderBlob blobs[FFX_FSR4_VK_MAX_PASS_COUNT];
     FfxFsr4V07AssetSet assets;
+    FfxFsr4412AssetSet assets412;
     FfxFsr4VkCreateInfo ci;
     void *model_initializer = NULL;
     void *pre_pass_weights = NULL;
@@ -399,99 +611,134 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
     bool ok = true;
     VkResult result;
     FfxFsr4ModelPreset preset;
+    FfxFsr4ModelVariant variant;
+    uint32_t total_passes = FFX_FSR4_VK_PASS_COUNT;
 
     if (!tier || !model || !fsr4_scratch) {
         Q_strlcpy(fsr4_unavailable_reason,
-                  "fallback: FSR4 v07 backend initialization failed",
+                  "fallback: FSR4 backend initialization failed",
                   sizeof(fsr4_unavailable_reason));
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-    if (!strcmp(model, "native"))
-        preset = FFX_FSR4_MODEL_PRESET_NATIVE_AA;
-    else if (!strcmp(model, "quality"))
-        preset = FFX_FSR4_MODEL_PRESET_QUALITY;
-    else if (!strcmp(model, "balanced"))
-        preset = FFX_FSR4_MODEL_PRESET_BALANCED;
-    else if (!strcmp(model, "performance"))
-        preset = FFX_FSR4_MODEL_PRESET_PERFORMANCE;
-    else if (!strcmp(model, "ultraperf"))
-        preset = FFX_FSR4_MODEL_PRESET_ULTRA_PERFORMANCE;
-    else if (!strcmp(model, "drs"))
-        preset = FFX_FSR4_MODEL_PRESET_DRS;
-    else {
+    if (!fsr4_parse_preset(model, &preset)) {
         Q_strlcpy(fsr4_unavailable_reason,
-                  "fallback: FSR4 v07 requested model is unsupported",
+                  "fallback: FSR4 requested model is unsupported",
                   sizeof(fsr4_unavailable_reason));
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-    if (!ffxFsr4V07BuildAssetSet(preset, qvk.extent_unscaled.width,
-                                 qvk.extent_unscaled.height, &assets) ||
-        strcmp(assets.tier, tier) != 0) {
-        Com_WPrintf("FSR4: reusable asset selector rejected %s/%s.\n",
-                    model, tier);
-        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                   "fallback: FSR4 v07 asset selector rejected %s/%s", model, tier);
-        return VK_ERROR_INITIALIZATION_FAILED;
-    }
-    Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-               "fallback: FSR4 v07 %s/%s assets unavailable", model, tier);
+    variant = fsr4_requested_variant(model);
     memset(blobs, 0, sizeof(blobs));
 
-    ok &= load_spv(assets.pre, "main", &blobs[0]);
-    for (int i = 1; i <= 12 && ok; ++i) {
-        static const char *pass_entries[13] = {
-            NULL,
-            "fsr4_model_v07_i8_pass1",  "fsr4_model_v07_i8_pass2",
-            "fsr4_model_v07_i8_pass3",  "fsr4_model_v07_i8_pass4",
-            "fsr4_model_v07_i8_pass5",  "fsr4_model_v07_i8_pass6",
-            "fsr4_model_v07_i8_pass7",  "fsr4_model_v07_i8_pass8",
-            "fsr4_model_v07_i8_pass9",  "fsr4_model_v07_i8_pass10",
-            "fsr4_model_v07_i8_pass11", "fsr4_model_v07_i8_pass12",
-        };
-        ok &= load_spv(assets.model[i - 1], pass_entries[i], &blobs[i]);
-    }
-    ok &= load_spv(assets.post, "main", &blobs[13]);
-
-    /* RCAS is a real optional dispatch, but its pipeline must be present so a
-     * user-visible sharpening request cannot turn into a partial graph. */
-    ok &= load_spv(assets.rcas, "main", &blobs[14]);
-    ok &= load_spv(assets.spdAutoExposure, "main", &blobs[15]);
-    ok &= load_model_asset(assets.initializer, &model_initializer,
-                           &model_initializer_size);
-    ok &= load_model_asset(assets.prePassWeights, &pre_pass_weights,
-                           &pre_pass_weights_size);
-    if (model_initializer_size != FFX_FSR4_V07_INITIALIZER_BYTES) {
-        Com_WPrintf("FSR4: initializer has unexpected size %zu (expected %u)\n",
-                    model_initializer_size,
-                    (unsigned)FFX_FSR4_V07_INITIALIZER_BYTES);
-        if (model_initializer) {
+    if (variant != FFX_FSR4_VARIANT_V07_INT8) {
+        if (!ffxFsr4412BuildAssetSet(variant, preset, qvk.extent_unscaled.width,
+                                     qvk.extent_unscaled.height, &assets412) ||
+            strcmp(assets412.tier, tier) != 0) {
+            Com_WPrintf("FSR4: 4.1.2 asset selector rejected %s/%s.\n",
+                        model, tier);
             Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                       "fallback: FSR4 v07 initializer size is invalid (%s)",
-                       assets.initializer);
+                       "fallback: FSR 4.1.2 asset selector rejected %s/%s", model, tier);
+            return VK_ERROR_INITIALIZATION_FAILED;
         }
-        ok = false;
-    }
-    if (pre_pass_weights_size != FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES) {
-        Com_WPrintf("FSR4: pre-pass weights have unexpected size %zu (expected %u)\n",
-                    pre_pass_weights_size,
-                    (unsigned)FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES);
-        if (pre_pass_weights) {
+        total_passes = assets412.modelPassCount + 4u;
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR 4.1.2 (%s) %s/%s assets unavailable",
+                   ffxFsr4ModelVariantName(variant), model, tier);
+
+        ok &= load_spv(assets412.pre, "main", &blobs[0]);
+        for (uint32_t i = 0; i < assets412.modelPassCount && ok; ++i)
+            ok &= load_spv(assets412.model[i], "main", &blobs[i + 1u]);
+        ok &= load_spv(assets412.post, "main", &blobs[assets412.modelPassCount + 1u]);
+        ok &= load_spv(assets412.rcas, "main", &blobs[assets412.modelPassCount + 2u]);
+        ok &= load_spv(assets412.spdAutoExposure, "main", &blobs[assets412.modelPassCount + 3u]);
+        ok &= load_model_asset(assets412.initializer, &model_initializer,
+                               &model_initializer_size);
+        if (model_initializer_size != assets412.expectedInitializerBytes) {
+            Com_WPrintf("FSR4: 4.1.2 initializer has unexpected size %zu (expected %u)\n",
+                        model_initializer_size,
+                        (unsigned)assets412.expectedInitializerBytes);
+            if (model_initializer) {
+                Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                           "fallback: FSR 4.1.2 initializer size is invalid (%s)",
+                           assets412.initializer);
+            }
+            ok = false;
+        }
+        if (!ok) {
+            Com_WPrintf("FSR4: coherent 4.1.2 (%s) %s/%s shader/model set is unavailable; FSR4 disabled.\n"
+                        "      Run python3 tools/extract_fsr412_vk.py --out-dir baseq2/fsr4_shaders --validate.\n",
+                        ffxFsr4ModelVariantName(variant), model, tier);
+            result = VK_ERROR_INITIALIZATION_FAILED;
+            goto cleanup;
+        }
+    } else {
+        if (!ffxFsr4V07BuildAssetSet(preset, qvk.extent_unscaled.width,
+                                     qvk.extent_unscaled.height, &assets) ||
+            strcmp(assets.tier, tier) != 0) {
+            Com_WPrintf("FSR4: reusable asset selector rejected %s/%s.\n",
+                        model, tier);
             Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                       "fallback: FSR4 v07 pre-pass weights size is invalid (%s)",
-                       assets.prePassWeights);
+                       "fallback: FSR4 v07 asset selector rejected %s/%s", model, tier);
+            return VK_ERROR_INITIALIZATION_FAILED;
         }
-        ok = false;
-    }
-    if (!ok) {
-        Com_WPrintf("FSR4: coherent %s/%s shader/model set is unavailable; FSR4 disabled.\n"
-                    "      Build target fsr4_shaders or run "
-                    "src/refresh/vkpt/fsr4/compile_shaders_fsr4.sh.\n",
-                    model, tier);
-        result = VK_ERROR_INITIALIZATION_FAILED;
-        goto cleanup;
+        Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                   "fallback: FSR4 v07 %s/%s assets unavailable", model, tier);
+
+        ok &= load_spv(assets.pre, "main", &blobs[0]);
+        for (int i = 1; i <= 12 && ok; ++i) {
+            static const char *pass_entries[13] = {
+                NULL,
+                "fsr4_model_v07_i8_pass1",  "fsr4_model_v07_i8_pass2",
+                "fsr4_model_v07_i8_pass3",  "fsr4_model_v07_i8_pass4",
+                "fsr4_model_v07_i8_pass5",  "fsr4_model_v07_i8_pass6",
+                "fsr4_model_v07_i8_pass7",  "fsr4_model_v07_i8_pass8",
+                "fsr4_model_v07_i8_pass9",  "fsr4_model_v07_i8_pass10",
+                "fsr4_model_v07_i8_pass11", "fsr4_model_v07_i8_pass12",
+            };
+            ok &= load_spv(assets.model[i - 1], pass_entries[i], &blobs[i]);
+        }
+        ok &= load_spv(assets.post, "main", &blobs[13]);
+
+        /* RCAS is a real optional dispatch, but its pipeline must be present so a
+         * user-visible sharpening request cannot turn into a partial graph. */
+        ok &= load_spv(assets.rcas, "main", &blobs[14]);
+        ok &= load_spv(assets.spdAutoExposure, "main", &blobs[15]);
+        ok &= load_model_asset(assets.initializer, &model_initializer,
+                               &model_initializer_size);
+        ok &= load_model_asset(assets.prePassWeights, &pre_pass_weights,
+                               &pre_pass_weights_size);
+        if (model_initializer_size != FFX_FSR4_V07_INITIALIZER_BYTES) {
+            Com_WPrintf("FSR4: initializer has unexpected size %zu (expected %u)\n",
+                        model_initializer_size,
+                        (unsigned)FFX_FSR4_V07_INITIALIZER_BYTES);
+            if (model_initializer) {
+                Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                           "fallback: FSR4 v07 initializer size is invalid (%s)",
+                           assets.initializer);
+            }
+            ok = false;
+        }
+        if (pre_pass_weights_size != FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES) {
+            Com_WPrintf("FSR4: pre-pass weights have unexpected size %zu (expected %u)\n",
+                        pre_pass_weights_size,
+                        (unsigned)FFX_FSR4_V07_PRE_PASS_WEIGHTS_BYTES);
+            if (pre_pass_weights) {
+                Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
+                           "fallback: FSR4 v07 pre-pass weights size is invalid (%s)",
+                           assets.prePassWeights);
+            }
+            ok = false;
+        }
+        if (!ok) {
+            Com_WPrintf("FSR4: coherent %s/%s shader/model set is unavailable; FSR4 disabled.\n"
+                        "      Build target fsr4_shaders or run "
+                        "src/refresh/vkpt/fsr4/compile_shaders_fsr4.sh.\n",
+                        model, tier);
+            result = VK_ERROR_INITIALIZATION_FAILED;
+            goto cleanup;
+        }
     }
 
-    for (uint32_t i = 0; i < FFX_FSR4_VK_PASS_COUNT; ++i)
+    for (uint32_t i = 0; i < total_passes; ++i)
         shader_bytes += blobs[i].sizeBytes;
 
     memset(&ci, 0, sizeof(ci));
@@ -499,7 +746,13 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
     ci.physicalDevice = qvk.physical_device;
     ci.scratchBuffer = fsr4_scratch;
     ci.scratchBufferSize = ffxFsr4VkGetScratchMemorySize();
-    memcpy(ci.shaders, blobs, sizeof(blobs));
+    ci.modelVariant = variant;
+    if (variant == FFX_FSR4_VARIANT_V07_INT8) {
+        memcpy(ci.shaders, blobs, sizeof(ci.shaders));
+    } else {
+        ci.extShaders = blobs;
+        ci.extShaderCount = total_passes;
+    }
     ci.modelInitializer = model_initializer;
     ci.modelInitializerSize = model_initializer_size;
     ci.prePassWeights = pre_pass_weights;
@@ -508,13 +761,24 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
     result = ffxFsr4VkCreateContext(&ci, &fsr4_backend);
     if (result == VK_SUCCESS) {
         fsr4_backend_ok = true;
+        fsr4_active_variant = variant;
+        fsr4_backend_variant = variant;
+        fsr4_active_pass_count = total_passes;
         Q_strlcpy(fsr4_shader_tier, tier, sizeof(fsr4_shader_tier));
         Q_strlcpy(fsr4_shader_model, model, sizeof(fsr4_shader_model));
         fsr4_unavailable_reason[0] = '\0';
-        Com_Printf("FSR4: source-v07 Vulkan backend ready (INT8/DOT4; %s, "
+        if (cvar_flt_fsr4_official_provider_reason) {
+            Cvar_SetByVar(cvar_flt_fsr4_official_provider_reason,
+                variant != FFX_FSR4_VARIANT_V07_INT8
+                    ? "active: FSR 4.1.2 (2.4.0.4370) extracted INT8/DP4a Vulkan model"
+                    : "source-v07 active (FSR 4.1.2 extracted assets not selected)",
+                FROM_CODE);
+        }
+        Com_Printf("FSR4: %s Vulkan backend ready (%s, "
                    "%s tier; %u shader passes, %.1f KiB SPIR-V; "
                    "model %.1f + %.1f KiB; backend %.1f KiB).\n",
-                   model, tier, (unsigned)FFX_FSR4_VK_PASS_COUNT,
+                   ffxFsr4ModelVariantName(variant),
+                   model, tier, (unsigned)total_passes,
                    (double)shader_bytes / 1024.0,
                    (double)model_initializer_size / 1024.0,
                    (double)pre_pass_weights_size / 1024.0,
@@ -523,14 +787,15 @@ static VkResult fsr4_create_backend_for_tier(const char *tier,
         Com_WPrintf("FSR4: Vulkan backend creation failed (%d); FSR4 disabled.\n",
                     result);
         Q_snprintf(fsr4_unavailable_reason, sizeof(fsr4_unavailable_reason),
-                   "fallback: FSR4 v07 Vulkan backend creation failed (%s)",
+                   "fallback: %s Vulkan backend creation failed (%s)",
+                   ffxFsr4ModelVariantName(variant),
                    qvk_result_to_string(result));
         ffxFsr4VkDestroyContext((FfxFsr4VkContext *)fsr4_scratch);
         memset(&fsr4_backend, 0, sizeof(fsr4_backend));
     }
 
 cleanup:
-    free_blobs(blobs);
+    free_blobs(blobs, FFX_FSR4_VK_MAX_PASS_COUNT);
     if (model_initializer) Z_Free(model_initializer);
     if (pre_pass_weights) Z_Free(pre_pass_weights);
     return result;
@@ -542,18 +807,20 @@ static VkResult fsr4_recreate_context(void)
 {
     const char *required_tier = display_res_tag();
     const char *required_model = fsr4_requested_model();
+    const FfxFsr4ModelVariant required_variant = fsr4_requested_variant(required_model);
     if (!fsr4_output_extent_supported(qvk.extent_unscaled)) {
         Com_WPrintf("FSR4: output extent %ux%u exceeds the v07 7680x4320 "
                     "limit; using fallback.\n",
                     qvk.extent_unscaled.width, qvk.extent_unscaled.height);
         Q_strlcpy(fsr4_unavailable_reason,
-                  "fallback: FSR4 v07 output exceeds 8K limit",
+                  "fallback: FSR4 output exceeds 8K limit",
                   sizeof(fsr4_unavailable_reason));
         fsr4_destroy_backend();
         return VK_ERROR_FORMAT_NOT_SUPPORTED;
     }
     if (!fsr4_backend_ok || strcmp(fsr4_shader_tier, required_tier) != 0 ||
-        strcmp(fsr4_shader_model, required_model) != 0) {
+        strcmp(fsr4_shader_model, required_model) != 0 ||
+        fsr4_backend_variant != required_variant) {
         /* A quality model owns persistent images and descriptors.  Settings
          * changes can occur while older frames are still in flight, unlike a
          * normal swapchain recreation, so retire them before replacing that
@@ -615,7 +882,8 @@ static VkResult fsr4_recreate_context(void)
         FfxErrorCode memory_result =
             fsr4_backend.fpGetEffectGpuMemoryUsage(&fsr4_backend, 0,
                                                     &memory_usage);
-        size_t activation_bytes = ffxFsr4GetDot4ScratchSize(
+        size_t activation_bytes = ffxFsr4GetVariantScratchSize(
+            fsr4_active_variant,
             qvk.extent_unscaled.width, qvk.extent_unscaled.height);
         if (memory_result == FFX_OK) {
             Com_Printf("FSR4: provider-owned Vulkan allocations %.2f MiB "
@@ -697,6 +965,99 @@ static const char *fsr_quality_label(int quality)
     case VKPT_FSR_QUALITY_ULTRA_PERFORMANCE: return "Ultra Performance";
     default: return "Performance";
     }
+}
+
+#ifdef VKPT_FSR3
+static bool xess_recovered_device_is_capable(void)
+{
+    return qvk.supports_fp16 && qvk.supports_int16 && qvk.supports_int8 &&
+           qvk.supports_dot4 &&
+           qvk.supports_storage_image_read_without_format &&
+           qvk.supports_storage_image_write_without_format &&
+           qvk.supports_uniform_buffer_standard_layout &&
+           qvk.supports_ubo_nonuniform_indexing &&
+           qvk.supports_storage_image_nonuniform_indexing;
+}
+
+static bool xess_ensure_model_blob(FfxVkXeSSRecoveredModel *out_model)
+{
+    if (!xess_model_blob_attempted) {
+        byte *vfs_data = NULL;
+        int vfs_len;
+        xess_model_blob_attempted = true;
+        vfs_len = FS_LoadFile("xess/xess-quality-1.xessvk", (void **)&vfs_data);
+        if (vfs_len > 0 && vfs_data) {
+            xess_model_blob = Z_Malloc((size_t)vfs_len);
+            memcpy(xess_model_blob, vfs_data, (size_t)vfs_len);
+            xess_model_blob_size = (size_t)vfs_len;
+            FS_FreeFile(vfs_data);
+        } else {
+            static const char *fallback_paths[] = {
+                "baseq2/xess/xess-quality-1.xessvk",
+                "build/xess-audit/xess-quality-1.xessvk",
+            };
+            for (size_t i = 0; i < LENGTH(fallback_paths) && !xess_model_blob; ++i) {
+                FILE *fp = fopen(fallback_paths[i], "rb");
+                if (!fp)
+                    continue;
+                if (fseek(fp, 0, SEEK_END) == 0) {
+                    long sz = ftell(fp);
+                    if (sz > 0 && fseek(fp, 0, SEEK_SET) == 0) {
+                        void *buf = Z_Malloc((size_t)sz);
+                        if (fread(buf, 1, (size_t)sz, fp) == (size_t)sz) {
+                            xess_model_blob = buf;
+                            xess_model_blob_size = (size_t)sz;
+                        } else {
+                            Z_Free(buf);
+                        }
+                    }
+                }
+                fclose(fp);
+            }
+        }
+        if (xess_model_blob) {
+            FfxVkXeSSRecoveredModel check_model;
+            char diag[128] = {0};
+            if (ffxVkXeSSRecoveredModelFromBlob(xess_model_blob,
+                    xess_model_blob_size, &check_model, diag,
+                    sizeof(diag)) != VK_SUCCESS) {
+                Com_WPrintf("XeSS: recovered model container invalid (%s).\n",
+                            diag[0] ? diag : "corrupt container");
+                Z_Free(xess_model_blob);
+                xess_model_blob = NULL;
+                xess_model_blob_size = 0;
+            }
+        }
+    }
+    if (!xess_model_blob)
+        return false;
+    if (out_model) {
+        if (ffxVkXeSSRecoveredModelFromBlob(xess_model_blob,
+                xess_model_blob_size, out_model, NULL, 0) != VK_SUCCESS)
+            return false;
+    }
+    return true;
+}
+#endif
+
+bool vkpt_fsr_get_exact_render_extent(VkExtent2D display_extent, VkExtent2D *out_extent)
+{
+    if (!out_extent || !display_extent.width || !display_extent.height)
+        return false;
+#ifdef VKPT_FSR3
+    if (requested_upscaler() == VKPT_UPSCALER_XESS &&
+        requested_fsr_quality() == VKPT_FSR_QUALITY_QUALITY &&
+        xess_recovered_device_is_capable()) {
+        FfxVkXeSSReplayExtent replay_extent;
+        if (ffxVkXeSSRecoveredGetExtent(display_extent, &replay_extent) &&
+            xess_ensure_model_blob(NULL)) {
+            out_extent->width = replay_extent.inputWidth;
+            out_extent->height = replay_extent.inputHeight;
+            return true;
+        }
+    }
+#endif
+    return false;
 }
 
 int vkpt_fsr_requested_render_scale(void)
@@ -1122,6 +1483,16 @@ static bool fsr3_315_is_enabled(void)
 
 static void xess_destroy_context(void)
 {
+    if (xess_recovered_context) {
+        _VK(vkDeviceWaitIdle(qvk.device));
+        ffxVkXeSSRecoveredDestroy(xess_recovered_context);
+        xess_recovered_context = NULL;
+    }
+    xess_recovered_ok = false;
+    memset(&xess_recovered_extent, 0, sizeof(xess_recovered_extent));
+    xess_prev_jitter_x = 0.0f;
+    xess_prev_jitter_y = 0.0f;
+    xess_ctx_quality = -1;
     if (xess_pipeline.pipeline != VK_NULL_HANDLE) {
         ffxVkXessDestroyPipeline(qvk.device, &xess_pipeline);
     }
@@ -1133,6 +1504,8 @@ static void xess_destroy_context(void)
 
 static VkResult xess_create_context(void)
 {
+    const int quality = requested_fsr_quality();
+
     xess_destroy_context();
     if (!qvk.extent_unscaled.width || !qvk.extent_unscaled.height)
         return VK_ERROR_INITIALIZATION_FAILED;
@@ -1146,7 +1519,7 @@ static VkResult xess_create_context(void)
         ? FFX_VK_XESS_PATH_DP4A
         : FFX_VK_XESS_PATH_GENERIC_COMPUTE;
 
-    switch (requested_fsr_quality()) {
+    switch (quality) {
     case VKPT_FSR_QUALITY_QUALITY:
         xess_create_info.quality = FFX_VK_XESS_QUALITY_QUALITY;
         break;
@@ -1182,13 +1555,46 @@ static VkResult xess_create_context(void)
         return VK_ERROR_FEATURE_NOT_PRESENT;
     }
 
+    if (quality == VKPT_FSR_QUALITY_QUALITY && xess_recovered_device_is_capable()) {
+        FfxVkXeSSReplayExtent replay_extent;
+        FfxVkXeSSRecoveredModel model;
+        if (ffxVkXeSSRecoveredGetExtent(qvk.extent_unscaled, &replay_extent) &&
+            xess_ensure_model_blob(&model)) {
+            FfxVkXeSSRecoveredCreateInfo rec_ci;
+            char diag[128] = {0};
+            memset(&rec_ci, 0, sizeof(rec_ci));
+            rec_ci.structSize = sizeof(rec_ci);
+            rec_ci.abiVersion = FFX_VK_XESS_RECOVERED_ABI_VERSION;
+            rec_ci.physicalDevice = qvk.physical_device;
+            rec_ci.device = qvk.device;
+            rec_ci.extent = replay_extent;
+            rec_ci.frameSlots = MAX_FRAMES_IN_FLIGHT;
+            rec_ci.model = &model;
+            if (ffxVkXeSSRecoveredCreate(&rec_ci, &xess_recovered_context,
+                    diag, sizeof(diag)) == VK_SUCCESS && xess_recovered_context) {
+                xess_recovered_ok = true;
+                xess_recovered_extent = replay_extent;
+                Com_Printf("XeSS: recovered 2.0.2 Quality INT8/DP4a U-Net ready "
+                           "(%ux%u -> %ux%u, 14 passes).\n",
+                           replay_extent.inputWidth, replay_extent.inputHeight,
+                           replay_extent.outputWidth, replay_extent.outputHeight);
+            } else {
+                Com_WPrintf("XeSS: recovered 2.0.2 context creation failed (%s); "
+                            "using spatial prototype.\n",
+                            diag[0] ? diag : "unknown error");
+            }
+        }
+    }
+
     xess_context_ok = true;
+    xess_ctx_quality = quality;
     xess_reset_next = true;
     xess_ctx_dw = qvk.extent_unscaled.width;
     xess_ctx_dh = qvk.extent_unscaled.height;
-    Com_Printf("XeSS: native Vulkan upscaler ready (max %ux%u, path %s).\n",
+    Com_Printf("XeSS: native Vulkan upscaler ready (max %ux%u, path %s%s).\n",
                xess_ctx_dw, xess_ctx_dh,
-               xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute");
+               xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute",
+               xess_recovered_ok ? ", recovered 2.0.2 U-Net" : ", spatial prototype");
     return VK_SUCCESS;
 }
 
@@ -1251,9 +1657,18 @@ static VkResult dlss_create_context(void)
     dlss_create_info.maxRenderSize = (FfxVkPortableExtent2D){ qvk.extent_unscaled.width, qvk.extent_unscaled.height };
     dlss_create_info.displaySize = (FfxVkPortableExtent2D){ qvk.extent_unscaled.width, qvk.extent_unscaled.height };
 
+    void *model_data = NULL;
+    size_t model_size = 0;
+    if (load_dlss_model_asset("dlss_k.bin", &model_data, &model_size)) {
+        dlss_create_info.modelContainerData = model_data;
+        dlss_create_info.modelContainerSizeBytes = model_size;
+    }
+
     uint64_t issues = 0;
     FfxVkPortableResult result = ffxVkDlssValidateCreateInfo(&dlss_create_info, &issues);
     if (result != FFX_VK_PORTABLE_OK || issues != 0) {
+        if (model_data)
+            Z_Free(model_data);
         Com_WPrintf("DLSS: create info validation failed (%d, 0x%llx); using fallback.\n",
                     (int)result, (unsigned long long)issues);
         return VK_ERROR_FEATURE_NOT_PRESENT;
@@ -1261,22 +1676,31 @@ static VkResult dlss_create_context(void)
 
     FfxVkPortableResult pres = ffxVkDlssCreatePipeline(qvk.device, &dlss_pipeline);
     if (pres != FFX_VK_PORTABLE_OK) {
+        if (model_data)
+            Z_Free(model_data);
         Com_WPrintf("DLSS: compute pipeline creation failed (%d); using fallback.\n", (int)pres);
         return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+
+    if (model_data && model_size > 0) {
+        (void)ffxVkDlssPipelineSetModel(&dlss_pipeline, model_data, model_size);
+        Com_Printf("DLSS / d4r: bound pre-trained Model K container (%zu bytes).\n", model_size);
+        Z_Free(model_data);
     }
 
     dlss_context_ok = true;
     dlss_reset_next = true;
     dlss_ctx_dw = qvk.extent_unscaled.width;
     dlss_ctx_dh = qvk.extent_unscaled.height;
-    Com_Printf("DLSS / d4r: native Vulkan upscaler ready (max %ux%u, arch %u).\n",
-               dlss_ctx_dw, dlss_ctx_dh, (unsigned int)dlss_create_info.gpuArch);
+    Com_Printf("DLSS / d4r: native Vulkan upscaler ready (max %ux%u, arch %u, neural multi-pass %s).\n",
+               dlss_ctx_dw, dlss_ctx_dh, (unsigned int)dlss_create_info.gpuArch,
+               dlss_pipeline.multiPassAvailable ? "available" : "single-pass");
     return VK_SUCCESS;
 }
 
 static void unified_sr_destroy_context(void)
 {
-    if (unified_sr_context_ok) {
+    if (unified_sr_context.initialized) {
         ffxVkUnifiedSrDestroy(&unified_sr_context);
     }
     memset(&unified_sr_context, 0, sizeof(unified_sr_context));
@@ -1330,6 +1754,13 @@ static VkResult unified_sr_create_context(void)
     VkResult result = ffxVkUnifiedSrCreate(&unified_sr_context, &create_info);
     if (result != VK_SUCCESS) {
         Com_WPrintf("Unified SR: context creation failed (%d); using fallback.\n", (int)result);
+        return result;
+    }
+
+    const char *readiness_reason = NULL;
+    result = ffxVkUnifiedSrGetReadiness(&unified_sr_context, &readiness_reason);
+    if (result != VK_SUCCESS) {
+        Com_WPrintf("Unified SR: %s; using fallback.\n", readiness_reason);
         return result;
     }
 
@@ -1400,7 +1831,13 @@ static bool unified_sr_is_enabled(void)
 
 static bool fsr4_is_enabled(void)
 {
-    if (requested_upscaler() != VKPT_UPSCALER_FSR4)
+    const int req = requested_upscaler();
+    if (req != VKPT_UPSCALER_FSR4
+#ifdef VKPT_FSR3
+        && !(req == VKPT_UPSCALER_UNIFIED && unified_sr_context_ok &&
+             unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4)
+#endif
+    )
         return false;
     if (!fsr4_backend_ok || !fsr4_context_ok)
         return false;
@@ -1411,6 +1848,59 @@ static bool fsr4_is_enabled(void)
     if (strcmp(fsr4_shader_model, fsr4_requested_model()) != 0)
         return false;
     return upscaler_frame_is_eligible(VKPT_UPSCALER_FSR4);
+}
+
+static void publish_scaler_availability(void)
+{
+    unsigned ready = 1u << FFX_VK_SCALER_OFF;
+    const char *reasons[FFX_VK_SCALER_COUNT] = { 0 };
+#ifdef VKPT_FSR3
+    if (fsr3_context_ok && fsr3_context)
+        ready |= 1u << FFX_VK_SCALER_FSR3_1_4;
+    if (fsr3_315_context_ok && fsr3_315_context)
+        ready |= 1u << FFX_VK_SCALER_FSR3_1_5;
+    if ((xess_recovered_ok && xess_recovered_context) ||
+        (xess_context_ok && xess_pipeline.pipeline))
+        ready |= 1u << FFX_VK_SCALER_INTEL_XESS;
+    if (dlss_context_ok && dlss_pipeline.pipeline)
+        ready |= 1u << FFX_VK_SCALER_NVIDIA_DLSS;
+    if (unified_sr_context_ok &&
+        (ffxVkUnifiedSrGetReadiness(&unified_sr_context, NULL) == VK_SUCCESS ||
+         (unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4 &&
+          fsr4_backend_ok && fsr4_context_ok &&
+          fsr4_output_extent_supported(qvk.extent_unscaled))))
+        ready |= 1u << FFX_VK_SCALER_UNIFIED_AUTO;
+    else
+        (void)ffxVkUnifiedSrGetReadiness(&unified_sr_context,
+            &reasons[FFX_VK_SCALER_UNIFIED_AUTO]);
+#endif
+    if (fsr4_backend_ok && fsr4_context_ok &&
+        fsr4_output_extent_supported(qvk.extent_unscaled))
+        ready |= 1u << FFX_VK_SCALER_FSR4_NEURAL;
+    else if (fsr4_unavailable_reason[0])
+        reasons[FFX_VK_SCALER_FSR4_NEURAL] = fsr4_unavailable_reason;
+    if (qvk.device_count != 1) {
+        ready = 1u << FFX_VK_SCALER_OFF;
+        for (int i = 1; i < FFX_VK_SCALER_COUNT; ++i)
+            reasons[i] = "Unavailable: temporal inputs require one GPU";
+    }
+    Cvar_SetInteger(Cvar_Get("flt_scaler_available", "1", CVAR_ROM),
+        (int)ready, FROM_CODE);
+    for (int i = 0; i < FFX_VK_SCALER_COUNT; ++i) {
+        const FfxVkScalerModel *model = ffxVkScalerModel(i);
+        const char *reason = (ready & (1u << i)) ? model->description :
+            (reasons[i] ? reasons[i] : "Unavailable: renderer context or model assets are not ready");
+#ifdef VKPT_FSR3
+        if (i == FFX_VK_SCALER_INTEL_XESS && (ready & (1u << i))) {
+            reason = (xess_recovered_ok && xess_recovered_context)
+                ? "Recovered XeSS 2.0.2 Quality INT8/DP4a U-Net active (14 passes; spatial fallback outside Quality 540p/720p/1080p)."
+                : "Spatial prototype fallback active (recovered XeSS 2.0.2 Quality INT8/DP4a U-Net requires Quality @ 540p/720p/1080p).";
+        }
+#endif
+        char name[128];
+        Q_snprintf(name, sizeof(name), "flt_scaler_%s_reason", model->key);
+        Cvar_SetByVar(Cvar_Get(name, "", CVAR_ROM), reason, FROM_CODE);
+    }
 }
 
 static void publish_upscaler_status(int active, const char *reason)
@@ -1485,6 +1975,9 @@ static bool resolve_upscaler(int *active, const char **reason)
         return true;
     }
     if (requested == VKPT_UPSCALER_XESS) {
+        if (xess_context_ok && xess_ctx_quality != requested_fsr_quality()) {
+            (void)xess_create_context();
+        }
         if (!xess_context_ok) {
             *reason = "fallback: Intel XeSS Vulkan context unavailable";
             return false;
@@ -1495,7 +1988,15 @@ static bool resolve_upscaler(int *active, const char **reason)
             return false;
         }
         *active = VKPT_UPSCALER_XESS;
-        *reason = "Intel XeSS Super Resolution active";
+        if (xess_recovered_ok && xess_recovered_context &&
+            qvk.extent_unscaled.width == xess_recovered_extent.outputWidth &&
+            qvk.extent_unscaled.height == xess_recovered_extent.outputHeight &&
+            qvk.extent_render.width >= xess_recovered_extent.inputWidth &&
+            qvk.extent_render.height >= xess_recovered_extent.inputHeight) {
+            *reason = "XeSS 2.0.2 Quality INT8/DP4a recovered neural model active";
+        } else {
+            *reason = "XeSS spatial prototype active (recovered 2.0.2 model requires Quality @ 540p/720p/1080p)";
+        }
         return true;
     }
     if (requested == VKPT_UPSCALER_DLSS) {
@@ -1509,12 +2010,16 @@ static bool resolve_upscaler(int *active, const char **reason)
             return false;
         }
         *active = VKPT_UPSCALER_DLSS;
-        *reason = "NVIDIA DLSS / AMD d4r Super Resolution active";
+        if (dlss_pipeline.hasPretrainedWeights) {
+            *reason = "DLSS 4 / d4r Model K neural Swin transformer active";
+        } else {
+            *reason = "DLSS 4 / d4r Swin transformer reconstruction active";
+        }
         return true;
     }
     if (requested == VKPT_UPSCALER_UNIFIED) {
         if (!unified_sr_context_ok) {
-            *reason = "fallback: Unified Super Resolution context unavailable";
+            (void)ffxVkUnifiedSrGetReadiness(&unified_sr_context, reason);
             return false;
         }
         if (unified_sr_ctx_dw != qvk.extent_unscaled.width ||
@@ -1522,8 +2027,25 @@ static bool resolve_upscaler(int *active, const char **reason)
             *reason = "fallback: Unified SR context resize pending";
             return false;
         }
+        if (unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4 &&
+            fsr4_backend_ok && fsr4_context_ok &&
+            (strcmp(fsr4_shader_tier, display_res_tag()) != 0 ||
+             strcmp(fsr4_shader_model, fsr4_requested_model()) != 0 ||
+             fsr4_backend_variant != fsr4_requested_variant(fsr4_requested_model()))) {
+            (void)fsr4_recreate_context();
+        }
         *active = VKPT_UPSCALER_UNIFIED;
-        *reason = "Unified Super Resolution (Auto) active";
+        if (unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4 &&
+            fsr4_is_enabled()) {
+            *reason = fsr4_active_variant != FFX_FSR4_VARIANT_V07_INT8
+                ? "Unified Super Resolution (Auto -> FSR 4.1.2 INT8/DP4a) active"
+                : "Unified Super Resolution (Auto -> FSR4 v07 INT8/DOT4) active";
+        } else if (unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR3 ||
+                   unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4) {
+            *reason = "Unified Super Resolution (Auto -> FSR3 3.1.4 native Vulkan) active";
+        } else {
+            *reason = "Unified Super Resolution (Auto) active";
+        }
         return true;
     }
 #endif
@@ -1548,12 +2070,13 @@ static bool resolve_upscaler(int *active, const char **reason)
      * transition safe even while earlier frames are in flight. */
     if (fsr4_backend_ok && fsr4_context_ok &&
         (strcmp(fsr4_shader_tier, display_res_tag()) != 0 ||
-         strcmp(fsr4_shader_model, fsr4_requested_model()) != 0)) {
+         strcmp(fsr4_shader_model, fsr4_requested_model()) != 0 ||
+         fsr4_backend_variant != fsr4_requested_variant(fsr4_requested_model()))) {
         VkResult recreate_result = fsr4_recreate_context();
         if (recreate_result != VK_SUCCESS) {
             *reason = fsr4_unavailable_reason[0]
                 ? fsr4_unavailable_reason
-                : "fallback: FSR4 v07 model rebuild failed";
+                : "fallback: FSR4 model rebuild failed";
             return false;
         }
     }
@@ -1561,35 +2084,37 @@ static bool resolve_upscaler(int *active, const char **reason)
     if (!fsr4_backend_ok || !fsr4_context_ok) {
         *reason = fsr4_unavailable_reason[0]
             ? fsr4_unavailable_reason
-            : "fallback: FSR4 v07 context unavailable";
+            : "fallback: FSR4 context unavailable";
         return false;
     }
     if (!fsr4_output_extent_supported(qvk.extent_unscaled)) {
-        *reason = "fallback: FSR4 v07 output exceeds 8K limit";
+        *reason = "fallback: FSR4 output exceeds 8K limit";
         return false;
     }
     if (strcmp(fsr4_shader_tier, display_res_tag()) != 0) {
-        *reason = "fallback: FSR4 v07 shader tier resize pending";
+        *reason = "fallback: FSR4 shader tier resize pending";
         return false;
     }
-    if (strcmp(fsr4_shader_model, fsr4_requested_model()) != 0) {
-        *reason = "fallback: FSR4 v07 quality model switch pending";
+    if (strcmp(fsr4_shader_model, fsr4_requested_model()) != 0 ||
+        fsr4_backend_variant != fsr4_requested_variant(fsr4_requested_model())) {
+        *reason = "fallback: FSR4 quality model switch pending";
         return false;
     }
     if (!upscaler_frame_is_eligible(VKPT_UPSCALER_FSR4)) {
-        *reason = "fallback: FSR4 v07 render ratio does not match model";
+        *reason = "fallback: FSR4 render ratio does not match model";
         return false;
     }
     *active = VKPT_UPSCALER_FSR4;
     {
         static char fsr4_reason[128];
+        const char *vname = ffxFsr4ModelVariantName(fsr4_active_variant);
         if (fsr4_dynamic_resolution_requested()) {
             Q_snprintf(fsr4_reason, sizeof(fsr4_reason),
-                       "FSR4 v07 INT8/DOT4 DRS model active");
+                       "%s DRS model active", vname);
         } else {
             Q_snprintf(fsr4_reason, sizeof(fsr4_reason),
-                       "FSR4 v07 INT8/DOT4 %s active",
-                       fsr_quality_label(requested_fsr_quality()));
+                       "%s %s active",
+                       vname, fsr_quality_label(requested_fsr_quality()));
         }
         *reason = fsr4_reason;
     }
@@ -1807,9 +2332,10 @@ void vkpt_fsr_print_diagnostics(void)
         else
             Com_Printf("  FSR3 3.1.5 memory: unavailable (%d)\n", (int)result);
     }
-    Com_Printf("  XeSS: context=%s path=%s\n",
-        xess_context_ok ? "ready" : "not ready",
-        xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute");
+    Com_Printf("  XeSS: context=%s path=%s mode=%s\n",
+        (xess_recovered_ok || xess_context_ok) ? "ready" : "not ready",
+        xess_create_info.path == FFX_VK_XESS_PATH_DP4A ? "DP4a" : "Generic Compute",
+        xess_recovered_ok ? "recovered 2.0.2 Quality INT8/DP4a U-Net (14 passes)" : "spatial prototype fallback");
     Com_Printf("  DLSS / d4r: context=%s arch=%u\n",
         dlss_context_ok ? "ready" : "not ready", (unsigned int)dlss_create_info.gpuArch);
     Com_Printf("  Unified SR: context=%s active=%s\n",
@@ -1872,13 +2398,14 @@ void vkpt_fsr_print_diagnostics(void)
     Com_Printf("  FSR3: not compiled\n");
 #endif
 
-    Com_Printf("  FSR4: backend=%s context=%s provider=source-v07 "
+    Com_Printf("  FSR4: backend=%s context=%s provider=%s "
                "model=%s tier=%s passes=%u\n",
         fsr4_backend_ok ? "ready" : "not ready",
         fsr4_context_ok ? "ready" : "not ready",
+        ffxFsr4ModelVariantName(fsr4_active_variant),
         fsr4_shader_model[0] ? fsr4_shader_model : "none",
         fsr4_shader_tier[0] ? fsr4_shader_tier : "none",
-        FFX_FSR4_VK_PASS_COUNT);
+        (unsigned)fsr4_active_pass_count);
     Com_Printf("  FSR4 permutation: INT8/DOT4, HDR linear, view-Z positive, "
                "motion current-to-previous jitter-free, RCAS=%.2f auto-exposure=%s DRS=%s\n",
         cvar_flt_fsr4_sharpening ? cvar_flt_fsr4_sharpening->value : 0.0f,
@@ -1899,7 +2426,8 @@ void vkpt_fsr_print_diagnostics(void)
         FfxErrorCode memory_result = fsr4_backend.fpGetEffectGpuMemoryUsage(
             &fsr4_backend, 0, &memory_usage);
         if (memory_result == FFX_OK) {
-            size_t activation_bytes = ffxFsr4GetDot4ScratchSize(
+            size_t activation_bytes = ffxFsr4GetVariantScratchSize(
+                fsr4_active_variant,
                 qvk.extent_unscaled.width, qvk.extent_unscaled.height);
             Com_Printf("  FSR4 memory: %.2f MiB provider-owned, %.2f MiB activation scratch\n",
                 (double)memory_usage.totalUsageInBytes / (1024.0 * 1024.0),
@@ -1913,6 +2441,9 @@ void vkpt_fsr_print_diagnostics(void)
 
 void vkpt_fsr_init_cvars(void)
 {
+    if (cvar_flt_fsr4_variant)
+        return;
+
     cvar_flt_upscaler     = Cvar_Get("flt_upscaler",     "0",   CVAR_ARCHIVE);
     cvar_flt_fsr_quality  = Cvar_Get("flt_fsr_quality",  "3",   CVAR_ARCHIVE);
     cvar_flt_fsr3_sharpening = Cvar_Get("flt_fsr3_sharpening", "0",
@@ -1923,6 +2454,8 @@ void vkpt_fsr_init_cvars(void)
                                            CVAR_ARCHIVE);
     cvar_flt_fsr4_dynamic_resolution = Cvar_Get(
         "flt_fsr4_dynamic_resolution", "0", CVAR_ARCHIVE);
+    cvar_flt_fsr4_variant = Cvar_Get(
+        "flt_fsr4_variant", "auto", CVAR_ARCHIVE);
     /* 0 = off, 1 = analytical FSR3 Frame Interpolation.  It remains gated by
      * the explicit presenter prerequisites; selecting it never replaces the
      * normal present path until that presenter has acquired two images. */
@@ -2028,6 +2561,7 @@ void vkpt_fsr_request_reset(void)
 
 VkResult vkpt_fsr_initialize(void)
 {
+    vkpt_fsr_init_cvars();
     size_t scratch_sz = ffxFsr4VkGetScratchMemorySize();
 
     if (!fsr4_device_is_capable())
@@ -2047,6 +2581,16 @@ VkResult vkpt_fsr_initialize(void)
 VkResult vkpt_fsr_destroy(void)
 {
 #ifdef VKPT_FSR3
+    rayregeneration_destroy_context();
+    unified_sr_destroy_context();
+    dlss_destroy_context();
+    xess_destroy_context();
+    if (xess_model_blob) {
+        Z_Free(xess_model_blob);
+        xess_model_blob = NULL;
+    }
+    xess_model_blob_size = 0;
+    xess_model_blob_attempted = false;
     fsr3_destroy_frame_generation_context();
     fsr3_destroy_context();
     fsr3_315_destroy_context();
@@ -2087,7 +2631,8 @@ VkResult vkpt_fsr_create_pipelines(void)
     }
     if (!xess_context_ok ||
         xess_ctx_dw != qvk.extent_unscaled.width ||
-        xess_ctx_dh != qvk.extent_unscaled.height) {
+        xess_ctx_dh != qvk.extent_unscaled.height ||
+        xess_ctx_quality != requested_fsr_quality()) {
         (void)xess_create_context();
     }
     if (!dlss_context_ok ||
@@ -2114,13 +2659,15 @@ VkResult vkpt_fsr_create_pipelines(void)
     if (fsr4_scratch) {
         if (!fsr4_context_ok || display_changed ||
             strcmp(fsr4_shader_tier, display_res_tag()) != 0 ||
-            strcmp(fsr4_shader_model, fsr4_requested_model()) != 0) {
+            strcmp(fsr4_shader_model, fsr4_requested_model()) != 0 ||
+            fsr4_backend_variant != fsr4_requested_variant(fsr4_requested_model())) {
             VkResult result = fsr4_recreate_context();
             if (result != VK_SUCCESS)
                 Com_WPrintf("FSR4: pipeline/context creation unavailable (%d); using fallback.\n",
                             result);
         }
     }
+    publish_scaler_availability();
     return VK_SUCCESS;
 }
 
@@ -2153,6 +2700,7 @@ bool vkpt_fsr_is_enabled(void)
     const char *reason;
     bool enabled = resolve_upscaler(&active, &reason);
 
+    publish_scaler_availability();
     publish_upscaler_status(active, reason);
     return enabled;
 }
@@ -2249,7 +2797,7 @@ uint32_t vkpt_fsr_jitter_phase_count(void)
     if (!vkpt_fsr_is_enabled())
         return 0;
 #ifdef VKPT_FSR3
-    if (fsr3_is_enabled()) {
+    if (!fsr4_is_enabled()) {
         float ratio = (float)qvk.extent_unscaled.width /
                       (float)max(1u, qvk.extent_render.width);
         return (uint32_t)max(1, (int)(8.0f * ratio * ratio));
@@ -3317,6 +3865,8 @@ static VkResult fsr3_315_dispatch(VkCommandBuffer cmd_buf)
     return VK_SUCCESS;
 }
 
+static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf);
+
 static VkResult xess_dispatch(VkCommandBuffer cmd_buf)
 {
     const VkptTemporalFrame *frame = vkpt_temporal_get_frame();
@@ -3329,6 +3879,15 @@ static VkResult xess_dispatch(VkCommandBuffer cmd_buf)
         VKPT_TEMPORAL_INPUT_SCENE_COLOR |
         VKPT_TEMPORAL_INPUT_MOTION_VECTORS |
         VKPT_TEMPORAL_INPUT_DEVICE_DEPTH;
+
+    if (requested_upscaler() == VKPT_UPSCALER_XESS &&
+        (!xess_context_ok || xess_ctx_dw != qvk.extent_unscaled.width ||
+         xess_ctx_dh != qvk.extent_unscaled.height ||
+         xess_ctx_quality != requested_fsr_quality())) {
+        VkResult recreate_result = xess_create_context();
+        if (recreate_result != VK_SUCCESS)
+            return recreate_result;
+    }
 
     if (!xess_is_enabled())
         return VK_SUCCESS;
@@ -3361,6 +3920,92 @@ static VkResult xess_dispatch(VkCommandBuffer cmd_buf)
             .oldLayout = input->layout,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         );
+    }
+
+    if (xess_recovered_ok && xess_recovered_context &&
+        frame->display_size.width == xess_recovered_extent.outputWidth &&
+        frame->display_size.height == xess_recovered_extent.outputHeight &&
+        frame->render_size.width >= xess_recovered_extent.inputWidth &&
+        frame->render_size.height >= xess_recovered_extent.inputHeight) {
+        FfxVkXeSSRecoveredImages rec_images;
+        FfxVkXeSSRecoveredConversion rec_conv;
+        FfxVkXeSSReplayFrame replay_frame;
+        char diag[128] = {0};
+        const bool reset = (xess_reset_next || !frame->history_valid);
+        const float jx = Q_clipf(-frame->camera.jitter_render_pixels[0], -0.5f, 0.5f);
+        const float jy = Q_clipf(-frame->camera.jitter_render_pixels[1], -0.5f, 0.5f);
+
+        memset(&rec_images, 0, sizeof(rec_images));
+        rec_images.structSize = sizeof(rec_images);
+        rec_images.color.image = frame->inputs.scene_color.image;
+        rec_images.color.view = frame->inputs.scene_color.view;
+        rec_images.color.extent = (VkExtent2D){
+            xess_recovered_extent.inputWidth, xess_recovered_extent.inputHeight
+        };
+        rec_images.color.format = frame->inputs.scene_color.format;
+        rec_images.motion.image = frame->inputs.motion_vectors.image;
+        rec_images.motion.view = frame->inputs.motion_vectors.view;
+        rec_images.motion.extent = (VkExtent2D){
+            xess_recovered_extent.inputWidth, xess_recovered_extent.inputHeight
+        };
+        rec_images.motion.format = frame->inputs.motion_vectors.format;
+        rec_images.depth.image = frame->inputs.device_depth.image;
+        rec_images.depth.view = frame->inputs.device_depth.view;
+        rec_images.depth.extent = (VkExtent2D){
+            xess_recovered_extent.inputWidth, xess_recovered_extent.inputHeight
+        };
+        rec_images.depth.format = frame->inputs.device_depth.format;
+        rec_images.output.image = qvk.images[VKPT_IMG_FSR_EASU_OUTPUT];
+        rec_images.output.view = qvk.images_views[VKPT_IMG_FSR_EASU_OUTPUT];
+        rec_images.output.extent = (VkExtent2D){
+            xess_recovered_extent.outputWidth, xess_recovered_extent.outputHeight
+        };
+        rec_images.output.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+        memset(&rec_conv, 0, sizeof(rec_conv));
+        rec_conv.structSize = sizeof(rec_conv);
+        rec_conv.colorScale = 1.0f / (float)STORAGE_SCALE_HDR;
+        rec_conv.outputScale = (float)STORAGE_SCALE_HDR;
+        rec_conv.motionScaleX = frame->inputs.motion_description.to_render_pixels[0] > 0.0f
+            ? frame->inputs.motion_description.to_render_pixels[0]
+            : (float)frame->render_size.width;
+        rec_conv.motionScaleY = frame->inputs.motion_description.to_render_pixels[1] > 0.0f
+            ? frame->inputs.motion_description.to_render_pixels[1]
+            : (float)frame->render_size.height;
+
+        if (ffxVkXeSSRecoveredBindConverted(xess_recovered_context,
+                qvk.current_frame_index, &rec_images, &rec_conv,
+                diag, sizeof(diag)) != VK_SUCCESS) {
+            END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+            xess_reset_next = true;
+            Com_WPrintf("XeSS: recovered bind failed (%s)\n",
+                        diag[0] ? diag : "unknown error");
+            return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+
+        memset(&replay_frame, 0, sizeof(replay_frame));
+        replay_frame.jitterX = jx;
+        replay_frame.jitterY = jy;
+        replay_frame.previousJitterX = reset ? jx : xess_prev_jitter_x;
+        replay_frame.previousJitterY = reset ? jy : xess_prev_jitter_y;
+        replay_frame.reset = reset ? 1u : 0u;
+
+        if (ffxVkXeSSRecoveredRecord(xess_recovered_context, cmd_buf,
+                &replay_frame, qvk.current_frame_index,
+                diag, sizeof(diag)) != VK_SUCCESS) {
+            END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+            xess_reset_next = true;
+            Com_WPrintf("XeSS: recovered record failed (%s)\n",
+                        diag[0] ? diag : "unknown error");
+            return VK_ERROR_UNKNOWN;
+        }
+
+        xess_prev_jitter_x = jx;
+        xess_prev_jitter_y = jy;
+        xess_reset_next = false;
+        copy_upscaled_output_to_taa(cmd_buf, frame);
+        END_PERF_MARKER(cmd_buf, PROFILER_FSR);
+        return VK_SUCCESS;
     }
 
     memset(&dispatch, 0, sizeof(dispatch));
@@ -3517,6 +4162,10 @@ static VkResult unified_sr_dispatch(VkCommandBuffer cmd_buf)
 
     if (!unified_sr_is_enabled())
         return VK_SUCCESS;
+    if (unified_sr_context.activeUpscaler == FFX_VK_UPSCALER_FSR4 &&
+        fsr4_is_enabled()) {
+        return fsr4_dispatch(cmd_buf);
+    }
     if (!vkpt_temporal_validate_current_frame(required_inputs,
             temporal_reason, sizeof(temporal_reason)) ||
         !(frame->flags & VKPT_TEMPORAL_FRAME_RECTILINEAR_PROJECTION) ||
@@ -3618,7 +4267,8 @@ static VkResult fsr4_dispatch(VkCommandBuffer cmd_buf)
     if (requested_upscaler() == VKPT_UPSCALER_FSR4 &&
         (!fsr4_backend_ok ||
          strcmp(fsr4_shader_tier, display_res_tag()) != 0 ||
-         strcmp(fsr4_shader_model, fsr4_requested_model()) != 0)) {
+         strcmp(fsr4_shader_model, fsr4_requested_model()) != 0 ||
+         fsr4_backend_variant != fsr4_requested_variant(fsr4_requested_model()))) {
         VkResult recreate_result = fsr4_recreate_context();
         if (recreate_result != VK_SUCCESS)
             return recreate_result;
