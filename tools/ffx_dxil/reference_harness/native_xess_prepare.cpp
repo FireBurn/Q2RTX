@@ -1,67 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Native XeSS prepare-pass experiment. Does not execute the full upscaler.
-// Build: g++ -std=c++17 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers native_xess_prepare.cpp -lvulkan -o native_xess_prepare
-#include <vulkan/vulkan.h>
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <stdexcept>
-#include <vector>
-
-static void check(VkResult result) {
-    if (result != VK_SUCCESS) throw std::runtime_error("Vulkan result " + std::to_string(result));
-}
-static std::vector<char> read(const char* path) {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
-    if (!f) throw std::runtime_error("Cannot open input");
-    auto n = f.tellg();
-    if (n <= 0 || n > 64 * 1024 * 1024) throw std::runtime_error("Input size out of bounds");
-    std::vector<char> data(static_cast<size_t>(n)); f.seekg(0);
-    if (!f.read(data.data(), n)) throw std::runtime_error("Input read failed");
-    return data;
-}
-static VkDevice device;
-static VkPhysicalDevice physical;
-static uint32_t memory_type(uint32_t bits, VkMemoryPropertyFlags required) {
-    VkPhysicalDeviceMemoryProperties p; vkGetPhysicalDeviceMemoryProperties(physical, &p);
-    for (uint32_t i=0;i<p.memoryTypeCount;i++)
-        if ((bits & (1u<<i)) && (p.memoryTypes[i].propertyFlags & required)==required) return i;
-    throw std::runtime_error("Required memory unavailable");
-}
-struct Buffer { VkBuffer handle; VkDeviceMemory memory; void* mapped; };
-static Buffer buffer(VkDeviceSize size, VkBufferUsageFlags usage) {
-    Buffer b{}; VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    info.size=size; info.usage=usage; check(vkCreateBuffer(device,&info,nullptr,&b.handle));
-    VkMemoryRequirements req; vkGetBufferMemoryRequirements(device,b.handle,&req);
-    VkMemoryAllocateFlagsInfo flags{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
-    flags.flags=(usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)?VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT:0;
-    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO}; alloc.pNext=&flags;
-    alloc.allocationSize=req.size; alloc.memoryTypeIndex=memory_type(req.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    check(vkAllocateMemory(device,&alloc,nullptr,&b.memory)); check(vkBindBufferMemory(device,b.handle,b.memory,0));
-    check(vkMapMemory(device,b.memory,0,size,0,&b.mapped)); return b;
-}
-struct Image { VkImage handle; VkDeviceMemory memory; VkImageView view; };
-static Image image(uint32_t width,uint32_t height,VkFormat format, bool array_view=false) {
-    Image im{}; VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    info.imageType=VK_IMAGE_TYPE_2D; info.format=format; info.extent={width,height,1};
-    info.mipLevels=info.arrayLayers=1; info.samples=VK_SAMPLE_COUNT_1_BIT;
-    info.usage=VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    check(vkCreateImage(device,&info,nullptr,&im.handle));
-    VkMemoryRequirements req; vkGetImageMemoryRequirements(device,im.handle,&req);
-    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO}; alloc.allocationSize=req.size;
-    alloc.memoryTypeIndex=memory_type(req.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    check(vkAllocateMemory(device,&alloc,nullptr,&im.memory)); check(vkBindImageMemory(device,im.handle,im.memory,0));
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO}; view.image=im.handle;
-    view.viewType=array_view?VK_IMAGE_VIEW_TYPE_2D_ARRAY:VK_IMAGE_VIEW_TYPE_2D; view.format=format; view.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
-    check(vkCreateImageView(device,&view,nullptr,&im.view)); return im;
-}
+#include "native_replay_common.h"
+#include "native_xess_inputs.h"
 
 int main(int argc,char** argv) try {
-    if (argc!=4) throw std::runtime_error("Usage: native_xess_prepare normalized-40553fb1ea6dd6f3.spv push-120.bin output.rgba32ui");
+    if (argc!=4 && argc!=5 && argc!=7) throw std::runtime_error("Usage: native_xess_prepare normalized-40553fb1ea6dd6f3.spv push-120.bin output.rgba32ui [prepared.rgba16f [history.rgba16f mask.r8]]");
     const auto shader=read(argv[1]), constants=read(argv[2]);
     if (shader.size()%4 || constants.size()!=120) throw std::runtime_error("Wrong capture sizes");
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO}; app.apiVersion=VK_API_VERSION_1_3;
@@ -106,7 +49,20 @@ int main(int argc,char** argv) try {
         if (((x/32)^(y/32))&1) std::swap(rgba[0],rgba[1]);
         std::memcpy(static_cast<char*>(upload.mapped)+(y*753+x)*8,rgba,8);
     }
+    CapturedXeSSInputs captured_inputs;
     Buffer output=buffer(640*360*16,VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    Buffer prepared{};
+    if (argc>=5) prepared=buffer(1280*720*8,VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    Buffer history{}, history_mask{};
+    if (argc==7) {
+        const auto colour=read(argv[5]), mask=read(argv[6]);
+        if (colour.size()!=1280*720*8 || mask.size()!=1280*720)
+            throw std::runtime_error("History shape mismatch");
+        history=buffer(colour.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+        history_mask=buffer(mask.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+        std::memcpy(history.mapped,colour.data(),colour.size());
+        std::memcpy(history_mask.mapped,mask.data(),mask.size());
+    }
     VkSamplerCreateInfo si{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     si.magFilter=si.minFilter=VK_FILTER_LINEAR; si.mipmapMode=VK_SAMPLER_MIPMAP_MODE_LINEAR;
     si.addressModeU=si.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; si.addressModeW=VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -157,6 +113,12 @@ int main(int argc,char** argv) try {
     vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&barrier,0,nullptr,0,nullptr);
     VkBufferImageCopy copy{}; copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1}; copy.imageExtent={753,424,1};
     vkCmdCopyBufferToImage(cmd,upload.handle,images[0].handle,VK_IMAGE_LAYOUT_GENERAL,1,&copy);
+    if (history.handle) {
+        copy.imageExtent={1280,720,1};
+        vkCmdCopyBufferToImage(cmd,history.handle,images[3].handle,VK_IMAGE_LAYOUT_GENERAL,1,&copy);
+        vkCmdCopyBufferToImage(cmd,history_mask.handle,images[4].handle,VK_IMAGE_LAYOUT_GENERAL,1,&copy);
+    }
+    captured_inputs.record(cmd,images.data());
     barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; barrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT|VK_ACCESS_SHADER_WRITE_BIT;
     vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,1,&barrier,0,nullptr,0,nullptr);
     vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,pipeline); vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,layout,0,1,&set,0,nullptr);
@@ -164,6 +126,10 @@ int main(int argc,char** argv) try {
     barrier.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT; barrier.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
     vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&barrier,0,nullptr,0,nullptr);
     copy.imageExtent={640,360,1}; vkCmdCopyImageToBuffer(cmd,images[7].handle,VK_IMAGE_LAYOUT_GENERAL,output.handle,1,&copy);
+    if (prepared.handle) {
+        copy.imageExtent={1280,720,1};
+        vkCmdCopyImageToBuffer(cmd,images[6].handle,VK_IMAGE_LAYOUT_GENERAL,prepared.handle,1,&copy);
+    }
     barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; barrier.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
     vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_HOST_BIT,0,1,&barrier,0,nullptr,0,nullptr);
     check(vkEndCommandBuffer(cmd)); VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO}; submit.commandBufferCount=1; submit.pCommandBuffers=&cmd;
@@ -173,12 +139,18 @@ int main(int argc,char** argv) try {
     for (unsigned i=0;i<640*360*4;++i) sentinels+=values[i]==0xdeadbeef;
     std::ofstream file(argv[3],std::ios::binary); file.write(static_cast<const char*>(output.mapped),640*360*16); file.close();
     if (!file) throw std::runtime_error("Output write failed");
+    if (prepared.handle) {
+        std::ofstream colour(argv[4],std::ios::binary);
+        colour.write(static_cast<const char*>(prepared.mapped),1280*720*8); colour.close();
+        if (!colour) throw std::runtime_error("Prepared colour write failed");
+    }
     std::printf("NATIVE_XESS_PREPARE sentinel_words=%u total_words=%u reference_match=unverified\n",sentinels,640*360*4);
     vkDestroyFence(device,fence,nullptr); vkDestroyCommandPool(device,commands,nullptr); vkDestroyPipeline(device,pipeline,nullptr);
     vkDestroyShaderModule(device,module,nullptr); vkDestroyPipelineLayout(device,layout,nullptr); vkDestroyDescriptorPool(device,pool,nullptr);
     vkDestroyDescriptorSetLayout(device,set_layout,nullptr); vkDestroySampler(device,sampler,nullptr);
     for (auto im:images) {vkDestroyImageView(device,im.view,nullptr);vkDestroyImage(device,im.handle,nullptr);vkFreeMemory(device,im.memory,nullptr);}
-    for (auto b:{upload,output}) {vkUnmapMemory(device,b.memory);vkDestroyBuffer(device,b.handle,nullptr);vkFreeMemory(device,b.memory,nullptr);}
+    for (auto b:{upload,output,prepared,history,history_mask}) if (b.handle) {vkUnmapMemory(device,b.memory);vkDestroyBuffer(device,b.handle,nullptr);vkFreeMemory(device,b.memory,nullptr);}
+    captured_inputs.release();
     vkDestroyDevice(device,nullptr); vkDestroyInstance(instance,nullptr);
     return sentinels?1:0;
 } catch (const std::exception& error) { std::fprintf(stderr,"%s\n",error.what()); return 1; }

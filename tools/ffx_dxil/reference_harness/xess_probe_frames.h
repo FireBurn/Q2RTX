@@ -28,7 +28,8 @@ static bool xess_probe_texture(ID3D12Device* device, xess_2d_t size,
 }
 
 static bool xess_probe_readback(ProbePixels& pixels, xess_2d_t input,
-    const wchar_t* directory, unsigned frame, std::vector<uint16_t>& result)
+    const wchar_t* directory, unsigned frame, std::vector<uint16_t>& result,
+    unsigned shift = 0, bool depth_scene = false)
 {
     const auto& layout = pixels.output_layout;
     const unsigned width = layout.Footprint.Width, height = layout.Footprint.Height;
@@ -49,11 +50,16 @@ static bool xess_probe_readback(ProbePixels& pixels, xess_2d_t input,
         }
     // Map input tile centres to output coordinates; no assumed scale factor.
     for (unsigned iy = 16; iy + 16 <= input.y; iy += 32)
-        for (unsigned ix = 16; ix + 16 <= input.x; ix += 32) {
+        for (unsigned ix = shift ? 48-shift : 16; ix + 16 <= input.x; ix += 32) {
+            // Keep checker assertions away from the moving foreground and its
+            // newly revealed pixels. Full-image native/reference comparison
+            // still covers these regions, including temporal boundary effects.
+            if(depth_scene && int(ix)>=int(input.x/4)-16 && ix<input.x/2+64+16 &&
+                int(iy)>=int(input.y/4)-16 && iy<input.y*3/4+16) continue;
             const unsigned x = unsigned(uint64_t(ix) * width / input.x);
             const unsigned y = unsigned(uint64_t(iy) * height / input.y);
             const auto* rgba = &result[(size_t(y) * width + x) * 4];
-            const bool green = ((ix / 32) ^ (iy / 32)) & 1;
+            const bool green = (((ix + shift) / 32) ^ (iy / 32)) & 1;
             const bool positive_finite = !(rgba[0] & 0x8000) && !(rgba[1] & 0x8000) &&
                 (rgba[0] & 0x7c00) != 0x7c00 && (rgba[1] & 0x7c00) != 0x7c00;
             ++samples;
@@ -98,14 +104,24 @@ static bool xess_probe_frames(ID3D12Device* device, xess_context_handle_t contex
     if (!event) return false;
     bool success = true;
     std::vector<uint16_t> first, current;
+    const bool depth_scene=GetEnvironmentVariableW(L"XESS_PROBE_DEPTH_SCENE", nullptr, 0)!=0;
+    const bool moving = depth_scene || GetEnvironmentVariableW(L"XESS_PROBE_MOVING", nullptr, 0) != 0;
     for (unsigned frame = 0; frame < 4 && success; ++frame) {
         ProbePixels pixels;
+        const unsigned shift = !depth_scene && moving && frame < 3 ? frame * 8 : 0;
+        const uint16_t motion = !depth_scene && moving && frame > 0 && frame < 3 ? 0x4800 : 0; // +8 input pixels
+        const unsigned object_offset=depth_scene && frame<3?frame*32:0;
+        const auto inputs = std::wstring(directory) + L"\\frame-" + std::to_wstring(frame);
+        if (moving && !CreateDirectoryW(inputs.c_str(), nullptr)) { success = false; break; }
+        const auto color_path = inputs + L"\\color.rgba16f";
+        const auto depth_path = inputs + L"\\depth.r32f";
+        const auto motion_path = inputs + L"\\motion.rg16f";
         if (frame && (FAILED(allocator.p->Reset()) || FAILED(commands.p->Reset(allocator.p, nullptr)))) { success = false; break; }
         if (frame) pixels.transition(commands.p, target.p, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         const auto read = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        if (!pixels.upload(device, commands.p, color.p, read, 0) ||
-            !pixels.upload(device, commands.p, depth.p, read, 1) ||
-            !pixels.upload(device, commands.p, velocity.p, read, 2) ||
+        if (!pixels.upload(device, commands.p, color.p, read, 0, shift, 0, moving ? color_path.c_str() : nullptr,depth_scene,object_offset) ||
+            !pixels.upload(device, commands.p, depth.p, read, 1, 0, 0, moving ? depth_path.c_str() : nullptr,depth_scene,object_offset) ||
+            !pixels.upload(device, commands.p, velocity.p, read, 2, 0, motion, moving ? motion_path.c_str() : nullptr,depth_scene,object_offset) ||
             !pixels.upload(device, commands.p, target.p, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 3)) { success = false; break; }
         xess_d3d12_execute_params_t params{};
         params.pColorTexture = color.p; params.pDepthTexture = depth.p;
@@ -113,6 +129,15 @@ static bool xess_probe_frames(ID3D12Device* device, xess_context_handle_t contex
         params.inputWidth = input.x; params.inputHeight = input.y;
         params.exposureScale = 1.0f;
         params.resetHistory = frame == 0 || frame == 3;
+        if (GetEnvironmentVariableW(L"XESS_PROBE_JITTER", nullptr, 0)) {
+            const float jitter_x[] = {0.25f, -0.25f, 0.125f, 0.25f};
+            const float jitter_y[] = {-0.25f, 0.25f, 0.375f, -0.25f};
+            params.jitterOffsetX = jitter_x[frame];
+            params.jitterOffsetY = jitter_y[frame];
+        }
+        std::printf("XESS_INPUT_METADATA frame=%u shift=%u jitter=%g,%g\n",
+            frame, shift, params.jitterOffsetX, params.jitterOffsetY);
+        if(depth_scene) std::printf("XESS_DEPTH_SCENE frame=%u object_offset=%u foreground_depth=0.25 background_depth=0.75..0.875\n",frame,object_offset);
         const auto status = execute(context, commands.p, &params);
         std::printf("XESS_EXECUTE frame=%u reset=%u result=%d\n", frame, params.resetHistory, int(status));
         if (status == XESS_RESULT_SUCCESS && internal_resources) {
@@ -141,7 +166,7 @@ static bool xess_probe_frames(ID3D12Device* device, xess_context_handle_t contex
             ExitProcess(1);
         }
         std::printf("XESS_COMPLETION frame=%u fence=%u device_ok=1\n", frame, frame + 1);
-        success = xess_probe_readback(pixels, input, directory, frame, current);
+        success = xess_probe_readback(pixels, input, directory, frame, current, shift,depth_scene);
         if (!frame) first = current;
         if (frame == 3) {
             const bool equal = first == current;

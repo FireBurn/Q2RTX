@@ -32,13 +32,17 @@ struct ProbePixels {
         commands->ResourceBarrier(1, &barrier);
     }
 
-    // kind: 0=colour checker, 1=depth, 2=zero motion/mask, 3=NaN output sentinel.
+    // kind: 0=colour checker, 1=depth, 2=motion/mask, 3=NaN output sentinel.
+    // Optional nonzero motion and the depth-scene velocity use RG16F only.
     bool upload(ID3D12Device* device, ID3D12GraphicsCommandList* commands,
-        ID3D12Resource* image, D3D12_RESOURCE_STATES state, unsigned kind) {
+        ID3D12Resource* image, D3D12_RESOURCE_STATES state, unsigned kind,
+        unsigned shift = 0, uint16_t motion_x = 0, const wchar_t* capture = nullptr,
+        bool depth_scene = false, unsigned object_offset = 0) {
         auto desc = image->GetDesc();
+        if(kind==2 && (depth_scene || motion_x) && desc.Format!=DXGI_FORMAT_R16G16_FLOAT) return false;
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-        UINT64 size = 0;
-        device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, nullptr, &size);
+        UINT64 size = 0, row_bytes = 0;
+        device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, &row_bytes, &size);
         ID3D12Resource* data = nullptr;
         if (!buffer(device, size, true, &data)) return false;
         staging.push_back(data);
@@ -49,18 +53,39 @@ struct ProbePixels {
         for (UINT y = 0; y < desc.Height; ++y) {
             auto* row = mapped + layout.Offset + y * layout.Footprint.RowPitch;
             for (UINT x = 0; x < desc.Width; ++x) {
+                const bool foreground=depth_scene && x>=desc.Width/4+object_offset &&
+                    x<desc.Width/2+object_offset && y>=desc.Height/4 && y<desc.Height*3/4;
                 if (kind == 0 || kind == 3) {
                     uint16_t rgba[4] = {0x3800, 0x3000, 0x3400, 0x3c00};
-                    if (((x / 32) ^ (y / 32)) & 1) std::swap(rgba[0], rgba[1]);
+                    if ((((x + shift) / 32) ^ (y / 32)) & 1) std::swap(rgba[0], rgba[1]);
+                    if(foreground && kind==0) {rgba[0]=0x2c00;rgba[1]=0x3000;rgba[2]=0x3a00;}
                     if (kind == 3) for (auto& component : rgba) component = 0x7e00;
                     std::memcpy(row + x * 8, rgba, 8);
                 } else if (kind == 1) {
-                    const float depth = 0.5f;
+                    const float depth = !depth_scene?0.5f:foreground?0.25f:
+                        0.75f+0.125f*float(x)/float(desc.Width);
                     std::memcpy(row + x * 4, &depth, 4);
+                } else if (kind == 2 && (depth_scene || motion_x)) {
+                    const uint16_t velocity=depth_scene?(foreground && object_offset?0xd000:0):motion_x;
+                    std::memcpy(row + x * 4, &velocity, 2); // -32 pixels for a right-moving object.
                 }
             }
         }
+        bool saved = true;
+        if (capture) {
+            HANDLE file = CreateFileW(capture, GENERIC_WRITE, 0, nullptr,
+                CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+            saved = file != INVALID_HANDLE_VALUE;
+            const DWORD bytes = static_cast<DWORD>(row_bytes);
+            for (UINT y = 0; y < desc.Height && saved; ++y) {
+                DWORD written = 0;
+                saved = WriteFile(file, mapped + layout.Offset + y * layout.Footprint.RowPitch,
+                    bytes, &written, nullptr) && written == bytes;
+            }
+            if (file != INVALID_HANDLE_VALUE) saved = (CloseHandle(file) != FALSE) && saved;
+        }
         data->Unmap(0, nullptr);
+        if (!saved) return false;
         transition(commands, image, state, D3D12_RESOURCE_STATE_COPY_DEST);
         D3D12_TEXTURE_COPY_LOCATION dst{}, src{};
         dst.pResource = image;

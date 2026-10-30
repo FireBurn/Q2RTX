@@ -25,6 +25,61 @@ The local manifest is `build/xess-audit/containers.json`.
 
 ## Pipeline creation probe
 
+### Native convolution replay milestone (2026-10-15)
+
+`../xess_conv_replay.py` builds a local manifest for first-frame passes 1..12
+from the serialized trace. It checks normalized shader hashes and binding/
+push layouts, resolves descriptor-table slots, preserves skip connections,
+and reconstructs buffers from recorded upload/copy order. It refuses missing
+bytes rather than silently filling uncaptured model data with zero. This
+profile excludes the prepare and final resolve shaders and is not a generic
+capture replay system.
+
+```sh
+python3 tools/ffx_dxil/xess_conv_replay.py \
+  build/xess-audit/trace-4 build/xess-audit/native-bindings-1 \
+  build/xess-audit/conv-replay-NEW
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers \
+  -Iextern/ffx-vulkan/include \
+  tools/ffx_dxil/reference_harness/native_xess_convolutions.cpp -lvulkan \
+  -o build/xess-audit/native_xess_convolutions
+VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation \
+  build/xess-audit/native_xess_convolutions \
+  build/xess-audit/conv-replay-NEW/manifest.json \
+  build/xess-audit/native-prepare.rgba32ui \
+  build/xess-audit/conv-replay-NEW/native
+```
+
+The harness additionally needs the `nlohmann/json.hpp` development header.
+Both output directories must be new. It binds 36 recovered weight/scale/bias
+buffers (252800 bytes), rebases two descriptor tables to six slots, and
+executes twelve captured convolution shaders with compute barriers and
+per-layer readbacks. Shader instructions and types are preserved. Native
+execution requires Vulkan 1.3, runtime descriptor arrays, buffer device
+address, shaderInt8, integer dot product, dynamic descriptor indexing and
+formatless storage-image writes; there is no Wine or vendor DLL dependency
+in the native executable. These requirements are not yet lowered for older
+GPUs.
+
+Renoir and RX 6800M/Navi22 runs completed with Vulkan validation enabled,
+no validation messages and zero untouched sentinel words in all twelve
+outputs. Evidence: `build/xess-audit/conv-replay-1/native.log` and
+`conv-replay-2/navi22.log`. The `--zero-weights` control preserves scales/biases
+but zeros convolution weights; every layer changes, including 2987413 of
+3686400 output bytes in pass 12. This establishes weight dependence, not
+reference equivalence. `conv-replay-1/weight-sensitivity.json` retains hashes.
+Cross-device comparison found identical passes 1..10, then 11 changed bytes
+in pass 11 and 146 in pass 12, each differing by one quantized step.
+`conv-replay-2/cross-device-comparison.json` records these differences.
+
+`native_xess_prepare` now accepts an optional fourth data-path argument to
+save its 1280x720 prepared-colour output as RGBA16F. The packed feature output
+is unchanged bitwise after the shared allocation-helper refactor. The native
+prepare, convolution and zero-control experiments still report
+`reference_match=unverified`. Next: replay final resolve with the three CBVs
+(including explicit handling of their uncopied padding), compare the full
+output to reference frame 0, then implement temporal history and motion cases.
+
 From the repository root:
 
 ```sh
@@ -54,6 +109,18 @@ queue across frames, but wait before reusing resources. These static synthetic
 checks exercise history reuse/reset, not motion reconstruction quality.
 
 Successful initialization proves neither frame execution nor image quality.
+
+Set `XESS_PROBE_INTERNALS=1` to request `xessStartDump` for all resources
+before executing, then query `xessD3D12GetResourcesToDump` after each dispatch.
+Use a fresh output directory: the SDK dump API may overwrite its own files.
+The probe logs dump status separately from frame execution. On Oct 15,
+runtime 2.0.2 returned `XESS_RESULT_ERROR_NOT_IMPLEMENTED` (-7) from
+`xessStartDump` and zero internal resources for all four frames. Execution,
+299/299 tile checks per frame, and reset-repeat equality still passed.
+Evidence: `build/xess-audit/internal-dump-2/probe.log` and `frames/`.
+This runtime cannot supply intermediate reference images through that debug
+API; use instrumented resource readback or full native-graph comparison.
+
 Next steps are capture inspection, controlled frame execution/readback,
 resource/model-upload and dispatch-graph recovery, and native Vulkan replay
 against the reference. Cross-vendor and temporal tests must follow; translated
@@ -194,6 +261,286 @@ convolutional architecture:
   topology, extracts all 13 layers, and bundles them into an aligned binary container
   (`XESSMOD2`) with 256-byte offset alignment suitable for Vulkan storage buffers.
   Verified with 34 tests in `tools/ffx_dxil/tests/test_xess_model_tool.py`.
+
+## Complete native fixed-profile replay
+
+`native_xess_resolve.cpp`, `xess_resolve_replay.py` and
+`replay_xess_sequence.py` complete the 14-pass graph and feed resolved history
+and mask into subsequent prepare passes. Four reset/history/history/reset
+frames match their same-device reference RGBA16F images byte-for-byte on both
+RX 6800M (Navi22) and integrated Renoir. Vulkan validation is enabled for each
+native stage. Captured final CBV prefixes are preserved and uncaptured padding
+is explicit; changing padding to 0xff preserves all four Navi22 matches.
+
+Example (use a new output directory):
+
+```sh
+python3 tools/ffx_dxil/replay_xess_sequence.py \
+  build/xess-audit/trace-4 build/xess-audit/native-bindings-1 \
+  build/xess-audit build/xess-audit/native-sequence-new \
+  --reference-frames build/xess-audit/reference-renoir-2/frames
+```
+
+The reference must match the selected GPU and input profile. Cross-device
+outputs differ slightly even in the reference runtime; same-device comparisons
+use exact equality, without relaxing error thresholds. This is a fixed
+753x424-input/1280x720-output checkerboard experiment with host readbacks
+between stages. Moving scenes, jitter, other quality/resolution profiles and
+GPU-resident engine integration remain unverified. The Q2RTX spatial prototype
+does not yet use this recovered graph. Native replay has no Wine, DirectX or
+vendor DLL dependency; those are used only to obtain offline references.
+
+### External input replay
+
+Prepare and resolve accept `XESS_REPLAY_INPUTS`, a directory containing tightly
+packed `color.rgba16f`, `motion.rg16f` and `depth.r32f` at 753x424. All three
+files are required and exact byte sizes are checked. Without this setting,
+the original synthetic checkerboard is used. The sequence runner's `--inputs`
+selects a parent directory containing `frame-0` through `frame-3` and records
+input SHA-256 hashes in its comparison report. Supply matching captured push
+constants and reference frames: changing images alone does not update jitter,
+motion conventions or reset metadata. This path enables moving-input research;
+it does not by itself establish moving-scene equivalence.
+
+### Translating input validation
+
+Set `XESS_PROBE_MOVING=1` for the reference probe to translate the checkerboard
+left by 0/8/16/0 input pixels. History frames carry +8 horizontal input-pixel
+motion, and the final frame resets. The probe saves its exact input images in
+`frame-N/` beside the output readbacks. Feed that directory to both `--inputs`
+and `--reference-frames`. The existing zero-jitter trace constants apply because
+only image contents change. On Renoir all four native outputs match the
+same-device reference byte-for-byte with Vulkan validation enabled. Zeroing
+motion while retaining translated color changes both history frames (maximum
+RGB error about 0.33), while reset frames remain exact. These are controlled
+translation results; jitter, disocclusion and general scene coverage remain.
+
+`XESS_PROBE_JITTER=1` additionally varies jitter metadata across the four
+frames: (0.25,-0.25), (-0.25,0.25), (0.125,0.375), then (0.25,-0.25) with
+reset. Capture fresh constants rather than reusing the zero-jitter trace.
+The instrumented `trace-jitter-1` and native `native-sequence-jitter-1` match
+all four Renoir frames exactly with Vulkan validation. Current jitter occupies
+prepare/resolve words 4/5; prepare words 22/23 hold previous jitter. This probe
+does not resample checkerboard pixels at subpixel positions, so this validates
+the graph's response to jitter metadata rather than camera sampling quality.
+
+### Generate frame constants from engine-style parameters
+
+Build `xess_frame_constants.cpp` with `-Iextern/ffx-vulkan/include` and place
+the executable alongside the native replay binaries. The experimental shared
+header `ffx_vk_xess_replay_constants.h` supports only the captured fixed-size,
+unit-exposure, zero-origin model profile. Pass `--frame-parameters frames.json`
+to the sequence runner, where the JSON is four objects of this form:
+`{"jitter":[0.25,-0.25],"reset":true}`. Previous jitter is retained across
+frames, including reset; initial previous jitter is zero. Nonfinite or out-of-
+range jitter is rejected. The builder's static fields are not claimed to be a
+general provider ABI. All four jittered outputs match the reference when the
+model trace is the original zero-jitter trace and constants are generated this
+way (`native-sequence-generated-constants-1`). Captured frame constants are
+therefore unnecessary for this profile; model data still comes from the trace.
+
+### Relocatable native bundle
+
+Package a successful local replay using:
+
+```sh
+python3 tools/ffx_dxil/xess_native_bundle.py REPLAY_DIRECTORY NORMALIZED_SHADERS NEW_BUNDLE
+```
+
+The bundle contains shader/model payloads and must remain a local build
+artifact. Its loader verifies asset hashes and rejects paths outside the bundle.
+Use `replay_xess_sequence.py` with `--bundle NEW_BUNDLE`, `--frame-parameters`,
+`--inputs` and `--reference-frames`. Trace and shader positional paths are
+unused in bundle mode. A relocated bundle with nonexistent trace/shader paths
+matches all four moving/jitter reference frames on Renoir under validation
+(`native-sequence-bundle-1`). This eliminates runtime trace dependence, while
+host readbacks and the fixed profile remain limitations of the harness.
+
+### Shared convolution command recorder
+
+`ffx_vk_xess_convolution_graph.h` records the twelve passes on caller-owned
+Vulkan handles, with compute barriers and no intermediate readbacks. The
+convolution executable's `--resident-repeat` mode uses it and submits twice
+with the same model and pipeline resources. Diagnostic tensor copies happen
+after the complete graph. All twelve outputs match the original path; the
+sequence runner's `--resident-convolutions` retains exact reference equality
+for all moving/jitter frames under validation. Input visibility, image layouts,
+resource lifetime and external-stage barriers remain caller responsibilities.
+This recorder does not yet own resources or include prepare/resolve/history.
+
+### Persistent fourteen-pass graph
+
+`native_xess_graph.cpp` keeps all pipelines, weights, tensors and history on
+one device for the whole sequence. Each frame uses one command buffer and
+submission; only input uploads and final output readback involve the host.
+
+```sh
+cmake -S extern/ffx-vulkan -B build/ffx-vulkan-project
+cmake --build build/ffx-vulkan-project --target ffx_vulkan_xess_recovered
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers \
+  -Iextern/ffx-vulkan/include \
+  tools/ffx_dxil/reference_harness/native_xess_graph.cpp \
+  build/ffx-vulkan-project/libffx_vulkan_xess_recovered.a -lvulkan \
+  -o build/xess-audit/native_xess_graph
+python3 tools/ffx_dxil/replay_xess_graph.py BUNDLE \
+  build/xess-audit/native_xess_graph FRAMES_JSON INPUTS REFERENCE NEW_OUTPUT
+```
+
+The wrapper checks bundle hashes, enables synchronization validation and
+requires exact RGBA16F reference equality. Four moving/jittered frames on
+Renoir and four static frames on Navi22 pass exactly with clean validation
+logs (`persistent-graph-2`, `persistent-graph-navi22-1`). This supersedes the
+intermediate-readback limitation of the older three-executable sequence runner.
+It remains fixed-profile experimental code with process-owned device lifetime;
+it is not yet the caller-owned library context or a Q2RTX backend.
+
+### Shared resource ownership
+
+The persistent graph uses `ffx_vk_xess_resources.hpp` for all images/buffers.
+Its C++ resource owner takes a borrowed physical/logical device pair; it never
+submits, waits or destroys the device. Retire commands before clearing or
+destroying it. Independent instances and clear/reuse are exercised by
+`xess_resources_probe.cpp`, compiled with `-Iextern/ffx-vulkan/include -lvulkan`.
+The full four-frame moving/jitter sequence remains exact with synchronization
+validation (`persistent-shared-resources-1`). Pipeline/descriptor ownership
+and complete graph lifecycle are still harness code, not a public SR context.
+
+The resource owner now also creates and destroys compute pipelines, shader
+modules, descriptor layouts/pools/sets and samplers. Shader words are supplied
+in memory; the shared component does not read JSON or files. Partially created
+stages remain tracked for cleanup. The harness uses it for all fourteen stages;
+Renoir moving/jitter and Navi22 static sequences remain exact with clean
+synchronization validation (`persistent-shared-stages-1` and
+`persistent-shared-stages-navi22-1`). Graph construction, descriptor bindings
+and frame scheduling remain harness responsibilities pending context extraction.
+
+### Shared complete context
+
+The persistent harness now calls `ffxvk::XeSSFixedContext` from
+`ffx_vk_xess_fixed_context.hpp`. Model bytes and shader words enter through
+typed structures; the library owns graph construction, weights, intermediate
+images, history, descriptors, pipelines and dispatch constants. Caller-owned
+input/output images are bound explicitly. The context records into a caller
+command buffer and performs no filesystem access, submission, wait or readback.
+The bundle/JSON loader remains harness code. See the reusable
+[integration example](../../../extern/ffx-vulkan/examples/xess-recovered/README.md).
+
+`shared-context-final-1` and `shared-context-final-navi22-1` match all four
+same-device reference frames exactly with clean synchronization validation.
+The live harness alternates two image sets, rejects invalid extent/jitter,
+requires bound images and initial reset, and recovers from discarded commands.
+It releases CPU model data immediately after context creation. Captured address
+words are replaced by zero; fixed dispatch sizes/constants are generated inside
+the context. An installed-headers-only rebuild also matches every reference
+frame (`shared-context-installed-1`). Q2RTX's spatial prototype is not yet
+connected to this fixed-size context, and broader profiles remain unverified.
+
+### Multiple quality extents
+
+The shared context accepts `FfxVkXeSSReplayExtent` at construction. Enabled
+input/output pairs are 565x318 -> 960x540, 753x424 -> 1280x720 and
+1130x636 -> 1920x1080. Each tensor downsampling level rounds up; dispatch
+counts and frame constants derive from that extent. Other extents are rejected.
+Recreate the context after retiring its work to change size. The original
+constructor/constant helper keep their 720p defaults.
+
+Set `XESS_PROBE_WIDTH` and `XESS_PROBE_HEIGHT` (integer [64,4096]) on the offline
+probe to capture another output size. `xess_geometry_probe.cpp` emits generated
+tensor/dispatch geometry and four fixture constant blocks for independent
+comparison against the trace. All generated values match the three captured
+traces (`geometry-comparison.json`). Both new sizes use the same shaders and
+original native model bundle, with no additional recovered weight set.
+
+The persistent wrapper accepts, for example, `--extent 1130 636 1920 1080`.
+Renoir moving/jitter comparisons pass exactly at 540p and 1080p
+(`shared-context-960x540-1`, `shared-context-1920x1080-1`); the post-change 720p
+regression also passes. A fresh RX 6800M 1080p capture and native comparison
+pass exactly (`shared-context-1920x1080-navi22-1`). Synchronization validation
+and live binding/reset/discard contracts remain clean. A staged installed-header
+rebuild also passes at 540p (`shared-context-multi-installed-1`). These are
+controlled checkerboard fixtures; broader scenes and quality modes remain open.
+
+### Variable depth and newly exposed pixels
+
+`XESS_PROBE_DEPTH_SCENE=1` selects a near blue rectangle moving right by
+0/32/64/0 input pixels, over a static checkerboard with varying far depth.
+Foreground depth is 0.25; background ranges from 0.75 toward 0.875. History
+frames supply -32-pixel foreground motion and zero background motion. Inputs
+are saved exactly; the final frame resets to initial inputs. Combine with
+`XESS_PROBE_JITTER=1` for varying jitter metadata.
+
+At 1080p the input contains 1131 distinct depths and exposes 10176 background
+pixels on each history frame. Four native outputs match every reference pixel
+exactly on both Renoir and RX 6800M, with clean synchronization validation:
+`shared-context-depth-scene-renoir-1` and `shared-context-depth-scene-navi22-1`.
+The reference's stable-checker assertions avoid the foreground footprint;
+the native comparison still covers the full image. A flat-depth control
+preserves reset frames but changes both history frames, confirming depth
+affects temporal reconstruction. This remains a controlled analytic fixture;
+physical camera jitter and general scene quality remain unverified.
+
+### Frames in flight
+
+The context's optional frame-slot count defaults to 1 and accepts 1..8.
+`bind(images, slot)` and `record(cmd, frame, slot)` use independent mutable
+prepare/resolve descriptor sets for the chosen slot. Pipelines, model buffers
+and ordered temporal resources remain shared. Retire that slot before rebinding;
+retire all uses before destruction or history discard. Submit frames once, in
+order, on the same queue. No queue wait happens inside the library.
+
+The harness now records both slot-0 and slot-1 command buffers before submitting
+either, then submits a pair and waits once. This explicitly checks descriptor
+updates cannot invalidate a previously recorded frame. Four moving-depth/jitter
+frames remain byte-identical to the same-device references on both GPUs, with
+clean synchronization validation (`shared-context-two-flight-renoir-1`,
+`shared-context-two-flight-navi22-1`). Invalid-slot and all previous context
+contracts remain enabled. This addresses one Q2RTX integration prerequisite;
+engine input conversion, asset loading and actual dispatch wiring remain.
+
+### C interface and one-file model assets
+
+The harness now creates, binds, records, discards history and destroys through
+the opaque C API in `ffx_vk_xess_recovered.h`. The exported
+`ffx-vulkan::xess-recovered` target carries the implementation. Bounded diagnostics,
+ABI/blob validation and exception-to-VkResult translation keep C++ internals
+inside the library. The copied installed-package consumer compiles its ABI
+checks as C.
+
+`pack_xess_model.py BUNDLE OUTPUT.xessvk` packs fourteen shaders and thirty-nine
+buffers into an XESSVK1 file. `ffxVkXeSSRecoveredModelFromBlob` checks table bounds
+and CRCs, returning borrowed model spans; creation copies all payloads. The
+engine can release the file after creation. See the shared
+[format documentation](../../../extern/ffx-vulkan/examples/xess-recovered/MODEL_FORMAT.md).
+
+Use `replay_xess_graph.py /nonexistent-bundle BINARY FRAMES INPUTS REFERENCE OUT`
+with `--packed-model FILE` and the usual `--extent` to verify independence from
+bundle directories. `shared-context-c-blob-renoir-1` and
+`shared-context-c-blob-navi22-1` retain exact four-frame depth-scene output with
+clean synchronization validation. The harness also rejects truncated model
+buffers, accepts unaligned shader storage, and releases source bytes before
+recording. A C container test covers corruption, overflow, overlap, truncation,
+wrong count, reserved fields and trailing bytes. Its synthetic entries test
+only parsing; full model execution is covered by the live comparisons.
+
+### Live Q2RTX engine integration (2026-10-27)
+
+`src/refresh/vkpt/fsr.c` and `src/refresh/vkpt/main.c` now integrate
+`FfxVkXeSSRecoveredContext` into Q2RTX (`flt_upscaler 4`):
+- Enables `shaderStorageImageReadWithoutFormat`, `uniformBufferStandardLayout`,
+  `shaderUniformBufferArrayNonUniformIndexing`, and
+  `shaderStorageImageArrayNonUniformIndexing` on `qvk.device`.
+- Loads `baseq2/xess/xess-quality-1.xessvk` (`XESSVK1` container, git-ignored)
+  via `ffxVkXeSSRecoveredModelFromBlob` and creates a 2-slot context
+  (`MAX_FRAMES_IN_FLIGHT = 2`).
+- Uses `ffxVkXeSSRecoveredGetExtent` to size Q2RTX's render extent (`566x318`,
+  `754x424`, `1130x636` even checkerboard width, cropped to `565x318`,
+  `753x424`, `1130x636` valid input extent) and `ffxVkXeSSRecoveredBindConverted`
+  to convert Q2RTX scaled HDR color (`value_scale = 1/128`) and UV motion
+  vectors (`motionScale = {renderWidth, renderHeight}`) into model units.
+- Live runs with `+set vk_validation 1` on AMD Radeon RX 6800M (`1002:73df`)
+  complete with zero validation errors at `960x540` (`1.260 ms`), `1280x720`
+  (`1.692 ms`), and `1920x1080`, and fall back cleanly to the spatial prototype
+  outside Quality `540p`/`720p`/`1080p`.
 
 ## DLSS scope
 
