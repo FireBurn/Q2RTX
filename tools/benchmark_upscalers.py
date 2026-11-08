@@ -23,10 +23,10 @@ import time
 UPSCALER_MODES = [
     (0, "Q2RTX Native", "Bilinear fallback"),
     (1, "AMD FSR 3.1.4", "Analytical temporal filter"),
-    (2, "AMD FSR 4 (v07)", "INT8 / DOT4 16-pass neural model"),
+    (2, "AMD FSR 4.1.2 (Navi2)", "INT8 / DP4a 29-pass native neural model"),
     (3, "AMD FSR 3.1.5", "Public SDK 2.3 Vulkan experiment"),
-    (4, "Intel XeSS", "DP4a / U-Net convolutional reconstruction"),
-    (5, "NVIDIA DLSS / d4r", "Swin Transformer 8x8 windowed attention"),
+    (4, "Intel XeSS 2.0.2", "DP4a / U-Net 14-pass convolutional reconstruction"),
+    (5, "NVIDIA DLSS 4 / d4r", "Swin Transformer 8x8 windowed attention (Model K)"),
     (6, "Unified SR (Auto)", "Hardware optimal automatic routing"),
 ]
 
@@ -54,7 +54,7 @@ def prepare_env():
                 break
     return env
 
-def run_single_benchmark(bin_path, mode_id, resolution_geom, demo_name="demo1", timeout=30):
+def run_single_benchmark(bin_path, mode_id, resolution_geom, demo_name="demo1", timeout=45, quality=1, variant="auto"):
     env = prepare_env()
     cmd = [
         bin_path,
@@ -63,7 +63,8 @@ def run_single_benchmark(bin_path, mode_id, resolution_geom, demo_name="demo1", 
         "+set", "vid_geometry", resolution_geom,
         "+set", "vid_fullscreen", "0",
         "+set", "flt_upscaler", str(mode_id),
-        "+set", "flt_fsr_quality", "1", # Quality preset (~1.5x)
+        "+set", "flt_fsr_quality", str(quality),
+        "+set", "flt_fsr4_variant", str(variant),
         "+set", "nextserver", "quit",
         "+demo", demo_name
     ]
@@ -138,10 +139,10 @@ def generate_markdown_report(results, gpu_info, resolutions, output_path):
         f.write("|:---:|:---|:---|:---|\n")
         f.write("| `0` | **Q2RTX Native** | Bilinear spatial unscaled | Universal (All GPUs) |\n")
         f.write("| `1` | **AMD FSR 3.1.4** | Analytical temporal accumulation + EASU/RCAS | Universal (All GPUs) |\n")
-        f.write("| `2` | **AMD FSR 4 (v07)** | INT8/DOT4 16-pass neural model | AMD RDNA2+, NVIDIA Turing+, Intel Arc |\n")
+        f.write("| `2` | **AMD FSR 4.1.2** | INT8/DP4a 29-pass native neural model | AMD RDNA2+, NVIDIA Turing+, Intel Arc |\n")
         f.write("| `3` | **AMD FSR 3.1.5** | Public SDK 2.3 Vulkan port | Universal (All GPUs) |\n")
-        f.write("| `4` | **Intel XeSS** | DP4a / U-Net convolutional reconstruction | Cross-vendor DP4a (Intel, AMD, NVIDIA) |\n")
-        f.write("| `5` | **NVIDIA DLSS / d4r** | Swin Transformer 8x8 windowed attention | AMD RDNA3/4 WMMA, NVIDIA Tensor, Vulkan |\n")
+        f.write("| `4` | **Intel XeSS 2.0.2** | DP4a / U-Net 14-pass convolutional reconstruction | Cross-vendor DP4a (Intel, AMD, NVIDIA) |\n")
+        f.write("| `5` | **NVIDIA DLSS 4 / d4r** | Swin Transformer 8x8 Model K attention | AMD RDNA3/4 WMMA, NVIDIA Tensor, Vulkan |\n")
         f.write("| `6` | **Unified SR** | Hardware-optimal automatic selector | Automatic selection based on GPU tier |\n\n")
 
         for res_label, geom in resolutions:
@@ -171,6 +172,8 @@ def main():
     parser.add_argument("--output", default="doc/benchmarks_2026.md", help="Output markdown path")
     parser.add_argument("--quick", action="store_true", help="Run only 720p for fast verification")
     parser.add_argument("--modes", nargs="+", type=int, help="Specific mode IDs to benchmark (0..6)")
+    parser.add_argument("--quality", type=int, default=1, help="Quality preset (0: Native AA, 1: Quality, 2: Balanced, 3: Performance, 4: Ultra Performance)")
+    parser.add_argument("--variant", default="auto", help="FSR 4.1.2 variant (auto, 412_i8_2, 412_lite_i8, 412_i8, v07_i8)")
     args = parser.parse_args()
 
     bin_path = os.path.abspath(args.bin)
@@ -192,7 +195,7 @@ def main():
         print(f"\n--- Testing Resolution: {res_label} ({geom}) ---")
         for mode_id, name, desc in selected_modes:
             print(f"[*] Running Mode {mode_id} ({name})... ", end="", flush=True)
-            res = run_single_benchmark(bin_path, mode_id, geom)
+            res = run_single_benchmark(bin_path, mode_id, geom, quality=args.quality, variant=args.variant)
             res["resolution"] = res_label
             res["mode_name"] = name
             res["mode_desc"] = desc

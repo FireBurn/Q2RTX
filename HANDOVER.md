@@ -1,9 +1,49 @@
 # FidelityFX Vulkan handover
 
-Last updated: 2026-10-30, Europe/London.  Update this file at every meaningful
+Last updated: 2026-11-08, Europe/London.  Update this file at every meaningful
 milestone and immediately before ending or transferring the session.
 
-## Latest review and user direction — 2026-10-30
+## Latest review and user direction — 2026-11-08
+
+### Intel XeSS 2.0.2 Multi-Preset Extension, FSR 4.1.2 Variant Menu UI & Automated Benchmark Suite
+
+Completed all 4 stages of the multi-vendor roadmap across `UniversalScalers-Vulkan` and Q2RTX:
+1. **Intel XeSS 2.0.2 Multi-Preset U-Net Support**:
+   - Extended the recovered XeSS 2.0.2 INT8/DP4a neural pipeline beyond Quality preset to support Native AA (1.0x), Quality (1.7x), Balanced (2.0x), Performance (2.3x), and Ultra Performance (3.0x).
+   - Added `ffxVkXeSSReplayExtentForOutputAndQuality` and `ffxVkXeSSRecoveredGetExtentForQuality` in `extern/ffx-vulkan/include/ffx_vk_xess_replay_constants.h` and `ffx_vk_xess_recovered.h`.
+   - Updated `ffxVkXeSSReplayExtentSupported` to support all valid extents where `input <= output` and positive dimensions, preserving exact backward compatibility with captured reference profiles.
+   - Updated `src/refresh/vkpt/fsr.c`: dynamically selects exact extent and initializes XeSS 2.0.2 U-Net for all quality presets.
+   - Live hardware timedemo metrics on AMD Radeon RX 6800M (RADV NAVI22):
+     - **Native AA (1.0x)**: 50.09 FPS (13.72s) - `XeSS 2.0.2 Native AA INT8/DP4a recovered neural model active`
+     - **Quality (~1.7x)**: 54.75 FPS (12.55s) - `XeSS 2.0.2 Quality INT8/DP4a recovered neural model active`
+     - **Balanced (~2.0x)**: 66.56 FPS (10.32s) - `XeSS 2.0.2 Balanced INT8/DP4a recovered neural model active` (21.6% speedup vs Quality)
+     - **Performance (~2.3x)**: 59.51 FPS (11.55s) - `XeSS 2.0.2 Performance INT8/DP4a recovered neural model active`
+2. **FSR 4.1.2 Variant Integration in Scaler Catalog & Settings Menu**:
+   - Added `FFX_VK_SCALER_OPTION_VARIANT` to `FfxVkScalerOptionId` in `extern/ffx-vulkan/include/ffx_vk_scaler_catalog.h`.
+   - Exposed 5 variant choices: `Auto (Hardware Detect)` (0), `4.1.2 i8_2 (Navi2 / RDNA2)` (1), `4.1.2 lite_i8 (Lite 12-Pass)` (2), `4.1.2 i8 (RDNA3 29-Pass)` (3), `v07 i8 (Legacy)` (4).
+   - Integrated into `src/client/ui/scaler.c`: two-way binding with `flt_fsr4_variant` preserving human-readable strings (`"412_i8_2"`, `"412_lite_i8"`, `"v07_i8"`) while driving dropdown UI.
+   - Decoupled frame generation controls in `baseq2/q2rtx.menu` to allow multi-frame interpolation multipliers (2x/3x/4x) and FSR3 FG scheduler selection whenever `flt_frame_generation 1` is enabled across all scalers.
+   - Live hardware timedemo verification on AMD Radeon RX 6800M:
+     - `412_i8_2` (Navi2/RDNA2 DP4a packed 29-pass): 65.46 FPS (10.50s)
+     - `412_lite_i8` (Lite 12-pass): 53.95 FPS (12.73s)
+     - `v07_i8` (Legacy 16-pass): 65.22 FPS (10.53s)
+   - Layout check passed: `python3 src/refresh/vkpt/fsr4/tests/verify_video_menu_layout.py baseq2/q2rtx.menu`.
+3. **Automated Multi-Vendor Benchmark Suite (`tools/benchmark_upscalers.py`)**:
+   - Updated benchmark harness supporting all 7 upscaler modes, `--quality` presets (0..4), and `--variant` selection.
+   - Executed full timedemo benchmark across all modes on AMD Radeon RX 6800M (RADV NAVI22) at 720p:
+     - **AMD FSR 3.1.5**: 92.75 FPS (10.78 ms) - `FSR3 3.1.5 public-SDK Vulkan experiment active`
+     - **Q2RTX Native**: 83.00 FPS (12.05 ms) - `Q2RTX fallback selected`
+     - **Intel XeSS 2.0.2**: 74.26 FPS (13.47 ms) - `XeSS 2.0.2 Quality INT8/DP4a recovered neural model active`
+     - **NVIDIA DLSS 4 / d4r**: 70.87 FPS (14.11 ms) - `DLSS 4 / d4r Model K neural Swin transformer active`
+     - **AMD FSR 3.1.4**: 69.06 FPS (14.48 ms) - `FSR3 3.1.4 native Vulkan active`
+     - **Unified SR (Auto)**: 68.01 FPS (14.70 ms) - `Unified Super Resolution (Auto -> FSR 4.1.2 INT8/DP4a) active`
+     - **AMD FSR 4.1.2 (Navi2)**: 59.91 FPS (16.69 ms) - `412_i8_2 Quality active`
+   - Generated report in `doc/benchmarks_2026.md`.
+4. **Standalone Packaging & CI (`UniversalScalers-Vulkan`)**:
+   - Created `extern/ffx-vulkan/cmake/UniversalScalers_Vulkan-config.cmake.in`.
+   - Updated `extern/ffx-vulkan/CMakeLists.txt` to export both `UniversalScalers::` and `ffx-vulkan::` namespaces.
+   - Updated GitHub workflow `extern/ffx-vulkan/.github/workflows/ci.yml` using `actions/checkout@v4` with consumer verification.
+   - Standalone CTests: 48/48 passed (100%). Root Q2RTX CTests: 6/6 passed (100%).
 
 ### Standalone Vulkan Subproject Renamed to `UniversalScalers-Vulkan` (2026-10-30)
 

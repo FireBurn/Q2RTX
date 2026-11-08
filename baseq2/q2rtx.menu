@@ -248,14 +248,7 @@ begin frame_generation_settings
     pairs --status "Multi-frame interpolation multiplier: 2x (1 generated frame), 3x (2 generated frames), or 4x (3 generated frames)." \
         "multi-frame multiplier" flt_frame_generation_multiplier \
         "2x (1 gen)" 2 "3x (2 gen)" 3 "4x (3 gen)" 4
-    ifeq flt_upscaler 1
-        pairs --status "SDK 3.1.6 is the newer reusable Vulkan FI/OF scheduler and the default. Legacy 1.1.4 remains available for compatibility comparison." \
-            "FSR3 FG scheduler" flt_frame_generation_backend \
-            "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1
-        range --status "Minimum completed render FPS for generation. 30 is conservative, 60 is target, and 0 disables safety gate." \
-            "FSR3 FG minimum FPS" flt_frame_generation_min_rendered_fps 0 120 1
-    endif
-    ifeq flt_upscaler 3
+    ifeq flt_frame_generation 1
         pairs --status "SDK 3.1.6 is the newer reusable Vulkan FI/OF scheduler and the default. Legacy 1.1.4 remains available for compatibility comparison." \
             "FSR3 FG scheduler" flt_frame_generation_backend \
             "Legacy 1.1.4" 0 "SDK 3.1.6 (default)" 1

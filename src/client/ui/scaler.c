@@ -38,8 +38,34 @@ static const char *binding(int model, int option)
             "flt_fsr4_sharpening" : "flt_fsr3_sharpening";
     case FFX_VK_SCALER_OPTION_AUTO_EXPOSURE: return "flt_fsr4_auto_exposure";
     case FFX_VK_SCALER_OPTION_DYNAMIC_RESOLUTION: return "flt_fsr4_dynamic_resolution";
+    case FFX_VK_SCALER_OPTION_VARIANT: return "flt_fsr4_variant";
     default: return NULL;
     }
+}
+
+static int variant_string_to_index(const char *s)
+{
+    if (!s || !s[0])
+        return 0;
+    if (!Q_stricmp(s, "412_i8_2") || !Q_stricmp(s, "i8_2") ||
+        !Q_stricmp(s, "navi2") || !Q_stricmp(s, "rdna2") || !strcmp(s, "1"))
+        return 1;
+    if (!Q_stricmp(s, "412_lite_i8") || !Q_stricmp(s, "lite_i8") ||
+        !Q_stricmp(s, "lite") || !strcmp(s, "2"))
+        return 2;
+    if (!Q_stricmp(s, "412_i8") || !Q_stricmp(s, "rdna3") || !strcmp(s, "3"))
+        return 3;
+    if (!Q_stricmp(s, "v07_i8") || !Q_stricmp(s, "v07") || !strcmp(s, "4"))
+        return 4;
+    return 0;
+}
+
+static const char *variant_index_to_string(int index)
+{
+    static const char *variants[] = { "auto", "412_i8_2", "412_lite_i8", "412_i8", "v07_i8" };
+    if (index >= 0 && index < 5)
+        return variants[index];
+    return "auto";
 }
 
 static bool option_visible(menuCommon_t *item)
@@ -85,7 +111,11 @@ static void apply_settings(void)
             continue;
         if (!ffxVkScalerOptionValueValid(model, i, value->value))
             Cvar_SetValue(value, ffxVkScalerOption(i)->defaultValue, FROM_MENU);
-        Cvar_SetByVar(Cvar_WeakGet(binding(model, i)), value->string, FROM_MENU);
+        if (i == FFX_VK_SCALER_OPTION_VARIANT) {
+            Cvar_Set("flt_fsr4_variant", variant_index_to_string((int)value->value));
+        } else {
+            Cvar_SetByVar(Cvar_WeakGet(binding(model, i)), value->string, FROM_MENU);
+        }
     }
 }
 
@@ -106,9 +136,17 @@ static bool scaler_push(menuFrameWork_t *menu)
     if (ffxVkScalerModel(model)) {
         for (int i = 0; i < FFX_VK_SCALER_OPTION_COUNT; ++i) {
             cvar_t *saved = settings[model][i];
-            cvar_t *effective = saved ? Cvar_FindVar(binding(model, i)) : NULL;
-            if (effective && ffxVkScalerOptionValueValid(model, i, effective->value))
-                Cvar_SetByVar(saved, effective->string, FROM_CODE);
+            if (!saved)
+                continue;
+            if (i == FFX_VK_SCALER_OPTION_VARIANT) {
+                cvar_t *effective = Cvar_FindVar("flt_fsr4_variant");
+                if (effective)
+                    Cvar_SetValue(saved, (float)variant_string_to_index(effective->string), FROM_CODE);
+            } else {
+                cvar_t *effective = Cvar_FindVar(binding(model, i));
+                if (effective && ffxVkScalerOptionValueValid(model, i, effective->value))
+                    Cvar_SetByVar(saved, effective->string, FROM_CODE);
+            }
         }
     }
     update_description(menu);
@@ -149,7 +187,7 @@ void UI_AddScalerSettings(menuFrameWork_t *menu)
     available_models = Cvar_WeakGet("flt_scaler_available");
     selector->generic.type = MTYPE_PAIRS;
     selector->generic.name = UI_CopyString("model");
-    selector->generic.status = UI_CopyString("Choose a reconstruction model. Only its settings appear below. DLSS spatial prototype does not execute the recovered DLSS neural model.");
+    selector->generic.status = UI_CopyString("Choose an upscaler model. Only its applicable settings appear below. Supports AMD FSR 3 / FSR 4.1.2 (RDNA2 INT8), Intel XeSS 2.0.2 (Multi-Preset INT8/DP4a U-Net), and NVIDIA DLSS 4 / d4r Model K.");
     selector->generic.change = settings_changed;
     selector->cvar = model_cvar;
     selector->numItems = FFX_VK_SCALER_COUNT;
@@ -172,11 +210,17 @@ void UI_AddScalerSettings(menuFrameWork_t *menu)
             Q_snprintf(name, sizeof(name), "ui_scaler_%s_%s", m->key, o->key);
             Q_snprintf(initial, sizeof(initial), "%g", o->defaultValue);
             cvar_t *legacy = Cvar_FindVar(binding(model, i));
+            char legacy_val[32] = {0};
+            if (i == FFX_VK_SCALER_OPTION_VARIANT && legacy) {
+                Q_snprintf(legacy_val, sizeof(legacy_val), "%d",
+                           variant_string_to_index(legacy->string));
+            }
             /* Seed new preferences from existing engine settings. Cvar_Get
              * retains an already archived per-model value on later loads. */
             settings[model][i] = Cvar_Get(name,
-                legacy && ffxVkScalerOptionValueValid(model, i, legacy->value) ?
-                legacy->string : initial, CVAR_ARCHIVE);
+                (i == FFX_VK_SCALER_OPTION_VARIANT && legacy) ? legacy_val :
+                (legacy && ffxVkScalerOptionValueValid(model, i, legacy->value) ?
+                 legacy->string : initial), CVAR_ARCHIVE);
             menuCommon_t *item;
             if (o->type == FFX_VK_SCALER_OPTION_RANGE) {
                 menuSlider_t *s = UI_Mallocz(sizeof(*s));

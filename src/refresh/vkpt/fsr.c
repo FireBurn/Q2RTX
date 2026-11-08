@@ -536,7 +536,7 @@ static FfxFsr4ModelVariant fsr4_requested_variant(const char *model)
         return FFX_FSR4_VARIANT_412_LITE_INT8;
     if (!Q_stricmp(req, "412_i8") || !Q_stricmp(req, "rdna3") || !strcmp(req, "3"))
         return FFX_FSR4_VARIANT_412_RDNA3_INT8;
-    if (!Q_stricmp(req, "v07_i8") || !Q_stricmp(req, "v07"))
+    if (!Q_stricmp(req, "v07_i8") || !Q_stricmp(req, "v07") || !strcmp(req, "4"))
         return FFX_FSR4_VARIANT_V07_INT8;
 
     /* "auto": prefer official FSR 4.1.2 RDNA2 INT8/DP4a (runs on RDNA2, RDNA3,
@@ -1046,10 +1046,10 @@ bool vkpt_fsr_get_exact_render_extent(VkExtent2D display_extent, VkExtent2D *out
         return false;
 #ifdef VKPT_FSR3
     if (requested_upscaler() == VKPT_UPSCALER_XESS &&
-        requested_fsr_quality() == VKPT_FSR_QUALITY_QUALITY &&
         xess_recovered_device_is_capable()) {
         FfxVkXeSSReplayExtent replay_extent;
-        if (ffxVkXeSSRecoveredGetExtent(display_extent, &replay_extent) &&
+        int quality = requested_fsr_quality();
+        if (ffxVkXeSSRecoveredGetExtentForQuality(display_extent, quality, &replay_extent) &&
             xess_ensure_model_blob(NULL)) {
             out_extent->width = replay_extent.inputWidth;
             out_extent->height = replay_extent.inputHeight;
@@ -1555,10 +1555,10 @@ static VkResult xess_create_context(void)
         return VK_ERROR_FEATURE_NOT_PRESENT;
     }
 
-    if (quality == VKPT_FSR_QUALITY_QUALITY && xess_recovered_device_is_capable()) {
+    if (xess_recovered_device_is_capable()) {
         FfxVkXeSSReplayExtent replay_extent;
         FfxVkXeSSRecoveredModel model;
-        if (ffxVkXeSSRecoveredGetExtent(qvk.extent_unscaled, &replay_extent) &&
+        if (ffxVkXeSSRecoveredGetExtentForQuality(qvk.extent_unscaled, quality, &replay_extent) &&
             xess_ensure_model_blob(&model)) {
             FfxVkXeSSRecoveredCreateInfo rec_ci;
             char diag[128] = {0};
@@ -1574,8 +1574,9 @@ static VkResult xess_create_context(void)
                     diag, sizeof(diag)) == VK_SUCCESS && xess_recovered_context) {
                 xess_recovered_ok = true;
                 xess_recovered_extent = replay_extent;
-                Com_Printf("XeSS: recovered 2.0.2 Quality INT8/DP4a U-Net ready "
+                Com_Printf("XeSS: recovered 2.0.2 %s INT8/DP4a U-Net ready "
                            "(%ux%u -> %ux%u, 14 passes).\n",
+                           fsr_quality_label(quality),
                            replay_extent.inputWidth, replay_extent.inputHeight,
                            replay_extent.outputWidth, replay_extent.outputHeight);
             } else {
@@ -1993,9 +1994,13 @@ static bool resolve_upscaler(int *active, const char **reason)
             qvk.extent_unscaled.height == xess_recovered_extent.outputHeight &&
             qvk.extent_render.width >= xess_recovered_extent.inputWidth &&
             qvk.extent_render.height >= xess_recovered_extent.inputHeight) {
-            *reason = "XeSS 2.0.2 Quality INT8/DP4a recovered neural model active";
+            static char xess_reason[128];
+            snprintf(xess_reason, sizeof(xess_reason),
+                     "XeSS 2.0.2 %s INT8/DP4a recovered neural model active",
+                     fsr_quality_label(xess_ctx_quality));
+            *reason = xess_reason;
         } else {
-            *reason = "XeSS spatial prototype active (recovered 2.0.2 model requires Quality @ 540p/720p/1080p)";
+            *reason = "XeSS spatial prototype active (recovered 2.0.2 model requires INT8/DP4a device & compatible extent)";
         }
         return true;
     }
